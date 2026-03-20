@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>梦幻足球在线 - 手机足球经理游戏</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700&display=swap');
+        * { font-family: 'Noto Sans SC', sans-serif; -webkit-tap-highlight-color: transparent; }
+        body { margin: 0; min-height: 100vh; background: linear-gradient(145deg, #020617, #0f172a); color: #e2e8f0; }
+        .card { border-radius: 1rem; border: 1px solid rgba(148,163,184,0.14); background: rgba(15,23,42,0.9); }
+        .btn-primary { background: linear-gradient(120deg, #22d3ee, #14b8a6); color: #032127; border: none; border-radius: 0.75rem; padding: 0.75rem; font-weight: 600; }
+        .btn-secondary { background: rgba(30,41,59,0.9); border: 1px solid rgba(148,163,184,0.2); color: #dbeafe; border-radius: 0.75rem; padding: 0.75rem; }
+        .stat-bar { height: 6px; border-radius: 3px; background: #1e293b; overflow: hidden; }
+        .stat-fill { height: 100%; border-radius: 3px; }
+    </style>
+</head>
+<body class="antialiased">
+    <div id="app"></div>
+    <script>
+// 游戏数据
+const TRANSLATIONS = {
+    "GK": "门将", "CB": "中后卫", "LB": "左后卫", "RB": "右后卫",
+    "CDM": "后腰", "CM": "中场", "CAM": "前腰", "LW": "左边锋", "RW": "右边锋", "ST": "前锋",
+    "Attacking": "全力进攻", "Balanced": "平衡", "Defensive": "防守反击", 
+    "Counter-Attack": "快速反击", "Park the Bus": "摆大巴",
+    "China": "中国", "Brazil": "巴西", "Iceland": "冰岛", "England": "英格兰",
+    "Spain": "西班牙", "Nigeria": "尼日利亚", "Ghana": "加纳", "Germany": "德国",
+    "France": "法国", "Argentina": "阿根廷", "Japan": "日本", "USA": "美国"
+};
+
+const REGIONS = ["China", "Brazil", "Iceland", "England", "Spain", "Nigeria", "Ghana", "Germany", "France", "Argentina", "Japan", "USA"];
+const POSITIONS = ["GK", "CB", "LB", "RB", "CDM", "CM", "CAM", "LW", "RW", "ST"];
+
+function t(key) { return TRANSLATIONS[key] || key; }
+function rand(min, max) { return Math.floor(Math.random() * (max - min + 1)) + min; }
+function uid() { return 'id_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9); }
+function formatMoney(n) { return '€' + (n / 1000000).toFixed(2) + 'M'; }
+
+// 生成球员
+function createPlayer(region, position, quality = 60) {
+    const age = rand(16, 32);
+    const names = {
+        China: () => ['张伟', '李明', '王强', '刘洋', '陈杰', '杨帆', '黄磊', '赵军', '吴涛', '周鹏'][rand(0,9)],
+        Brazil: () => ['Carlos-Silva', 'Joao-Pedro', 'Mateus-Santos', 'Rafael-Costa'][rand(0,3)],
+        Iceland: () => ['Eriksson', 'Gudmundsson', 'Bjarnason', 'Olafsson'][rand(0,3)],
+        England: () => ['James Wilson', 'Oliver Brown', 'Harry Clark', 'Jack Evans'][rand(0,3)],
+        Spain: () => ['Garcia Lopez', 'Martinez Ruiz', 'Sanchez Diaz', 'Torres Vega'][rand(0,3)],
+        Nigeria: () => ['Adewale', 'Temitope', 'Kunle', 'Femi'][rand(0,3)],
+        Ghana: () => ['Mensah', 'Asante', 'Boateng', 'Owusu'][rand(0,3)],
+        Germany: () => ['Muller', 'Schmidt', 'Weber', 'Fischer'][rand(0,3)],
+        France: () => ['Dubois', 'Laurent', 'Moreau', 'Girard'][rand(0,3)],
+        Argentina: () => ['Fernandez', 'Gonzalez', 'Rodriguez', 'Lopez'][rand(0,3)],
+        Japan: () => ['Sato', 'Suzuki', 'Tanaka', 'Yamamoto'][rand(0,3)],
+        USA: () => ['Johnson', 'Smith', 'Miller', 'Anderson'][rand(0,3)]
+    };
+    
+    const posBonus = { GK: [-10, -20, 0, 15, 10], CB: [0, -10, 0, 15, 10], LB: [5, -5, 5, 8, 5], RB: [5, -5, 5, 8, 5], CDM: [0, 0, 8, 10, 8], CM: [2, 2, 10, 5, 5], CAM: [5, 8, 12, 0, 3], LW: [12, 8, 5, -5, 2], RW: [12, 8, 5, -5, 2], ST: [8, 15, 2, -8, 5] };
+    const bonus = posBonus[position] || [0, 0, 0, 0, 0];
+    
+    return {
+        id: uid(),
+        name: (names[region] || names.China)(),
+        age,
+        region,
+        position,
+        ovr: rand(quality - 10, quality + 10),
+        pace: rand(40, 90) + bonus[0],
+        shooting: rand(30, 85) + bonus[1],
+        passing: rand(40, 90) + bonus[2],
+        defending: rand(30, 85) + bonus[3],
+        physical: rand(40, 90) + bonus[4],
+        potential: rand(60, 95),
+        fitness: rand(80, 100),
+        morale: rand(60, 95),
+        value: rand(500000, 5000000),
+        wage: rand(5000, 50000)
+    };
+}
+
+// 游戏状态
+let game = {
+    budget: 5000000,
+    team: [],
+    lineup: [],
+    bench: [],
+    prospects: [],
+    market: [],
+    standings: [],
+    played: false,
+    scouted: false
+};
+
+// 初始化球队
+function initTeam() {
+    game.team = [];
+    for (let i = 0; i < 22; i++) {
+        const pos = POSITIONS[rand(0, POSITIONS.length - 1)];
+        game.team.push(createPlayer(REGIONS[rand(0, REGIONS.length - 1)], pos, 60));
+    }
+    game.lineup = game.team.slice(0, 11).map(p => p.id);
+    game.bench = game.team.slice(11, 18).map(p => p.id);
+    
+    // 生成其他球队积分榜
+    game.standings = [];
+    for (let i = 0; i < 12; i++) {
+        game.standings.push({
+            name: ['FC联', '竞技俱乐部', '北欧FC', '桑巴星', '龙之队', '雄狮FC', '雄鹰SC', '旭日FC', '绿鹰', '红战士', '蓝城FC', '金星'][i],
+            p: rand(0, 10), w: rand(0, 5), d: rand(0, 3), l: rand(0, 5),
+            gf: rand(5, 20), ga: rand(5, 20), pts: rand(5, 20)
+        });
+    }
+    game.standings.sort((a, b) => b.pts - a.pts);
+}
+
+// 生成转会市场
+function refreshMarket() {
+    game.market = [];
+    for (let i = 0; i < 8; i++) {
+        const pos = POSITIONS[rand(0, POSITIONS.length - 1)];
+        const player = createPlayer(REGIONS[rand(0, REGIONS.length - 1)], pos, rand(55, 75));
+        game.market.push({...player, askPrice: player.value});
+    }
+}
+
+// 青训抽卡
+function scoutAcademy() {
+    game.prospects = [];
+    const count = rand(1, 3);
+    for (let i = 0; i < count; i++) {
+        const pos = POSITIONS[rand(0, POSITIONS.length - 1)];
+        game.prospects.push(createPlayer('China', pos, rand(50, 70)));
+    }
+    game.scouted = true;
+}
+
+// 渲染
+function render() {
+    const hour = new Date().getHours();
+    const isMorning = hour >= 6 && hour < 16;
+    const isEvening = hour >= 16 && hour < 24;
+    
+    let html = `
+        <header class="sticky top-0 z-20 bg-slate-900/95 border-b border-cyan-500/30 p-4">
+            <div class="flex justify-between items-center max-w-md mx-auto">
+                <div>
+                    <h1 class="text-cyan-300 font-bold text-lg">梦幻足球在线</h1>
+                    <p class="text-xs text-slate-400">资金: ${formatMoney(game.budget)}</p>
+                </div>
+                <div class="text-right">
+                    <p class="text-xs text-slate-400">${isMorning ? '早间' : isEvening ? '晚间' : '夜间'}</p>
+                    <p class="text-xs text-slate-400">排名: #${game.standings.findIndex(s => s.name === 'FC联') + 1 || rand(1,12)}</p>
+                </div>
+            </div>
+        </header>
+        
+        <main class="max-w-md mx-auto p-4 pb-24">
+            <!-- 每日行动 -->
+            <div class="card p-4 mb-4">
+                <h2 class="font-bold mb-3">每日行动</h2>
+                <div class="space-y-2">
+                    ${isMorning && !game.scouted ? 
+                        `<button onclick="scout()" class="btn-primary w-full">青训抽卡 (1-3人)</button>` :
+                        `<button disabled class="btn-secondary w-full opacity-50">${game.scouted ? '青训已完成' : '早间开放'}</button>`
+                    }
+                    ${isEvening && !game.played ?
+                        `<button onclick="playMatch()" class="btn-primary w-full">进行比赛</button>` :
+                        `<button disabled class="btn-secondary w-full opacity-50">${game.played ? '今日比赛已完成' : '晚间开放'}</button>`
+                    }
+                </div>
+            </div>
+            
+            <!-- 青训人才 -->
+            ${game.prospects.length > 0 ? `
+            <div class="card p-4 mb-4">
+                <h2 class="font-bold mb-3">青训人才</h2>
+                <div class="space-y-3">
+                    ${game.prospects.map(p => `
+                        <div class="bg-slate-800/50 p-3 rounded-lg">
+                            <div class="flex justify-between mb-2">
+                                <span class="font-semibold">${p.name} (${t(p.position)})</span>
+                                <span class="text-cyan-300">${p.age}岁</span>
+                            </div>
+                            <div class="text-xs text-slate-400 mb-2">${t(p.region)} • 总评 ${p.ovr} • 潜力 ${p.potential}</div>
+                            <div class="grid grid-cols-5 gap-1 mb-2 text-xs">
+                                <div>速${p.pace}</div><div>射${p.shooting}</div><div>传${p.passing}</div><div>防${p.defending}</div><div>体${p.physical}</div>
+                            </div>
+                            <div class="flex gap-2">
+                                <button onclick="signPlayer('${p.id}')" class="btn-primary flex-1 text-sm">签约 ${formatMoney(p.value * 0.4)}</button>
+                                <button onclick="rejectPlayer('${p.id}')" class="btn-secondary flex-1 text-sm">放弃</button>
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+            ` : ''}
+            
+            <!-- 阵容 -->
+            <div class="card p-4 mb-4">
+                <h2 class="font-bold mb-3">我的阵容 (${game.team.length}人)</h2>
+                <div class="space-y-2 max-h-64 overflow-y-auto">
+                    ${game.team.map(p => `
+                        <div class="flex items-center justify-between bg-slate-800/30 p-2 rounded text-sm">
+                            <div class="flex items-center gap-2">
+                                <span class="text-xs ${game.lineup.includes(p.id) ? 'text-emerald-400' : game.bench.includes(p.id) ? 'text-amber-400' : 'text-slate-500'}">
+                                    ${game.lineup.includes(p.id) ? '首发' : game.bench.includes(p.id) ? '替补' : '预备'}
+                                </span>
+                                <span>${p.name}</span>
+                            </div>
+                            <div class="text-xs text-slate-400">${t(p.position)} ${p.ovr}</div>
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+            
+            <!-- 转会市场 -->
+            <div class="card p-4 mb-4">
+                <h2 class="font-bold mb-3">转会市场</h2>
+                <div class="space-y-3">
+                    ${game.market.map(p => `
+                        <div class="bg-slate-800/50 p-3 rounded-lg">
+                            <div class="flex justify-between mb-1">
+                                <span class="font-semibold">${p.name}</span>
+                                <span class="text-emerald-300">${formatMoney(p.askPrice)}</span>
+                            </div>
+                            <div class="text-xs text-slate-400 mb-2">${t(p.region)} • ${t(p.position)} • 总评${p.ovr}</div>
+                            <button onclick="buyPlayer('${p.id}')" class="btn-primary w-full text-sm">购买</button>
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+            
+            <!-- 积分榜 -->
+            <div class="card p-4">
+                <h2 class="font-bold mb-3">积分榜</h2>
+                <table class="w-full text-xs">
+                    <thead class="text-slate-400">
+                        <tr><th class="text-left">#</th><th class="text-left">球队</th><th class="text-right">赛</th><th class="text-right">分</th></tr>
+                    </thead>
+                    <tbody>
+                        ${game.standings.slice(0, 8).map((s, i) => `
+                            <tr class="${i < 3 ? 'text-emerald-300' : ''}">
+                                <td>${i + 1}</td>
+                                <td>${s.name}</td>
+                                <td class="text-right">${s.p}</td>
+                                <td class="text-right font-bold">${s.pts}</td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            </div>
+        </main>
+        
+        <nav class="fixed bottom-0 left-0 right-0 bg-slate-900/95 border-t border-cyan-500/30 p-2">
+            <div class="max-w-md mx-auto flex justify-around text-xs">
+                <button onclick="location.reload()" class="text-cyan-300">🏠 首页</button>
+                <button onclick="alert('阵容管理功能开发中')" class="text-slate-400">⚔️ 阵容</button>
+                <button onclick="alert('战术板功能开发中')" class="text-slate-400">⚙️ 战术</button>
+            </div>
+        </nav>
+    `;
+    
+    document.getElementById('app').innerHTML = html;
+}
+
+// 操作函数
+function scout() { scoutAcademy(); render(); }
+function signPlayer(id) {
+    const p = game.prospects.find(x => x.id === id);
+    if (p && game.budget >= p.value * 0.4) {
+        game.budget -= p.value * 0.4;
+        game.team.push(p);
+        game.prospects = game.prospects.filter(x => x.id !== id);
+        render();
+    }
+}
+function rejectPlayer(id) {
+    game.prospects = game.prospects.filter(x => x.id !== id);
+    render();
+}
+function buyPlayer(id) {
+    const p = game.market.find(x => x.id === id);
+    if (p && game.budget >= p.askPrice) {
+        game.budget -= p.askPrice;
+        game.team.push(p);
+        game.market = game.market.filter(x => x.id !== id);
+        render();
+    }
+}
+function playMatch() {
+    game.played = true;
+    const myScore = rand(0, 4);
+    const oppScore = rand(0, 3);
+    game.budget += rand(50000, 150000);
+    alert(`比赛结束！你 ${myScore} - ${oppScore} 对手\n获得奖金！`);
+    render();
+}
+
+// 初始化
+initTeam();
+refreshMarket();
+render();
+    </script>
+</body>
+</html>
