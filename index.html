@@ -2,433 +2,1086 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>梦幻足球Online - 足球经理游戏</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>梦幻足球Online</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Noto+Sans+SC:wght@400;500;700&display=swap" rel="stylesheet">
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700&display=swap');
-        * { font-family: 'Noto Sans SC', sans-serif; -webkit-tap-highlight-color: transparent; }
-        body { margin: 0; min-height: 100vh; background: linear-gradient(145deg, #0f172a, #1e1b4b); color: #e2e8f0; }
-        .card { border-radius: 1rem; background: rgba(30, 41, 59, 0.8); backdrop-filter: blur(10px); }
-        .btn { border-radius: 0.5rem; padding: 0.5rem 1rem; font-weight: 500; transition: all 0.2s; }
-        .btn:active { transform: scale(0.95); }
-        .btn-primary { background: linear-gradient(135deg, #22d3ee, #06b6d4); color: #0c4a6e; }
-        .btn-success { background: linear-gradient(135deg, #34d399, #10b981); color: #022c22; }
-        .btn-danger { background: linear-gradient(135deg, #f87171, #ef4444); color: #7f1d1d; }
-        .btn-secondary { background: rgba(71, 85, 105, 0.8); color: #e2e8f0; }
-        .stat-bar { height: 6px; border-radius: 3px; background: #334155; overflow: hidden; }
-        .tab-active { border-bottom: 2px solid #22d3ee; color: #22d3ee; }
+        * { font-family: 'Noto Sans SC', sans-serif; -webkit-tap-highlight-color: transparent; user-select: none; }
+        :root {
+            --gold: #ffd700;
+            --gold-dark: #b8860b;
+            --cyan: #00d4ff;
+            --purple: #9333ea;
+            --green: #22c55e;
+            --red: #ef4444;
+            --dark: #0a0a1a;
+        }
+        body { 
+            margin: 0; 
+            min-height: 100vh; 
+            background: linear-gradient(135deg, #0a0a1a 0%, #1a1a3a 50%, #0f172a 100%);
+            color: #fff;
+            overflow-x: hidden;
+        }
+        .game-title { font-family: 'Orbitron', sans-serif; }
+        
+        /* 卡片 */
+        .card {
+            background: linear-gradient(145deg, rgba(30,41,59,0.9), rgba(15,23,42,0.95));
+            border: 1px solid rgba(0,212,255,0.2);
+            border-radius: 16px;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 4px 20px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.1);
+        }
+        
+        /* 按钮 */
+        .btn-game {
+            background: linear-gradient(135deg, var(--cyan), #0099cc);
+            border: none;
+            border-radius: 12px;
+            padding: 12px 20px;
+            font-weight: 700;
+            color: #000;
+            cursor: pointer;
+            transition: all 0.2s;
+            box-shadow: 0 4px 15px rgba(0,212,255,0.3), inset 0 -2px 0 rgba(0,0,0,0.2);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        .btn-game:active { transform: scale(0.95); }
+        .btn-game.gold {
+            background: linear-gradient(135deg, var(--gold), var(--gold-dark));
+            box-shadow: 0 4px 15px rgba(255,215,0,0.4);
+        }
+        .btn-game.purple {
+            background: linear-gradient(135deg, var(--purple), #7c3aed);
+            color: #fff;
+        }
+        .btn-game.green {
+            background: linear-gradient(135deg, var(--green), #16a34a);
+        }
+        .btn-game.red {
+            background: linear-gradient(135deg, var(--red), #dc2626);
+        }
+        
+        /* 进度条 */
+        .stat-bar {
+            height: 8px;
+            border-radius: 4px;
+            background: rgba(0,0,0,0.5);
+            overflow: hidden;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+        .stat-fill {
+            height: 100%;
+            border-radius: 4px;
+            transition: width 0.5s ease;
+        }
+        
+        /* 能力值条 */
+        .attr-bar {
+            width: 60px;
+            height: 6px;
+            background: rgba(0,0,0,0.4);
+            border-radius: 3px;
+            overflow: hidden;
+        }
+        .attr-fill {
+            height: 100%;
+            border-radius: 3px;
+            transition: width 0.3s;
+        }
+        
+        /* 球员卡片 */
+        .player-card {
+            background: linear-gradient(145deg, #1e293b, #0f172a);
+            border: 1px solid rgba(255,215,0,0.3);
+            border-radius: 12px;
+            padding: 12px;
+            position: relative;
+            overflow: hidden;
+        }
+        .player-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: linear-gradient(90deg, var(--gold), var(--cyan), var(--gold));
+        }
+        .player-card.selected {
+            border-color: var(--gold);
+            box-shadow: 0 0 20px rgba(255,215,0,0.3);
+        }
+        
+        /* 位置徽章 */
+        .pos-badge {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 900;
+            font-size: 11px;
+            font-family: 'Orbitron', sans-serif;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+        }
+        
+        /* 语言切换 */
+        .lang-btn {
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            border: 1px solid rgba(255,255,255,0.3);
+            background: rgba(255,255,255,0.1);
+            color: #fff;
+            cursor: pointer;
+        }
+        .lang-btn.active {
+            background: var(--cyan);
+            color: #000;
+            border-color: var(--cyan);
+        }
+        
+        /* 导航 */
+        .nav-btn {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 8px 16px;
+            color: rgba(255,255,255,0.5);
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .nav-btn.active {
+            color: var(--cyan);
+        }
+        .nav-btn .icon { font-size: 20px; }
+        .nav-btn .text { font-size: 10px; margin-top: 2px; }
+        
+        /* 比赛动画 */
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+        @keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes scoreFlash {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.2); }
+            100% { transform: scale(1); }
+        }
+        .animate-pulse { animation: pulse 1s infinite; }
+        .animate-slideUp { animation: slideUp 0.3s ease-out; }
+        .score-flash { animation: scoreFlash 0.5s ease; }
+        
+        /* 消息通知 */
+        .toast {
+            position: fixed;
+            top: 80px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: linear-gradient(135deg, rgba(34,197,94,0.95), rgba(22,163,74,0.95));
+            padding: 12px 24px;
+            border-radius: 30px;
+            font-weight: 600;
+            z-index: 100;
+            box-shadow: 0 4px 20px rgba(34,197,94,0.4);
+        }
+        
+        /* 积分榜 */
+        .standings-row {
+            display: grid;
+            grid-template-columns: 30px 1fr 40px 40px 40px 50px;
+            padding: 8px 12px;
+            border-radius: 8px;
+            margin-bottom: 4px;
+            align-items: center;
+            font-size: 13px;
+        }
+        .standings-row:nth-child(1) { background: linear-gradient(90deg, rgba(255,215,0,0.2), transparent); }
+        .standings-row:nth-child(2) { background: linear-gradient(90deg, rgba(192,192,192,0.15), transparent); }
+        .standings-row:nth-child(3) { background: linear-gradient(90deg, rgba(205,127,50,0.15), transparent); }
+        .standings-row.me { background: linear-gradient(90deg, rgba(0,212,255,0.3), transparent) !important; border: 1px solid rgba(0,212,255,0.5); }
     </style>
 </head>
 <body>
     <div id="app"></div>
+    
     <script>
-// ==================== 基础配置 ====================
-const TRANSLATIONS = {
-    "GK": "门将", "CB": "中后卫", "LB": "左后卫", "RB": "右后卫",
-    "CDM": "后腰", "CM": "中场", "CAM": "前腰", "LW": "左边锋", "RW": "右边锋", "ST": "前锋",
-    "China": "中国", "Brazil": "巴西", "England": "英格兰", "Spain": "西班牙",
-    "Germany": "德国", "France": "法国", "Argentina": "阿根廷", "Italy": "意大利",
-    "Japan": "日本", "Korea": "韩国", "USA": "美国", "Nigeria": "尼日利亚"
-};
-
-const REGIONS = ["China", "Brazil", "England", "Spain", "Germany", "France", "Argentina", "Italy", "Japan", "Korea", "USA", "Nigeria"];
-
-const POSITIONS = ["GK", "CB", "LB", "RB", "CDM", "CM", "CAM", "LW", "RW", "ST"];
-
-const FORMATIONS = {
-    "4-4-2": ["GK", "CB", "CB", "LB", "RB", "CM", "CM", "CM", "CM", "ST", "ST"],
-    "4-3-3": ["GK", "CB", "CB", "LB", "RB", "CDM", "CM", "CM", "LW", "ST", "RW"],
-    "4-2-3-1": ["GK", "CB", "CB", "LB", "RB", "CDM", "CDM", "CAM", "CAM", "CAM", "ST"],
-    "3-5-2": ["GK", "CB", "CB", "CB", "CDM", "CM", "CM", "CAM", "CAM", "ST", "ST"]
-};
-
-const TACTICS = {
-    "进攻": { defBonus: -10, attBonus: 15 },
-    "平衡": { defBonus: 0, attBonus: 0 },
-    "防守": { defBonus: 15, attBonus: -10 }
-};
-
-const TEAM_NAMES = ["FC联", "竞技俱乐部", "龙之队", "雄狮FC", "红星队", "蓝月亮", "绿茵FC", "凤凰FC", "银鹰SC", "金蛇队", "紫百合", "黑豹FC"];
-
-function t(key) { return TRANSLATIONS[key] || key; }
-function rand(min, max) { return Math.floor(Math.random() * (max - min + 1)) + min; }
-function uid() { return 'p' + Date.now() + Math.random().toString(36).substr(2, 6); }
-function formatMoney(n) { 
-    if (n >= 1000000) return '€' + (n / 1000000).toFixed(1) + 'M';
-    if (n >= 1000) return '€' + (n / 1000).toFixed(0) + 'K';
-    return '€' + n;
-}
-
-// ==================== 数据持久化 ====================
-function saveGame() {
-    const saveData = {
-        budget: game.budget,
-        team: game.team,
-        league: game.league,
-        facilities: game.facilities,
-        season: game.season,
-        week: game.week,
-        day: game.day,
-        myFormation: game.myFormation,
-        myTactic: game.myTactic,
-        lastUpdate: Date.now()
-    };
-    localStorage.setItem('football_manager_save', JSON.stringify(saveData));
-}
-
-function loadGame() {
-    const saved = localStorage.getItem('football_manager_save');
-    if (saved) {
-        try {
-            const data = JSON.parse(saved);
-            const elapsed = Date.now() - (data.lastUpdate || Date.now());
-            data.day = ((data.day || 0) + Math.floor(elapsed / 86400000)) % 7;
-            return data;
-        } catch(e) { console.error('Load failed', e); }
-    }
-    return null;
-}
-
-// ==================== 球员生成 ====================
-function createPlayer(region, position, quality = 60) {
-    const age = rand(16, 35);
-    const names = {
-        China: ['张伟', '李明', '王强', '刘洋', '陈杰', '杨帆', '黄磊', '赵军', '吴涛', '周鹏'],
-        Brazil: ['Silva', 'Santos', 'Oliveira', 'Costa', 'Lima', 'Silva', 'Souza'],
-        England: ['Smith', 'Johnson', 'Williams', 'Brown', 'Jones', 'Garcia', 'Miller'],
-        Spain: ['Garcia', 'Martinez', 'Sanchez', 'Torres', 'Rodriguez', 'Fernandez'],
-        Germany: ['Mueller', 'Schmidt', 'Weber', 'Fischer', 'Meyer', 'Wagner'],
-        France: ['Dubois', 'Laurent', 'Moreau', 'Girard', 'Petit', 'Roux'],
-        Argentina: ['Gonzalez', 'Rodriguez', 'Lopez', 'Martinez', 'Perez', 'Sanchez'],
-        Italy: ['Rossi', 'Russo', 'Ferrari', 'Esposito', 'Bianchi', 'Romano'],
-        Japan: ['佐藤', '鈴木', '高橋', '田中', '伊藤', '渡辺'],
-        Korea: ['김민수', '이준호', '박지훈', '최윤호', '정우성'],
-        USA: ['Johnson', 'Smith', 'Williams', 'Brown', 'Jones', 'Davis'],
-        Nigeria: ['Adewale', 'Temitope', 'Kunle', 'Femi', 'Chidi', 'Emeka']
-    };
-    
-    const name = (names[region] || names.China)[rand(0, 8)];
-    
-    const posBonus = {
-        GK: { pace: -15, shooting: -20, defending: 15 },
-        CB: { pace: -5, shooting: -15, defending: 20, physical: 15 },
-        LB: { pace: 10, passing: 10, defending: 10 },
-        RB: { pace: 10, passing: 10, defending: 10 },
-        CDM: { pace: 0, passing: 15, defending: 15 },
-        CM: { pace: 5, passing: 15, shooting: 5 },
-        CAM: { pace: 10, shooting: 15, passing: 15 },
-        LW: { pace: 20, shooting: 15, passing: 10 },
-        RW: { pace: 20, shooting: 15, passing: 10 },
-        ST: { pace: 10, shooting: 20, physical: 15 }
-    };
-    
-    const bonus = posBonus[position] || {};
-    const potential = Math.min(99, quality + rand(5, 20));
-    
-    return {
-        id: uid(),
-        name, age, region, position,
-        ovr: Math.max(30, Math.min(99, quality + rand(-8, 8))),
-        pace: Math.max(30, Math.min(99, rand(50, 85) + (bonus.pace || 0))),
-        shooting: Math.max(30, Math.min(99, rand(40, 80) + (bonus.shooting || 0))),
-        passing: Math.max(30, Math.min(99, rand(45, 85) + (bonus.passing || 0))),
-        defending: Math.max(30, Math.min(99, rand(40, 80) + (bonus.defending || 0))),
-        physical: Math.max(30, Math.min(99, rand(50, 85) + (bonus.physical || 0))),
-        potential,
-        fitness: 100,
-        morale: rand(60, 100),
-        value: Math.floor(quality * 8000 * (age < 22 ? 1.5 : age < 26 ? 1.2 : age < 30 ? 0.8 : 0.4)),
-        wage: Math.floor(quality * 80),
-        goals: 0, assists: 0, matches: 0
-    };
-}
-
-// ==================== 游戏状态 ====================
-let game = {
-    budget: 5000000, team: [], league: [],
-    facilities: { "训练场": 1, "青训营": 1, "体育场": 1 },
-    season: 1, week: 1, day: 0,
-    myFormation: "4-4-2", myTactic: "平衡",
-    market: [], prospects: [], news: []
-};
-
-function initGame() {
-    const saved = loadGame();
-    if (saved) {
-        Object.assign(game, saved);
-    } else {
-        for (let i = 0; i < 22; i++) {
-            game.team.push(createPlayer(REGIONS[rand(0, REGIONS.length - 1)], POSITIONS[rand(0, POSITIONS.length - 1)], rand(55, 70)));
+    // ==================== 多语言配置 ====================
+    const I18N = {
+        zh: {
+            appName: "梦幻足球Online",
+            home: "首页",
+            team: "阵容",
+            tactics: "战术",
+            facility: "设施",
+            match: "比赛",
+            budget: "资金",
+            round: "第{week}轮",
+            season: "赛季{season}",
+            rank: "排名",
+            record: "战绩",
+            gd: "净胜",
+            vs: "VS",
+            win: "胜",
+            draw: "平",
+            lose: "负",
+            pts: "分",
+            play: "进行比赛",
+            train: "训练球队",
+            refresh: "刷新市场",
+            academy: "青训",
+            market: "转会市场",
+            standings: "积分榜",
+            squad: "我的阵容",
+            formation: "阵型",
+            style: "战术风格",
+            upgrade: "升级",
+            level: "等级",
+            cost: "费用",
+            sign: "签约",
+            reject: "放弃",
+            buy: "购买",
+            sell: "出售",
+            sellPrice: "挂牌价",
+            income: "收入",
+            matchResult: "比赛结果",
+            yourTeam: "FC联",
+            news: "最新消息",
+            playerDetail: "球员详情",
+            age: "年龄",
+            potential: "潜力",
+            contract: "签约费",
+            wage: "周薪",
+            position: "位置",
+            overall: "总评",
+            pace: "速度",
+            shooting: "射门",
+            passing: "传球",
+            defending: "防守",
+            physical: "体格",
+            fitness: "体能",
+            morale: "士气",
+            goals: "进球",
+            assists: "助攻",
+            matches: "出场",
+            trainingGround: "训练场",
+            academyFac: "青训营",
+            stadium: "体育场",
+            trainingEfficiency: "训练效率",
+            youthQuality: "青训质量",
+            matchIncome: "比赛收入",
+            noMoney: "资金不足！",
+            signed: "签约成功！",
+            sold: "出售成功！",
+            trained: "训练完成！",
+            upgraded: "升级成功！",
+            language: "语言",
+            stats: "数据",
+            all: "全部",
+            attackers: "前锋",
+            midfielders: "中场",
+            defenders: "后卫",
+            goalkeeper: "门将"
+        },
+        en: {
+            appName: "Fantasy Football",
+            home: "Home",
+            team: "Squad",
+            tactics: "Tactics",
+            facility: "Facilities",
+            match: "Match",
+            budget: "Budget",
+            round: "Round {week}",
+            season: "Season {season}",
+            rank: "Rank",
+            record: "Record",
+            gd: "GD",
+            vs: "VS",
+            win: "W",
+            draw: "D",
+            lose: "L",
+            pts: "PTS",
+            play: "Play Match",
+            train: "Train Team",
+            refresh: "Refresh Market",
+            academy: "Academy",
+            market: "Transfer Market",
+            standings: "Standings",
+            squad: "My Squad",
+            formation: "Formation",
+            style: "Style",
+            upgrade: "Upgrade",
+            level: "Level",
+            cost: "Cost",
+            sign: "Sign",
+            reject: "Release",
+            buy: "Buy",
+            sell: "Sell",
+            sellPrice: "Price",
+            income: "Income",
+            matchResult: "Match Result",
+            yourTeam: "FC United",
+            news: "News",
+            playerDetail: "Player Info",
+            age: "Age",
+            potential: "Potential",
+            contract: "Sign Fee",
+            wage: "Wage",
+            position: "Position",
+            overall: "OVR",
+            pace: "PAC",
+            shooting: "SHO",
+            passing: "PAS",
+            defending: "DEF",
+            physical: "PHY",
+            fitness: "FIT",
+            morale: "MOR",
+            goals: "G",
+            assists: "A",
+            matches: "M",
+            trainingGround: "Training",
+            academyFac: "Academy",
+            stadium: "Stadium",
+            trainingEfficiency: "Training Eff.",
+            youthQuality: "Youth Quality",
+            matchIncome: "Match Income",
+            noMoney: "Not enough funds!",
+            signed: "Signed!",
+            sold: "Sold!",
+            trained: "Trained!",
+            upgraded: "Upgraded!",
+            language: "Lang",
+            stats: "Stats",
+            all: "All",
+            attackers: "Attackers",
+            midfielders: "Midfielders",
+            defenders: "Defenders",
+            goalkeeper: "Goalkeeper"
         }
-        game.league = TEAM_NAMES.map(name => ({
-            name, played: 0, won: 0, drawn: 0, lost: 0, gf: 0, ga: 0, pts: 0, strength: rand(40, 90)
+    };
+
+    // ==================== 球员名字库 ====================
+    const NAMES = {
+        China: {
+            first: ['伟', '明', '强', '洋', '杰', '帆', '磊', '军', '涛', '鹏', '浩', '杰', '龙', '虎', '超', '宇', '峰', '波', '华', '斌'],
+            last: ['张', '李', '王', '刘', '陈', '杨', '黄', '赵', '吴', '周', '郑', '孙', '林', '马', '徐', '郭', '何', '高', '罗', '朱']
+        },
+        Brazil: {
+            first: ['Silva', 'Santos', 'Oliveira', 'Costa', 'Lima', 'Souza', 'Pereira', 'Alves', 'Ferreira', 'Carvalho', 'Rodrigues', 'Gomes'],
+            last: ['', '', '', '', '', '', '', '', '', '', '', '']
+        },
+        England: {
+            first: ['James', 'Oliver', 'Harry', 'Jack', 'George', 'William', 'Charlie', 'Thomas', 'Oscar', 'Henry', 'Archie', 'Joshua'],
+            last: ['Smith', 'Johnson', 'Williams', 'Brown', 'Jones', 'Taylor', 'Davies', 'Wilson', 'Evans', 'Thomas']
+        },
+        Spain: {
+            first: ['Carlos', 'Alejandro', 'Daniel', 'Pablo', 'Miguel', 'David', 'Javier', 'Adrian', 'Sergio', 'Diego'],
+            last: ['Garcia', 'Martinez', 'Sanchez', 'Rodriguez', 'Fernandez', 'Lopez', 'Gonzalez', 'Torres', 'Diaz', 'Vega']
+        },
+        Germany: {
+            first: ['Thomas', 'Michael', 'Sebastian', 'Markus', 'Christian', 'Andreas', 'Stefan', 'Marcel', 'Kevin', 'Lukas'],
+            last: ['Mueller', 'Schmidt', 'Weber', 'Fischer', 'Meyer', 'Wagner', 'Becker', 'Schulz', 'Hoffmann', 'Koch']
+        },
+        France: {
+            first: ['Lucas', 'Louis', 'Hugo', 'Arthur', 'Raphael', 'Ethan', 'Leo', 'Maxime', 'Nathan', 'Paul'],
+            last: ['Dubois', 'Laurent', 'Moreau', 'Girard', 'Petit', 'Roux', 'Marchand', 'Bernard', 'Fontaine', 'Blanc']
+        },
+        Argentina: {
+            first: ['Santiago', 'Matias', 'Nicolas', 'Gonzalo', 'Lucas', 'Juan', 'Lautaro', 'Lionel', 'Emiliano', 'Marcos'],
+            last: ['Gonzalez', 'Rodriguez', 'Martinez', 'Lopez', 'Perez', 'Sanchez', 'Ramirez', 'Torres', 'Flores', 'Romero']
+        },
+        Italy: {
+            first: ['Marco', 'Luca', 'Alessandro', 'Andrea', 'Matteo', 'Lorenzo', 'Federico', 'Davide', 'Simone', 'Filippo'],
+            last: ['Rossi', 'Russo', 'Ferrari', 'Esposito', 'Bianchi', 'Romano', 'Colombo', 'Ricci', 'Marino', 'Greco']
+        },
+        Japan: {
+            first: ['大翔', '蓮', '湊', '悠人', '陽翔', '樹', '大和', '悠翔', '陸', '太一'],
+            last: ['佐藤', '鈴木', '高橋', '田中', '伊藤', '渡辺', '山本', '中村', '小林', '加藤']
+        },
+        Korea: {
+            first: ['민수', '준호', '지훈', '윤호', '우성', '민수', '동우', '서준', '도윤', '시우'],
+            last: ['김', '이', '박', '최', '정', '한', '오', '신', '권', '장']
+        },
+        USA: {
+            first: ['Jayden', 'Mason', 'Ethan', 'Liam', 'Noah', 'Lucas', 'Logan', 'Aiden', 'Jackson', 'Sebastian'],
+            last: ['Johnson', 'Smith', 'Williams', 'Brown', 'Davis', 'Miller', 'Wilson', 'Moore', 'Taylor', 'Anderson']
+        },
+        Nigeria: {
+            first: ['Adewale', 'Temitope', 'Kunle', 'Femi', 'Chidi', 'Emeka', 'Oluwaseun', 'Babajide', 'Kelechi', 'Ifeanyi'],
+            last: ['', '', '', '', '', '', '', '', '', '']
+        }
+    };
+
+    // ==================== 全局变量 ====================
+    let LANG = 'zh';
+    let game = null;
+    let currentTab = 'home';
+    let filterPos = 'all';
+    let showToast = null;
+
+    function t(key, ...args) {
+        let text = I18N[LANG][key] || key;
+        if (args.length) {
+            args.forEach((v, i) => text = text.replace(`{${i}}`, v));
+        }
+        return text;
+    }
+
+    function $fmt(n) {
+        if (n >= 1000000000) return '€' + (n / 1000000000).toFixed(1) + 'B';
+        if (n >= 1000000) return '€' + (n / 1000000).toFixed(1) + 'M';
+        if (n >= 1000) return '€' + (n / 1000).toFixed(0) + 'K';
+        return '€' + n;
+    }
+
+    function rand(min, max) { return Math.floor(Math.random() * (max - min + 1)) + min; }
+    function uid() { return 'p' + Date.now() + Math.random().toString(36).substr(2, 6); }
+
+    // ==================== 球员生成 ====================
+    function genName(region) {
+        const names = NAMES[region] || NAMES['China'];
+        const first = names.first[rand(0, names.first.length - 1)];
+        const last = names.last[rand(0, names.last.length - 1)];
+        if (LANG === 'zh') {
+            return last + first;
+        }
+        return (first + (last ? ' ' + last : '')).trim();
+    }
+
+    function createPlayer(region, position, quality = 60) {
+        const age = rand(16, 35);
+        const posBonus = {
+            GK: { pace: -20, shooting: -25, defending: 20, passing: 5 },
+            CB: { pace: -5, shooting: -15, defending: 25, physical: 20 },
+            LB: { pace: 15, shooting: 0, defending: 10, passing: 10 },
+            RB: { pace: 15, shooting: 0, defending: 10, passing: 10 },
+            CDM: { pace: 0, shooting: -5, defending: 15, passing: 15 },
+            CM: { pace: 5, shooting: 10, defending: 5, passing: 18 },
+            CAM: { pace: 10, shooting: 18, defending: -5, passing: 15 },
+            LW: { pace: 22, shooting: 18, defending: -10, passing: 10 },
+            RW: { pace: 22, shooting: 18, defending: -10, passing: 10 },
+            ST: { pace: 12, shooting: 25, defending: -15, physical: 15 }
+        };
+        const b = posBonus[position] || {};
+        const potential = Math.min(99, quality + rand(5, 22));
+        const baseOvr = Math.max(30, Math.min(99, quality + rand(-8, 8)));
+        const baseValue = Math.floor(baseOvr * 8000 * (age < 22 ? 1.6 : age < 26 ? 1.2 : age < 30 ? 0.8 : 0.35));
+        return {
+            id: uid(),
+            name: genName(region),
+            region,
+            position,
+            age,
+            ovr: baseOvr,
+            pace: Math.max(30, Math.min(99, rand(50, 85) + (b.pace || 0))),
+            shooting: Math.max(30, Math.min(99, rand(40, 80) + (b.shooting || 0))),
+            passing: Math.max(30, Math.min(99, rand(45, 85) + (b.passing || 0))),
+            defending: Math.max(30, Math.min(99, rand(40, 80) + (b.defending || 0))),
+            physical: Math.max(30, Math.min(99, rand(50, 85) + (b.physical || 0))),
+            potential,
+            fitness: rand(75, 100),
+            morale: rand(60, 100),
+            value: Math.floor(baseValue * rand(80, 120) / 100),
+            wage: Math.floor(baseOvr * 80 * rand(80, 120) / 100),
+            goals: 0, assists: 0, matches: 0
+        };
+    }
+
+    // ==================== 游戏初始化 ====================
+    function initGame() {
+        const saved = localStorage.getItem('football_v3_save');
+        if (saved) {
+            try {
+                game = JSON.parse(saved);
+                return;
+            } catch(e) {}
+        }
+        game = {
+            budget: 5000000,
+            team: [],
+            league: [],
+            facilities: { training: 1, academy: 1, stadium: 1 },
+            season: 1, week: 1, day: 0,
+            formation: '4-4-2', tactic: 'balance',
+            market: [], prospects: [], news: []
+        };
+        // 生成22人阵容
+        const positions = ['GK','CB','CB','CB','LB','RB','CDM','CM','CM','CAM','LW','RW','ST','ST','CM','CDM','CB','LB','RB','GK','CM','ST'];
+        for (let i = 0; i < 22; i++) {
+            game.team.push(createPlayer('China', positions[i], rand(58, 72)));
+        }
+        // 生成联赛
+        const teamNames = {
+            zh: ['FC联', '竞技俱乐部', '龙之队', '雄狮FC', '红星队', '蓝月亮', '绿茵FC', '凤凰FC', '银鹰SC', '金蛇队', '紫百合', '黑豹FC'],
+            en: ['FC United', 'Athletic Club', 'Dragon FC', 'Lion SC', 'Red Stars', 'Blue Moon', 'Green FC', 'Phoenix FC', 'Silver Eagles', 'Golden Snakes', 'Violets', 'Panthers']
+        };
+        const names = teamNames[LANG];
+        game.league = names.map((name, i) => ({
+            name, index: i, strength: rand(38, 88),
+            played: 0, won: 0, drawn: 0, lost: 0, gf: 0, ga: 0, pts: 0
         }));
     }
-    refreshMarket();
-    if (game.day === 0 && game.prospects.length === 0) scoutAcademy();
-}
 
-function refreshMarket() {
-    const q = 55 + game.facilities["青训营"] * 3;
-    game.market = [];
-    for (let i = 0; i < 6; i++) {
-        const p = createPlayer(REGIONS[rand(0, REGIONS.length - 1)], POSITIONS[rand(0, POSITIONS.length - 1)], rand(q - 10, q + 15));
-        p.askPrice = Math.floor(p.value * rand(80, 120) / 100);
-        game.market.push(p);
+    function save() {
+        localStorage.setItem('football_v3_save', JSON.stringify(game));
     }
-}
 
-function scoutAcademy() {
-    const count = 2 + Math.floor(game.facilities["青训营"] / 2);
-    const q = 45 + game.facilities["青训营"] * 4;
-    game.prospects = [];
-    for (let i = 0; i < Math.min(count, 4); i++) {
-        game.prospects.push(createPlayer('China', POSITIONS[rand(0, POSITIONS.length - 1)], rand(q - 15, q + 10)));
+    // ==================== 游戏逻辑 ====================
+    function refreshMarket() {
+        const q = 55 + game.facilities.academy * 3;
+        game.market = [];
+        const regions = Object.keys(NAMES);
+        for (let i = 0; i < 6; i++) {
+            const p = createPlayer(regions[rand(0, regions.length - 1)], ['GK','CB','LB','RB','CDM','CM','CAM','LW','RW','ST'][rand(0, 9)], rand(q - 10, q + 15));
+            p.askPrice = Math.floor(p.value * rand(75, 125) / 100);
+            game.market.push(p);
+        }
+        save();
     }
-    game.news.unshift({ type: 'scout', text: `🌟 青训营发现了 ${game.prospects.length} 名年轻球员！` });
-}
 
-function trainTeam() {
-    const bonus = 1 + game.facilities["训练场"] * 0.15;
-    game.team.forEach(p => {
-        if (p.age < 28 && p.ovr < p.potential) {
-            const gain = Math.floor(rand(0, 2) * bonus);
-            if (gain > 0 && p.ovr < 99) {
-                p.ovr = Math.min(99, p.ovr + gain);
-                if (rand(1, 100) <= 20) {
-                    const stat = ['pace', 'shooting', 'passing', 'defending', 'physical'][rand(0, 4)];
-                    p[stat] = Math.min(99, p[stat] + 1);
+    function scoutAcademy() {
+        const count = 2 + Math.floor(game.facilities.academy / 2);
+        const q = 42 + game.facilities.academy * 4;
+        game.prospects = [];
+        for (let i = 0; i < Math.min(count, 4); i++) {
+            game.prospects.push(createPlayer('China', ['GK','CB','CM','ST'][rand(0, 3)], rand(q - 12, q + 12)));
+        }
+        addNews(LANG === 'zh' ? `🌟 青训营发现了 ${game.prospects.length} 名新星！` : `🌟 Academy found ${game.prospects.length} talents!`);
+    }
+
+    function trainTeam() {
+        const bonus = 1 + game.facilities.training * 0.18;
+        game.team.forEach(p => {
+            if (p.age < 29 && p.ovr < p.potential) {
+                const gain = Math.floor(rand(0, 2) * bonus);
+                if (gain > 0) {
+                    p.ovr = Math.min(p.potential, p.ovr + gain);
+                    if (rand(1, 100) <= 25) {
+                        const stats = ['pace', 'shooting', 'passing', 'defending', 'physical'];
+                        p[stats[rand(0, 4)]] = Math.min(99, p[stats[rand(0, 4)]] + 1);
+                    }
                 }
             }
+            p.fitness = Math.min(100, p.fitness + rand(8, 18));
+        });
+        addNews(t('trained'));
+        save();
+    }
+
+    function simulateMatch() {
+        const myLeague = game.league.find(l => l.name === (LANG === 'zh' ? 'FC联' : 'FC United'));
+        const opp = game.league[rand(1, game.league.length - 1)];
+        const tacticMod = { attack: { att: 20, def: -10 }, balance: { att: 0, def: 0 }, defend: { att: -10, def: 20 } };
+        const mod = tacticMod[game.tactic] || { att: 0, def: 0 };
+        
+        let myStr = game.team.slice(0, 11).reduce((s, p) => s + p.ovr * (p.fitness / 100) * (p.morale / 100), 0) / 11;
+        myStr *= (1 + mod.att / 100);
+        const oppStr = opp.strength * rand(85, 115) / 100 * (1 - mod.def / 100);
+        
+        const myChance = myStr / (myStr + oppStr);
+        let myGoals = 0, oppGoals = 0;
+        for (let i = 0; i < rand(8, 15); i++) {
+            if (Math.random() < myChance * 0.38) myGoals++;
+            else if (Math.random() < (1 - myChance) * 0.32) oppGoals++;
         }
-        p.fitness = Math.min(100, p.fitness + rand(5, 15));
-    });
-    game.news.unshift({ type: 'train', text: '🏋️ 训练完成，球员能力提升！' });
-    saveGame();
-}
-
-// ==================== 比赛系统 ====================
-function simulateMatch(oppName, oppStrength) {
-    const tactic = TACTICS[game.myTactic];
-    const myTeam = game.team.slice(0, 11);
-    
-    let myStrength = myTeam.reduce((s, p) => s + p.ovr * (p.fitness / 100) * (p.morale / 100), 0) / 11;
-    if (game.myTactic === "进攻") myStrength *= 1.1;
-    if (game.myTactic === "防守") myStrength *= 0.9;
-    
-    const opp = oppStrength * rand(85, 115) / 100;
-    const myChance = myStrength / (myStrength + opp);
-    
-    let myGoals = 0, oppGoals = 0;
-    for (let i = 0; i < rand(5, 12); i++) {
-        if (Math.random() < myChance * 0.4) myGoals++;
-        else if (Math.random() < (1 - myChance) * 0.35) oppGoals++;
+        
+        // 更新积分
+        myLeague.played++; opp.played++;
+        myLeague.gf += myGoals; myLeague.ga += oppGoals;
+        opp.gf += oppGoals; opp.ga += myGoals;
+        if (myGoals > oppGoals) { myLeague.won++; myLeague.pts += 3; opp.lost++; }
+        else if (myGoals === oppGoals) { myLeague.drawn++; myLeague.pts += 1; opp.drawn++; opp.pts += 1; }
+        else { myLeague.lost++; opp.won++; opp.pts += 3; }
+        
+        const income = 120000 * game.facilities.stadium;
+        game.budget += income;
+        
+        game.team.slice(0, 11).forEach(p => {
+            p.matches++;
+            p.fitness = Math.max(45, p.fitness - rand(10, 20));
+            p.morale = Math.min(100, p.morale + (myGoals > oppGoals ? 6 : -4));
+            if (Math.random() < 0.12) p.assists++;
+        });
+        
+        game.week++;
+        const result = { myScore: myGoals, oppScore: oppGoals, oppName: opp.name, income };
+        
+        const resultText = myGoals > oppGoals ? '🎉' : myGoals === oppGoals ? '🤝' : '😢';
+        addNews(`${resultText} ${t('round', game.week - 1)}: FC United ${myGoals}-${oppGoals} ${opp.name} | ${t('income')}: ${$fmt(income)}`);
+        
+        if (game.week > 38) {
+            game.season++;
+            game.week = 1;
+            game.league.sort((a, b) => b.pts - a.pts);
+            const pos = game.league.findIndex(l => l.name === (LANG === 'zh' ? 'FC联' : 'FC United')) + 1;
+            addNews(`🏆 ${t('season', game.season - 1)} ${LANG === 'zh' ? '结束！排名第' : 'Ended! Ranked #'}${'秩'.repeat(Math.max(0, 5 - Math.floor(pos / 2)))}${pos}`);
+            game.league.forEach(l => {
+                if (l.name !== (LANG === 'zh' ? 'FC联' : 'FC United')) l.strength = Math.max(35, Math.min(95, l.strength + rand(-6, 6)));
+                l.played = l.won = l.drawn = l.lost = l.gf = l.ga = l.pts = 0;
+            });
+            game.budget += 2500000;
+        }
+        
+        save();
+        return result;
     }
-    
-    // 更新联赛
-    const myL = game.league.find(l => l.name === 'FC联');
-    const oppL = game.league.find(l => l.name === oppName);
-    [myL, oppL].forEach(l => { l.played++; l.gf += l === myL ? myGoals : oppGoals; l.ga += l === myL ? oppGoals : myGoals; });
-    
-    if (myGoals > oppGoals) { myL.won++; myL.pts += 3; oppL.lost++; }
-    else if (myGoals === oppGoals) { myL.drawn++; myL.pts += 1; oppL.drawn++; oppL.pts += 1; }
-    else { myL.lost++; oppL.won++; oppL.pts += 3; }
-    
-    const income = 100000 * game.facilities["体育场"];
-    game.budget += income;
-    
-    myTeam.forEach(p => {
-        p.matches++;
-        p.fitness = Math.max(50, p.fitness - rand(8, 18));
-        p.morale = Math.min(100, p.morale + (myGoals > oppGoals ? 5 : -3));
-        if (Math.random() < 0.15) p.assists++;
-    });
-    
-    game.week++;
-    
-    const result = { myScore: myGoals, oppScore: oppGoals, oppName, income };
-    game.news.unshift({
-        type: myGoals > oppGoals ? 'win' : myGoals === oppGoals ? 'draw' : 'lose',
-        text: myGoals > oppGoals ? `🎉 胜！${myGoals}-${oppGoals} ${oppName}` : myGoals === oppGoals ? `🤝 平！${myGoals}-${oppGoals} ${oppName}` : `😢 负！${myGoals}-${oppGoals} ${oppName}`
-    });
-    
-    if (game.week > 38) {
-        game.season++;
-        game.week = 1;
-        game.league.sort((a, b) => b.pts - a.pts);
-        const myPos = game.league.findIndex(l => l.name === 'FC联');
-        game.news.unshift({ type: 'season', text: `🏆 赛季${game.season-1}结束！你排名第${myPos+1}` });
-        if (myPos >= 10) game.news.unshift({ type: 'bad', text: '⚠️ 球队可能降级！' });
-        game.league.forEach(l => { if (l.name !== 'FC联') l.strength = Math.max(30, Math.min(95, l.strength + rand(-5, 5))); l.played=l.won=l.drawn=l.lost=l.gf=l.ga=l.pts=0; });
-        game.budget += 2000000;
+
+    function addNews(text) {
+        game.news.unshift({ text, time: Date.now() });
+        if (game.news.length > 20) game.news = game.news.slice(0, 20);
     }
-    
-    saveGame();
-    return result;
-}
 
-function getOpponent() {
-    const pos = game.league.findIndex(l => l.name === 'FC联');
-    const difficulty = rand(1, 3);
-    const candidates = game.league.filter(l => l.name !== 'FC联');
-    if (difficulty === 1) return candidates.sort((a, b) => b.strength - a.strength)[rand(0, 2)];
-    if (difficulty === 2) return candidates[rand(0, candidates.length - 1)];
-    return candidates.sort((a, b) => a.strength - b.strength)[rand(0, 2)];
-}
-
-// ==================== UI ====================
-let currentTab = 'home';
-
-function switchTab(tab) { currentTab = tab; render(); }
-
-function render() {
-    const days = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'];
-    const league = [...game.league].sort((a, b) => b.pts - a.pts);
-    const myPos = league.findIndex(l => l.name === 'FC联') + 1;
-    const myTeam = game.league.find(l => l.name === 'FC联');
-    
-    let main = '';
-    if (currentTab === 'home') main = renderHome(myPos, myTeam);
-    else if (currentTab === 'team') main = renderTeam();
-    else if (currentTab === 'tactics') main = renderTactics();
-    else if (currentTab === 'facility') main = renderFacility();
-    
-    document.getElementById('app').innerHTML = `
-        <header class="sticky top-0 z-20 bg-slate-900/95 border-b border-cyan-500/30 p-3">
-            <div class="flex justify-between items-center max-w-md mx-auto">
-                <div>
-                    <h1 class="text-cyan-300 font-bold text-lg">🏆 梦幻足球Online</h1>
-                    <p class="text-xs text-slate-400">💰 ${formatMoney(game.budget)}</p>
+    // ==================== UI渲染 ====================
+    function render() {
+        const days = LANG === 'zh' ? ['一', '二', '三', '四', '五', '六', '日'] : ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+        const myLeague = game.league.find(l => l.name === (LANG === 'zh' ? 'FC联' : 'FC United'));
+        const sorted = [...game.league].sort((a, b) => b.pts - a.pts || (b.gf - b.ga) - (a.gf - a.ga));
+        const myPos = sorted.findIndex(l => l.name === (LANG === 'zh' ? 'FC联' : 'FC United')) + 1;
+        
+        let main = '';
+        if (currentTab === 'home') main = renderHome(myLeague, sorted, myPos);
+        else if (currentTab === 'team') main = renderTeam();
+        else if (currentTab === 'tactics') main = renderTactics();
+        else if (currentTab === 'facility') main = renderFacility();
+        else if (currentTab === 'match') main = renderMatch();
+        
+        document.getElementById('app').innerHTML = `
+            <header class="sticky top-0 z-20 bg-gradient-to-b from-slate-900 to-slate-900/95 border-b border-cyan-500/30 p-3">
+                <div class="flex justify-between items-center max-w-md mx-auto">
+                    <div>
+                        <h1 class="game-title text-cyan-300 font-bold text-lg tracking-wider">${t('appName')}</h1>
+                        <p class="text-amber-400 text-sm font-semibold">${$fmt(game.budget)}</p>
+                    </div>
+                    <div class="text-right">
+                        <div class="flex gap-1 justify-end mb-1">
+                            <button onclick="setLang('zh')" class="lang-btn ${LANG==='zh'?'active':''}">中文</button>
+                            <button onclick="setLang('en')" class="lang-btn ${LANG==='en'?'active':''}">EN</button>
+                        </div>
+                        <p class="text-xs text-slate-400">${days[game.day]}${LANG === 'zh' ? '期' : ''} · ${t('round', game.week)}</p>
+                    </div>
                 </div>
-                <div class="text-right text-xs">
-                    <p class="text-slate-300">${days[game.day]} · 第${game.week}轮</p>
-                    <p class="text-slate-400">赛季${game.season} · #${myPos}</p>
+            </header>
+            
+            <main class="max-w-md mx-auto p-3 pb-24">${main}</main>
+            
+            <nav class="fixed bottom-0 left-0 right-0 bg-gradient-to-t from-slate-900 to-slate-900/95 border-t border-cyan-500/30 p-2 z-30">
+                <div class="max-w-md mx-auto flex justify-around">
+                    ${['home', 'match', 'team', 'tactics', 'facility'].map(tab => `
+                        <button onclick="switchTab('${tab}')" class="nav-btn ${currentTab===tab?'active':''}">
+                            <span class="icon">${tab==='home'?'🏠':tab==='match'?'⚽':tab==='team'?'👥':tab==='tactics'?'⚙️':'🏟️'}</span>
+                            <span class="text">${t(tab)}</span>
+                        </button>
+                    `).join('')}
+                </div>
+            </nav>
+            
+            ${showToast ? `<div class="toast">${showToast}</div>` : ''}
+        `;
+        
+        if (showToast) {
+            setTimeout(() => { showToast = null; render(); }, 2000);
+        }
+    }
+
+    function switchTab(tab) { currentTab = tab; render(); }
+    function setLang(lang) { LANG = lang; game.team.forEach(p => p.name = genName(p.region)); render(); }
+
+    function renderHome(myLeague, sorted, myPos) {
+        return `
+            <!-- 状态栏 -->
+            <div class="card p-3 mb-3">
+                <div class="grid grid-cols-4 gap-2 text-center">
+                    <div class="bg-slate-800/50 rounded-lg p-2">
+                        <div class="text-cyan-300 font-bold text-lg">#${myPos}</div>
+                        <div class="text-xs text-slate-400">${t('rank')}</div>
+                    </div>
+                    <div class="bg-slate-800/50 rounded-lg p-2">
+                        <div class="text-white font-bold text-lg">${myLeague.won}-${myLeague.drawn}-${myLeague.lost}</div>
+                        <div class="text-xs text-slate-400">${t('record')}</div>
+                    </div>
+                    <div class="bg-slate-800/50 rounded-lg p-2">
+                        <div class="${myLeague.gf-myLeague.ga>=0?'text-green-400':'text-red-400'} font-bold text-lg">${myLeague.gf-myLeague.ga>0?'+':''}${myLeague.gf-myLeague.ga}</div>
+                        <div class="text-xs text-slate-400">${t('gd')}</div>
+                    </div>
+                    <div class="bg-slate-800/50 rounded-lg p-2">
+                        <div class="text-amber-400 font-bold text-lg">${myLeague.pts}</div>
+                        <div class="text-xs text-slate-400">${t('pts')}</div>
+                    </div>
                 </div>
             </div>
-        </header>
-        <main class="max-w-md mx-auto p-3 pb-24">${main}</main>
-        <nav class="fixed bottom-0 left-0 right-0 bg-slate-900/95 border-t border-cyan-500/30 p-2">
-            <div class="max-w-md mx-auto flex justify-around text-xs">
-                <button onclick="switchTab('home')" class="${currentTab === 'home' ? 'text-cyan-300' : 'text-slate-400'}">🏠 首页</button>
-                <button onclick="switchTab('team')" class="${currentTab === 'team' ? 'text-cyan-300' : 'text-slate-400'}">👥 球队</button>
-                <button onclick="switchTab('tactics')" class="${currentTab === 'tactics' ? 'text-cyan-300' : 'text-slate-400'}">⚙️ 战术</button>
-                <button onclick="switchTab('facility')" class="${currentTab === 'facility' ? 'text-cyan-300' : 'text-slate-400'}">🏟️ 设施</button>
+            
+            <!-- 快速操作 -->
+            <div class="card p-3 mb-3">
+                <button onclick="doMatch()" class="btn-game gold w-full text-sm mb-2">⚽ ${LANG==='zh'?'进行比赛':'Play Match'}</button>
+                <div class="grid grid-cols-2 gap-2">
+                    <button onclick="trainTeam();render()" class="btn-game text-xs">🏋️ ${t('train')}</button>
+                    <button onclick="refreshMarket();render()" class="btn-game purple text-xs">🔄 ${t('refresh')}</button>
+                </div>
             </div>
-        </nav>
-    `;
-}
-
-function renderHome(myPos, myTeam) {
-    let html = `
-        <div class="card p-3 mb-3">
-            <div class="flex justify-between text-sm mb-2">
-                <span>战绩: <span class="text-white">${myTeam.won}胜${myTeam.drawn}平${myTeam.lost}负</span></span>
-                <span>净胜: <span class="${myTeam.gf-myTeam.ga>=0?'text-green-400':'text-red-400'}">${myTeam.gf-myTeam.ga}</span></span>
+            
+            <!-- 新闻 -->
+            ${game.news.length > 0 ? `
+            <div class="card p-3 mb-3">
+                <h3 class="font-bold text-sm mb-2 flex items-center gap-1">📰 ${t('news')}</h3>
+                <div class="space-y-1 max-h-32 overflow-y-auto">
+                    ${game.news.slice(0, 5).map(n => `<div class="text-xs bg-slate-800/60 p-2 rounded-lg animate-slideUp">${n.text}</div>`).join('')}
+                </div>
             </div>
-            <button onclick="doMatch()" class="btn btn-primary w-full mb-2">⚽ 比赛</button>
-            <div class="grid grid-cols-2 gap-2">
-                <button onclick="trainTeam();render()" class="btn btn-secondary text-sm">🏋️ 训练</button>
-                <button onclick="refreshMarket();render()" class="btn btn-secondary text-sm">🔄 市场</button>
+            ` : ''}
+            
+            <!-- 青训 -->
+            ${game.prospects.length > 0 ? `
+            <div class="card p-3 mb-3">
+                <h3 class="font-bold text-sm mb-2">🌟 ${t('academy')} (${game.prospects.length})</h3>
+                <div class="space-y-2">
+                    ${game.prospects.map(p => `
+                        <div class="player-card">
+                            <div class="flex justify-between items-center">
+                                <div class="flex items-center gap-2">
+                                    <div class="pos-badge bg-gradient-to-br from-amber-400 to-amber-600 text-black">${p.position}</div>
+                                    <div>
+                                        <div class="font-bold">${p.name}</div>
+                                        <div class="text-xs text-slate-400">${p.age} ${LANG==='zh'?'岁':'yrs'} · ${t('potential')}: ${p.potential}</div>
+                                    </div>
+                                </div>
+                                <div class="text-right">
+                                    <div class="text-2xl font-bold game-title ${p.ovr>=70?'text-cyan-300':p.ovr>=60?'text-green-400':'text-slate-400'}">${p.ovr}</div>
+                                    <div class="text-xs text-slate-400">${t('overall')}</div>
+                                </div>
+                            </div>
+                            <div class="flex gap-1 mt-2">
+                                <button onclick="signProspect('${p.id}')" class="btn-game green flex-1 text-xs">✅ ${t('sign')} (${$fmt(Math.floor(p.value*0.3))})</button>
+                                <button onclick="rejectProspect('${p.id}')" class="btn-game red flex-1 text-xs">❌ ${t('reject')}</button>
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
             </div>
-        </div>
-    `;
-    
-    if (game.news.length) {
-        html += `<div class="card p-3 mb-3"><h3 class="font-bold text-sm mb-2">📰 消息</h3><div class="space-y-1">${game.news.slice(0,4).map(n=>`<div class="text-xs bg-slate-800/50 p-2 rounded">${n.text}</div>`).join('')}</div></div>`;
+            ` : ''}
+            
+            <!-- 转会市场 -->
+            <div class="card p-3 mb-3">
+                <div class="flex justify-between items-center mb-2">
+                    <h3 class="font-bold text-sm">💰 ${t('market')}</h3>
+                    <span class="text-xs text-slate-400">${LANG==='zh'?'点击购买':'Tap to buy'}</span>
+                </div>
+                <div class="space-y-2 max-h-48 overflow-y-auto">
+                    ${game.market.map(p => `
+                        <div class="flex justify-between items-center bg-slate-800/50 p-2 rounded-lg cursor-pointer hover:bg-slate-700/50" onclick="buyPlayer('${p.id}')">
+                            <div class="flex items-center gap-2">
+                                <div class="pos-badge ${p.position==='GK'?'bg-green-600':p.position==='CB'||p.position==='LB'||p.position==='RB'?'bg-blue-600':p.position==='CDM'||p.position==='CM'||p.position==='CAM'?'bg-yellow-600':'bg-red-600'} text-white text-xs">${p.position}</div>
+                                <div>
+                                    <div class="font-medium text-sm">${p.name}</div>
+                                    <div class="text-xs text-slate-400">${p.age}${LANG==='zh'?'岁':''} · ${p.ovr}⭐</div>
+                                </div>
+                            </div>
+                            <div class="text-right">
+                                <div class="text-amber-400 font-bold">${$fmt(p.askPrice)}</div>
+                                <div class="text-xs text-slate-500">${t('wage')}: ${$fmt(p.wage)}</div>
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+            
+            <!-- 积分榜 -->
+            <div class="card p-3">
+                <h3 class="font-bold text-sm mb-2">📊 ${t('standings')}</h3>
+                <div class="standings-row text-xs text-slate-400 font-semibold mb-1">
+                    <span>#</span><span>${LANG==='zh'?'球队':'Team'}</span><span class="text-center">${t('win')}</span><span class="text-center">${t('draw')}</span><span class="text-center">${t('lose')}</span><span class="text-right">${t('pts')}</span>
+                </div>
+                ${sorted.slice(0, 10).map((s, i) => {
+                    const isMe = s.name === (LANG === 'zh' ? 'FC联' : 'FC United');
+                    return `<div class="standings-row ${isMe?'me':''} ${i<3?'text-green-400':''}">
+                        <span class="font-bold">${i+1}</span>
+                        <span class="${isMe?'text-cyan-300 font-bold':'text-slate-200'}">${s.name}</span>
+                        <span class="text-center">${s.won}</span>
+                        <span class="text-center">${s.drawn}</span>
+                        <span class="text-center">${s.lost}</span>
+                        <span class="text-right font-bold">${s.pts}</span>
+                    </div>`;
+                }).join('')}
+            </div>
+        `;
     }
-    
-    if (game.prospects.length) {
-        html += `<div class="card p-3 mb-3"><h3 class="font-bold text-sm mb-2">🌟 青训 (${game.prospects.length})</h3>${game.prospects.map(p=>`<div class="bg-slate-800/50 p-2 rounded mb-2"><div class="flex justify-between"><span>${p.name} ${t(p.position)}</span><span class="text-cyan-300">${p.ovr}→${p.potential}</span></div><div class="flex gap-1 mt-1"><button onclick="signProspect('${p.id}')" class="btn btn-success text-xs flex-1">签约</button><button onclick="rejectProspect('${p.id}')" class="btn btn-danger text-xs flex-1">放弃</button></div></div>`).join('')}</div>`;
-    }
-    
-    html += `<div class="card p-3"><h3 class="font-bold text-sm mb-2">📊 积分榜</h3><table class="w-full text-xs">${league.slice(0,8).map((s,i)=`<tr class="${s.name==='FC联'?'bg-cyan-900/50':''}"><td class="${i<3?'text-green-400':''}">${i+1}</td><td>${s.name}</td><td class="text-right">${s.pts}</td></tr>`).join('')}</table></div>`;
-    
-    return html;
-}
 
-function renderTeam() {
-    const sorted = [...game.team].sort((a, b) => b.ovr - a.ovr);
-    return `<div class="card p-3"><h3 class="font-bold text-sm mb-2">👥 球队阵容 (${game.team.length}人)</h3><div class="space-y-1 max-h-[60vh] overflow-y-auto">${sorted.map(p=>`<div class="flex justify-between items-center bg-slate-800/50 p-2 rounded"><div><span class="font-medium">${p.name}</span><span class="text-xs text-slate-400"> ${t(p.position)}</span></div><div class="text-right"><span class="text-cyan-300">${p.ovr}</span><span class="text-xs text-slate-500 ml-2">⚡${p.pace} 🎯${p.shooting} 👟${p.passing} 🛡️${p.defending}</span></div></div>`).join('')}</div></div>`;
-}
-
-function renderTactics() {
-    return `
-        <div class="card p-3 mb-3">
-            <h3 class="font-bold text-sm mb-3">⚙️ 战术设置</h3>
+    function renderTeam() {
+        const sorted = [...game.team].sort((a, b) => b.ovr - a.ovr);
+        const posGroups = {
+            GK: sorted.filter(p => p.position === 'GK'),
+            DEF: sorted.filter(p => ['CB','LB','RB'].includes(p.position)),
+            MID: sorted.filter(p => ['CDM','CM','CAM','LW','RW'].includes(p.position)),
+            ATT: sorted.filter(p => ['ST','CF'].includes(p.position))
+        };
+        
+        return `
             <div class="mb-3">
-                <label class="text-xs text-slate-400">阵型</label>
-                <div class="grid grid-cols-4 gap-1 mt-1">${Object.keys(FORMATIONS).map(f=>`<button onclick="game.myFormation='${f}';render()" class="btn ${game.myFormation===f?'btn-primary':'btn-secondary'} text-xs">${f}</button>`).join('')}</div>
+                <div class="flex gap-1 mb-3 overflow-x-auto pb-1">
+                    <button onclick="filterPos='all';render()" class="btn-game text-xs whitespace-nowrap ${filterPos==='all'?'gold':'secondary'}">${t('all')}</button>
+                    <button onclick="filterPos='GK';render()" class="btn-game text-xs whitespace-nowrap ${filterPos==='GK'?'gold':'secondary'}">🧤 ${t('goalkeeper')}</button>
+                    <button onclick="filterPos='DEF';render()" class="btn-game text-xs whitespace-nowrap ${filterPos==='DEF'?'gold':'secondary'}">🛡️ ${t('defenders')}</button>
+                    <button onclick="filterPos='MID';render()" class="btn-game text-xs whitespace-nowrap ${filterPos==='MID'?'gold':'secondary'}">⚙️ ${t('midfielders')}</button>
+                    <button onclick="filterPos='ATT';render()" class="btn-game text-xs whitespace-nowrap ${filterPos==='ATT'?'gold':'secondary'}">⚔️ ${t('attackers')}</button>
+                </div>
             </div>
-            <div>
-                <label class="text-xs text-slate-400">战术风格</label>
-                <div class="grid grid-cols-3 gap-1 mt-1">${Object.keys(TACTICS).map(tact=>`<button onclick="game.myTactic='${tact}';render()" class="btn ${game.myTactic===tact?'btn-primary':'btn-secondary'} text-xs">${tact}</button>`).join('')}</div>
+            
+            <div class="space-y-2">
+                ${sorted.filter(p => {
+                    if (filterPos === 'all') return true;
+                    if (filterPos === 'GK') return p.position === 'GK';
+                    if (filterPos === 'DEF') return ['CB','LB','RB'].includes(p.position);
+                    if (filterPos === 'MID') return ['CDM','CM','CAM','LW','RW'].includes(p.position);
+                    if (filterPos === 'ATT') return ['ST','CF'].includes(p.position);
+                    return true;
+                }).map(p => renderPlayerCard(p)).join('')}
             </div>
-        </div>
-        <div class="card p-3">
-            <h3 class="font-bold text-sm mb-2">📈 首发阵容</h3>
-            <div class="text-xs text-slate-400">当前阵容: ${game.myFormation} · ${game.myTactic}</div>
-            <div class="mt-2 space-y-1">${game.team.slice(0,11).map(p=>`<div class="bg-slate-800/50 p-1 rounded text-xs flex justify-between"><span>${p.name}</span><span>${t(p.position)}</span></div>`).join('')}</div>
-        </div>
-    `;
-}
+        `;
+    }
 
-function renderFacility() {
-    const names = { "训练场": "训练", "青训营": "青训", "体育场": "球票" };
-    return `<div class="card p-3"><h3 class="font-bold text-sm mb-3">🏟️ 设施升级</h3><div class="space-y-3">${Object.entries(game.facilities).map(([name, level])=>{const c=[50000,100000,200000,400000,800000];const cost=c[Math.min(level-1,4)];return`<div class="bg-slate-800/50 p-3 rounded"><div class="flex justify-between mb-1"><span>${name}</span><span class="text-cyan-300">Lv.${level}</span></div><div class="text-xs text-slate-400 mb-2">${name==='训练场'?'+球员训练效率':name==='青训营'?'+青训质量':'+比赛收入'}</div><button onclick="upgradeFacility('${name}')" class="btn ${game.budget>=cost?'btn-success':'btn-secondary'} w-full text-xs" ${game.budget<cost||level>=10?'disabled':''}>升级 (${formatMoney(cost)})</button></div>`}).join('')}</div></div>`;
-}
+    function renderPlayerCard(p) {
+        const posColor = p.position === 'GK' ? 'from-green-500 to-green-700' : ['CB','LB','RB'].includes(p.position) ? 'from-blue-500 to-blue-700' : ['CDM','CM','CAM','LW','RW'].includes(p.position) ? 'from-yellow-500 to-yellow-700' : 'from-red-500 to-red-700';
+        const ovrColor = p.ovr >= 75 ? 'text-cyan-300' : p.ovr >= 65 ? 'text-green-400' : 'text-slate-400';
+        return `
+            <div class="player-card" onclick="showPlayerDetail('${p.id}')">
+                <div class="flex justify-between items-center">
+                    <div class="flex items-center gap-3">
+                        <div class="pos-badge bg-gradient-to-br ${posColor} text-white text-sm">${p.position}</div>
+                        <div>
+                            <div class="font-bold">${p.name}</div>
+                            <div class="text-xs text-slate-400">${p.age}${LANG==='zh'?'岁':''} · ${p.region}</div>
+                        </div>
+                    </div>
+                    <div class="text-right">
+                        <div class="text-3xl font-bold game-title ${ovrColor}">${p.ovr}</div>
+                        <div class="text-xs text-slate-400">${t('potential')}: ${p.potential}</div>
+                    </div>
+                </div>
+                <div class="grid grid-cols-5 gap-1 mt-2">
+                    <div class="text-center"><div class="text-xs text-slate-400">${t('pace')}</div><div class="text-sm font-semibold">${p.pace}</div><div class="attr-bar mx-auto"><div class="attr-fill bg-cyan-500" style="width:${p.pace}%"></div></div></div>
+                    <div class="text-center"><div class="text-xs text-slate-400">${t('shooting')}</div><div class="text-sm font-semibold">${p.shooting}</div><div class="attr-bar mx-auto"><div class="attr-fill bg-red-500" style="width:${p.shooting}%"></div></div></div>
+                    <div class="text-center"><div class="text-xs text-slate-400">${t('passing')}</div><div class="text-sm font-semibold">${p.passing}</div><div class="attr-bar mx-auto"><div class="attr-fill bg-yellow-500" style="width:${p.passing}%"></div></div></div>
+                    <div class="text-center"><div class="text-xs text-slate-400">${t('defending')}</div><div class="text-sm font-semibold">${p.defending}</div><div class="attr-bar mx-auto"><div class="attr-fill bg-blue-500" style="width:${p.defending}%"></div></div></div>
+                    <div class="text-center"><div class="text-xs text-slate-400">${t('physical')}</div><div class="text-sm font-semibold">${p.physical}</div><div class="attr-bar mx-auto"><div class="attr-fill bg-green-500" style="width:${p.physical}%"></div></div></div>
+                </div>
+                <div class="flex gap-2 mt-2">
+                    <div class="flex-1 bg-slate-800/50 rounded p-1 text-center"><div class="text-xs text-slate-400">⚡${t('fitness')}</div><div class="stat-bar"><div class="stat-fill ${p.fitness>=70?'bg-green-500':p.fitness>=40?'bg-yellow-500':'bg-red-500'}" style="width:${p.fitness}%"></div></div></div>
+                    <div class="flex-1 bg-slate-800/50 rounded p-1 text-center"><div class="text-xs text-slate-400">😊${t('morale')}</div><div class="stat-bar"><div class="stat-fill ${p.morale>=70?'bg-green-500':p.morale>=40?'bg-yellow-500':'bg-red-500'}" style="width:${p.morale}%"></div></div></div>
+                    <div class="bg-slate-800/50 rounded p-1 text-center px-2"><div class="text-xs text-slate-400">${t('goals')}</div><div class="text-sm font-bold text-amber-400">${p.goals}</div></div>
+                    <div class="bg-slate-800/50 rounded p-1 text-center px-2"><div class="text-xs text-slate-400">${t('assists')}</div><div class="text-sm font-bold text-cyan-400">${p.assists}</div></div>
+                </div>
+            </div>
+        `;
+    }
 
-function upgradeFacility(name) {
-    const costs = [50000, 100000, 200000, 400000, 800000, 1600000, 3200000, 6400000, 12800000];
-    const cost = costs[Math.min(game.facilities[name] - 1, 8)];
-    if (game.budget >= cost && game.facilities[name] < 10) {
-        game.budget -= cost;
-        game.facilities[name]++;
-        game.news.unshift({ type: 'upgrade', text: `🔧 ${name}升级到Lv.${game.facilities[name]}！` });
-        saveGame();
+    function showPlayerDetail(id) {
+        const p = game.team.find(x => x.id === id);
+        if (!p) return;
+        alert(`${p.name}\n${LANG==='zh'?'总评':'OVR'}: ${p.ovr} | ${LANG==='zh'?'潜力':'Potential'}: ${p.potential}\n${LANG==='zh'?'位置':'Position'}: ${p.position}\n${LANG==='zh'?'年龄':'Age'}: ${p.age}\n\n⚡${p.pace} 🎯${p.shooting} 👟${p.passing} 🛡️${p.defending} 💪${p.physical}\n\n${LANG==='zh'?'身价':'Value'}: ${$fmt(p.value)}\n${LANG==='zh'?'周薪':'Wage'}: ${$fmt(p.wage)}\n\n${LANG==='zh'?'进球':'Goals'}: ${p.goals} | ${LANG==='zh'?'助攻':'Assists'}: ${p.assists}\n${LANG==='zh'?'出场':'Matches'}: ${p.matches}`);
+    }
+
+    function renderTactics() {
+        const formations = {
+            '4-4-2': { zh: '4-4-2', en: '4-4-2', desc: { zh: '经典442，双前锋平衡', en: 'Classic 442, balanced' } },
+            '4-3-3': { zh: '4-3-3', en: '4-3-3', desc: { zh: '攻击性强，边路突破', en: 'Attacking, wing play' } },
+            '4-2-3-1': { zh: '4-2-3-1', en: '4-2-3-1', desc: { zh: '中路渗透，单前锋', en: 'Center play, lone striker' } },
+            '3-5-2': { zh: '3-5-2', en: '3-5-2', desc: { zh: '翼卫压上，中场控制', en: 'Wing backs, midfield control' } }
+        };
+        const tactics = {
+            attack: { zh: '进攻', en: 'Attack', color: 'red' },
+            balance: { zh: '平衡', en: 'Balance', color: 'gold' },
+            defend: { zh: '防守', en: 'Defend', color: 'green' }
+        };
+        
+        return `
+            <div class="card p-3 mb-3">
+                <h3 class="font-bold text-sm mb-3">⚙️ ${t('formation')}</h3>
+                <div class="grid grid-cols-2 gap-2">
+                    ${Object.entries(formations).map(([key, f]) => `
+                        <button onclick="game.formation='${key}';save();render()" class="p-3 rounded-xl text-left ${game.formation===key?'bg-cyan-500/20 border-2 border-cyan-400':'bg-slate-800/50 border border-slate-600'}">
+                            <div class="text-xl font-bold game-title">${f[LANG]}</div>
+                            <div class="text-xs text-slate-400 mt-1">${f.desc[LANG]}</div>
+                        </button>
+                    `).join('')}
+                </div>
+            </div>
+            
+            <div class="card p-3 mb-3">
+                <h3 class="font-bold text-sm mb-3">🎯 ${t('style')}</h3>
+                <div class="grid grid-cols-3 gap-2">
+                    ${Object.entries(tactics).map(([key, t]) => `
+                        <button onclick="game.tactic='${key}';save();render()" class="p-3 rounded-xl text-center ${game.tactic===key?'bg-cyan-500/20 border-2 border-cyan-400':'bg-slate-800/50 border border-slate-600'}">
+                            <div class="text-2xl mb-1">${key==='attack'?'⚔️':key==='balance'?'⚖️':'🛡️'}</div>
+                            <div class="font-bold">${t[LANG]}</div>
+                        </button>
+                    `).join('')}
+                </div>
+            </div>
+            
+            <div class="card p-3">
+                <h3 class="font-bold text-sm mb-3">📋 ${LANG==='zh'?'当前首发':'Current XI'}</h3>
+                <div class="text-xs text-slate-400 mb-2">${LANG==='zh'?'阵型':'Formation'}: ${formations[game.formation][LANG]} · ${tactics[game.tactic][LANG]}</div>
+                <div class="space-y-1">
+                    ${game.team.slice(0, 11).map(p => `
+                        <div class="flex justify-between items-center bg-slate-800/50 p-2 rounded-lg text-sm">
+                            <span>${p.name}</span>
+                            <span class="text-cyan-400 font-bold">${p.position}</span>
+                            <span class="text-amber-400">${p.ovr}</span>
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+        `;
+    }
+
+    function renderFacility() {
+        const facilities = {
+            training: { name: { zh: '训练场', en: 'Training Ground' }, icon: '🏋️', desc: { zh: '训练效率 +18%/级', en: 'Training +18%/level' } },
+            academy: { name: { zh: '青训营', en: 'Youth Academy' }, icon: '🌟', desc: { zh: '青训质量 +4总评/级', en: 'Youth quality +4 OVR/level' } },
+            stadium: { name: { zh: '体育场', en: 'Stadium' }, icon: '🏟️', desc: { zh: '比赛收入 +20%/级', en: 'Match income +20%/level' } }
+        };
+        const costs = [50000, 100000, 200000, 400000, 800000, 1600000, 3200000, 6400000, 12800000];
+        
+        return `
+            <div class="space-y-3">
+                ${Object.entries(facilities).map(([key, f]) => {
+                    const level = game.facilities[key];
+                    const cost = costs[Math.min(level - 1, 8)];
+                    const canAfford = game.budget >= cost;
+                    return `
+                        <div class="card p-4">
+                            <div class="flex justify-between items-center mb-2">
+                                <div class="flex items-center gap-2">
+                                    <span class="text-2xl">${f.icon}</span>
+                                    <div>
+                                        <div class="font-bold">${f.name[LANG]}</div>
+                                        <div class="text-xs text-slate-400">${f.desc[LANG]}</div>
+                                    </div>
+                                </div>
+                                <div class="text-right">
+                                    <div class="text-2xl font-bold game-title text-cyan-300">Lv.${level}</div>
+                                    <div class="text-xs text-slate-400">MAX 10</div>
+                                </div>
+                            </div>
+                            <div class="flex gap-2">
+                                <button onclick="upgradeFacility('${key}')" class="btn-game flex-1 text-xs ${canAfford&&level<10?'gold':'secondary'}" ${!canAfford||level>=10?'disabled':''}>
+                                    ${level >= 10 ? (LANG==='zh'?'已满级':'MAX') : `⬆️ ${t('upgrade')} (${$fmt(cost)})`}
+                                </button>
+                            </div>
+                            <div class="flex gap-1 mt-2">
+                                ${Array.from({length: 10}).map((_, i) => `<div class="h-2 flex-1 rounded ${i < level ? 'bg-cyan-400' : 'bg-slate-700'}"></div>`).join('')}
+                            </div>
+                        </div>
+                    `;
+                }).join('')}
+            </div>
+        `;
+    }
+
+    function renderMatch() {
+        const myLeague = game.league.find(l => l.name === (LANG === 'zh' ? 'FC联' : 'FC United'));
+        const opp = game.league[rand(1, game.league.length - 1)];
+        const opp2 = game.league[rand(1, game.league.length - 1)];
+        
+        return `
+            <div class="card p-4 mb-3 text-center">
+                <h3 class="font-bold text-lg mb-4">⚽ ${LANG==='zh'?'下一场比赛':'Next Match'}</h3>
+                <div class="flex items-center justify-center gap-4">
+                    <div class="text-center">
+                        <div class="text-2xl mb-1">🔵</div>
+                        <div class="font-bold">${LANG==='zh'?'FC联':'FC United'}</div>
+                        <div class="text-xs text-slate-400">#${game.league.sort((a,b)=>b.pts-a.pts).findIndex(l=>l.name===(LANG==='zh'?'FC联':'FC United'))+1}</div>
+                    </div>
+                    <div class="text-3xl font-bold game-title text-slate-500">VS</div>
+                    <div class="text-center">
+                        <div class="text-2xl mb-1">🔴</div>
+                        <div class="font-bold">${opp.name}</div>
+                        <div class="text-xs text-slate-400">${LANG==='zh'?'实力':'STR'}: ${opp.strength}</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="card p-4 mb-3">
+                <h4 class="font-bold text-sm mb-2">${LANG==='zh'?'比赛信息':'Match Info'}</h4>
+                <div class="grid grid-cols-2 gap-2 text-sm">
+                    <div class="bg-slate-800/50 p-2 rounded"><span class="text-slate-400">${LANG==='zh'?'阵型':'Formation'}:</span> <span class="text-cyan-300">${game.formation}</span></div>
+                    <div class="bg-slate-800/50 p-2 rounded"><span class="text-slate-400">${LANG==='zh'?'战术':'Tactic'}:</span> <span class="text-cyan-300">${game.tactic === 'attack' ? (LANG==='zh'?'进攻':'Attack') : game.tactic === 'balance' ? (LANG==='zh'?'平衡':'Balance') : (LANG==='zh'?'防守':'Defend')}</span></div>
+                    <div class="bg-slate-800/50 p-2 rounded"><span class="text-slate-400">${LANG==='zh'?'赛季':'Season'}:</span> ${game.season}</div>
+                    <div class="bg-slate-800/50 p-2 rounded"><span class="text-slate-400">${LANG==='zh'?'当前积分':'Points'}:</span> <span class="text-amber-400">${myLeague.pts}</span></div>
+                </div>
+            </div>
+            
+            <button onclick="doMatch()" class="btn-game gold w-full text-lg py-4">⚽ ${t('play')}</button>
+        `;
+    }
+
+    // ==================== 操作函数 ====================
+    function doMatch() {
+        const result = simulateMatch();
+        const winText = result.myScore > result.oppScore ? '🎉 ' + (LANG === 'zh' ? '胜利！' : 'Victory!') : result.myScore === result.oppScore ? '🤝 ' + (LANG === 'zh' ? '平局！' : 'Draw!') : '😢 ' + (LANG === 'zh' ? '失利...' : 'Defeat...');
+        alert(`${winText}\n\n${LANG === 'zh' ? 'FC联' : 'FC United'} ${result.myScore} - ${result.oppScore} ${result.oppName}\n\n💰 ${t('income')}: ${$fmt(result.income)}`);
+        currentTab = 'home';
         render();
     }
-}
 
-function doMatch() {
-    const opp = getOpponent();
-    const result = simulateMatch(opp.name, opp.strength);
-    alert(`⚽ 比赛结束\n\nFC联 ${result.myScore} - ${result.oppScore} ${result.oppName}\n\n💰 收入: ${formatMoney(result.income)}`);
-    render();
-}
+    function upgradeFacility(key) {
+        const costs = [50000, 100000, 200000, 400000, 800000, 1600000, 3200000, 6400000, 12800000];
+        const cost = costs[Math.min(game.facilities[key] - 1, 8)];
+        if (game.budget >= cost && game.facilities[key] < 10) {
+            game.budget -= cost;
+            game.facilities[key]++;
+            addNews(LANG === 'zh' ? `🔧 ${key === 'training' ? '训练场' : key === 'academy' ? '青训营' : '体育场'} 升级到 Lv.${game.facilities[key]}！` : `🔧 ${key} upgraded to Lv.${game.facilities[key]}!`);
+            showToast = t('upgraded');
+            save();
+            render();
+        } else {
+            showToast = t('noMoney');
+            render();
+        }
+    }
 
-function signProspect(id) {
-    const p = game.prospects.find(x => x.id === id);
-    if (p && game.budget >= p.value * 0.3) {
-        game.budget -= Math.floor(p.value * 0.3);
-        game.team.push(p);
+    function signProspect(id) {
+        const p = game.prospects.find(x => x.id === id);
+        if (p && game.budget >= p.value * 0.3) {
+            game.budget -= Math.floor(p.value * 0.3);
+            game.team.push(p);
+            game.prospects = game.prospects.filter(x => x.id !== id);
+            addNews(LANG === 'zh' ? `✅ 签约新星 ${p.name}！` : `✅ Signed ${p.name}!`);
+            showToast = t('signed');
+            save();
+            render();
+        } else {
+            showToast = t('noMoney');
+            render();
+        }
+    }
+
+    function rejectProspect(id) {
         game.prospects = game.prospects.filter(x => x.id !== id);
-        game.news.unshift({ type: 'sign', text: `✅ 签约 ${p.name}！` });
-        saveGame();
         render();
     }
-}
 
-function rejectProspect(id) {
-    game.prospects = game.prospects.filter(x => x.id !== id);
+    function buyPlayer(id) {
+        const p = game.market.find(x => x.id === id);
+        if (p && game.budget >= p.askPrice) {
+            game.budget -= p.askPrice;
+            game.team.push(p);
+            game.market = game.market.filter(x => x.id !== id);
+            addNews(LANG === 'zh' ? `💰 签下 ${p.name}！` : `💰 Signed ${p.name}!`);
+            showToast = t('signed');
+            save();
+            render();
+        } else {
+            showToast = t('noMoney');
+            render();
+        }
+    }
+
+    // ==================== 启动 ====================
+    initGame();
     render();
-}
-
-function buyFromMarket(id) {
-    const p = game.market.find(x => x.id === id);
-    if (p && game.budget >= p.askPrice) {
-        game.budget -= p.askPrice;
-        game.team.push(p);
-        game.market = game.market.filter(x => x.id !== id);
-        game.news.unshift({ type: 'buy', text: `💰 签下 ${p.name}！` });
-        saveGame();
-        render();
-    }
-}
-
-// 启动
-initGame();
-render();
     </script>
 </body>
 </html>
