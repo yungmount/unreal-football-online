@@ -395,8 +395,48 @@
     let matchCanvas = null;
     let matchCtx = null;
     let animationId = null;
+    let selectedPlayer = null;
 
     // ==================== Player Creation ====================
+    // ==================== Player Height/Weight System ====================
+    function calculateHeight(age, baseHeight) {
+        // 人类身高生长曲线：16岁前快速生长，16-20岁缓慢生长，20岁后基本定型
+        if (age < 16) {
+            // 16岁前：快速生长期
+            const growthRate = 0.08; // 每年增长8cm
+            return baseHeight - (20 - age) * growthRate;
+        } else if (age < 20) {
+            // 16-20岁：缓慢生长期
+            const growthRate = 0.02; // 每年增长2cm
+            return baseHeight - (20 - age) * growthRate;
+        } else {
+            // 20岁后：定型
+            return baseHeight;
+        }
+    }
+
+    function generatePlayerStats(position, age) {
+        // 根据位置生成基础身高
+        const heightBase = {
+            GK: rand(188, 195),
+            CB: rand(185, 193),
+            LB: rand(178, 185),
+            RB: rand(178, 185),
+            CDM: rand(180, 188),
+            CM: rand(178, 185),
+            CAM: rand(175, 182),
+            LW: rand(173, 180),
+            RW: rand(173, 180),
+            ST: rand(180, 190)
+        };
+        
+        const base = heightBase[position] || 180;
+        const height = calculateHeight(age, base);
+        const weight = Math.round(height * 0.65 + rand(-5, 5)); // 身高*0.65 ± 5kg
+        
+        return { height: Math.round(height), weight };
+    }
+
     function createPlayer(region, position, quality = 60) {
         const age = rand(17, 35);
         const names = PLAYER_NAMES[region] || PLAYER_NAMES['England'];
@@ -419,6 +459,8 @@
         const baseOvr = Math.max(30, Math.min(99, quality + rand(-8, 8)));
         const baseValue = Math.floor(baseOvr * 8000 * (age < 22 ? 1.6 : age < 26 ? 1.2 : age < 30 ? 0.8 : 0.35));
         
+        const stats = generatePlayerStats(position, age);
+        
         return {
             id: uid(),
             name,
@@ -438,7 +480,9 @@
             wage: Math.floor(baseOvr * 80 * rand(80, 120) / 100),
             goals: 0, assists: 0, matches: 0,
             avatar: null,
-            isGK: position === 'GK'
+            isGK: position === 'GK',
+            height: stats.height,
+            weight: stats.weight
         };
     }
 
@@ -1032,7 +1076,8 @@
         const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
         
         let main = '';
-        if (currentTab === 'home') main = renderHome(myLeague, sorted, myPos);
+        if (currentTab === 'playerDetail') main = renderPlayerDetail();
+        else if (currentTab === 'home') main = renderHome(myLeague, sorted, myPos);
         else if (currentTab === 'team') main = renderTeam();
         else if (currentTab === 'tactics') main = renderTactics();
         else if (currentTab === 'facility') main = renderFacility();
@@ -1059,12 +1104,14 @@
             
             <nav class="fixed bottom-0 left-0 right-0 bg-gradient-to-t from-slate-900 to-slate-900/95 border-t border-cyan-500/30 p-2 z-30">
                 <div class="max-w-md mx-auto flex justify-around">
-                    ${['home', 'match', 'team', 'tactics', 'facility'].map(tab => `
-                        <button onclick="switchTab('${tab}')" class="nav-btn ${currentTab===tab?'active':''}">
-                            <span class="icon">${tab==='home'?'🏠':tab==='match'?'⚽':tab==='team'?'👥':tab==='tactics'?'⚙️':'🏟️'}</span>
-                            <span class="text">${t(tab)}</span>
-                        </button>
-                    `).join('')}
+                    ${currentTab !== 'playerDetail' ? `
+                        ${['home', 'match', 'team', 'tactics', 'facility'].map(tab => `
+                            <button onclick="switchTab('${tab}')" class="nav-btn ${currentTab===tab?'active':''}">
+                                <span class="icon">${tab==='home'?'🏠':tab==='match'?'⚽':tab==='team'?'👥':tab==='tactics'?'⚙️':'🏟️'}</span>
+                                <span class="text">${t(tab)}</span>
+                            </button>
+                        `).join('')}
+                    ` : ''}
                 </div>
             </nav>
             
@@ -1078,6 +1125,149 @@
 
     function switchTab(tab) { currentTab = tab; render(); }
     function setLang(lang) { LANG = lang; render(); }
+
+    function showPlayerDetail(player) {
+        selectedPlayer = player;
+        currentTab = 'playerDetail';
+        render();
+    }
+
+    function renderPlayerDetail() {
+        if (!selectedPlayer) return '';
+        
+        const p = selectedPlayer;
+        const stats = [
+            { label: t('pace'), value: p.pace },
+            { label: t('shooting'), value: p.shooting },
+            { label: t('passing'), value: p.passing },
+            { label: t('defending'), value: p.defending },
+            { label: t('physical'), value: p.physical }
+        ];
+        
+        // 生成雷达图 SVG
+        const radarSvg = generateRadarChart(stats);
+        
+        return `
+            <div class="card p-4 mb-3">
+                <div class="flex items-center gap-4 mb-4">
+                    <div class="player-avatar" style="width:80px;height:80px;">
+                        <img src="${p.avatar || 'data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22%3E%3Ccircle cx=%2250%22 cy=%2250%22 r=%2250%22 fill=%22%23667eea%22/%3E%3C/svg%3E'}" alt="${p.name}" onerror="this.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22%3E%3Ccircle cx=%2250%22 cy=%2250%22 r=%2250%22 fill=%22%23667eea%22/%3E%3C/svg%3E'">
+                    </div>
+                    <div>
+                        <h2 class="text-2xl font-bold game-title text-cyan-300">${p.name}</h2>
+                        <p class="text-sm text-slate-400">${t('position')}: ${p.position}</p>
+                        <p class="text-sm text-slate-400">${p.region}</p>
+                        <p class="text-lg font-bold text-amber-400 mt-1">${p.ovr} OVR</p>
+                    </div>
+                </div>
+                
+                <div class="grid grid-cols-2 gap-3 mb-4">
+                    <div class="bg-slate-800/50 p-3 rounded-lg">
+                        <div class="text-xs text-slate-400">${t('age')}</div>
+                        <div class="text-2xl font-bold">${p.age}</div>
+                    </div>
+                    <div class="bg-slate-800/50 p-3 rounded-lg">
+                        <div class="text-xs text-slate-400">${t('potential')}</div>
+                        <div class="text-2xl font-bold text-cyan-300">${p.potential}</div>
+                    </div>
+                    <div class="bg-slate-800/50 p-3 rounded-lg">
+                        <div class="text-xs text-slate-400">Height</div>
+                        <div class="text-2xl font-bold">${p.height}cm</div>
+                    </div>
+                    <div class="bg-slate-800/50 p-3 rounded-lg">
+                        <div class="text-xs text-slate-400">Weight</div>
+                        <div class="text-2xl font-bold">${p.weight}kg</div>
+                    </div>
+                </div>
+                
+                <div class="bg-slate-800/50 p-4 rounded-lg mb-4">
+                    <h3 class="font-bold text-sm mb-3">📊 Abilities</h3>
+                    ${radarSvg}
+                </div>
+                
+                <div class="grid grid-cols-2 gap-2 mb-4">
+                    <div class="bg-slate-800/50 p-3 rounded-lg">
+                        <div class="text-xs text-slate-400">${t('value')}</div>
+                        <div class="text-sm font-bold text-green-400">${fmt(p.value)}</div>
+                    </div>
+                    <div class="bg-slate-800/50 p-3 rounded-lg">
+                        <div class="text-xs text-slate-400">${t('wage')}</div>
+                        <div class="text-sm font-bold text-amber-400">${fmt(p.wage)}/week</div>
+                    </div>
+                    <div class="bg-slate-800/50 p-3 rounded-lg">
+                        <div class="text-xs text-slate-400">${t('matches')}</div>
+                        <div class="text-sm font-bold">${p.matches}</div>
+                    </div>
+                    <div class="bg-slate-800/50 p-3 rounded-lg">
+                        <div class="text-xs text-slate-400">${t('goals')}</div>
+                        <div class="text-sm font-bold text-red-400">${p.goals}</div>
+                    </div>
+                </div>
+                
+                <button onclick="selectedPlayer=null;currentTab='home';render()" class="btn-game w-full">${t('back')}</button>
+            </div>
+        `;
+    }
+
+    function generateRadarChart(stats) {
+        const size = 150;
+        const center = size / 2;
+        const maxValue = 100;
+        const numStats = stats.length;
+        const angleSlice = (Math.PI * 2) / numStats;
+        
+        let points = [];
+        let labels = [];
+        
+        stats.forEach((stat, i) => {
+            const angle = angleSlice * i - Math.PI / 2;
+            const radius = (stat.value / maxValue) * (size / 2 - 20);
+            const x = center + radius * Math.cos(angle);
+            const y = center + radius * Math.sin(angle);
+            points.push(`${x},${y}`);
+            
+            const labelRadius = (size / 2 - 5);
+            const labelX = center + labelRadius * Math.cos(angle);
+            const labelY = center + labelRadius * Math.sin(angle);
+            labels.push({ x: labelX, y: labelY, text: stat.label, value: stat.value });
+        });
+        
+        // 生成网格
+        let gridLines = '';
+        for (let i = 1; i <= 5; i++) {
+            const r = (size / 2 - 20) * (i / 5);
+            let gridPoints = [];
+            for (let j = 0; j < numStats; j++) {
+                const angle = angleSlice * j - Math.PI / 2;
+                const x = center + r * Math.cos(angle);
+                const y = center + r * Math.sin(angle);
+                gridPoints.push(`${x},${y}`);
+            }
+            gridLines += `<polygon points="${gridPoints.join(' ')}" fill="none" stroke="rgba(100,150,200,0.2)" stroke-width="1"/>`;
+        }
+        
+        // 生成轴线
+        let axisLines = '';
+        for (let i = 0; i < numStats; i++) {
+            const angle = angleSlice * i - Math.PI / 2;
+            const x = center + (size / 2 - 20) * Math.cos(angle);
+            const y = center + (size / 2 - 20) * Math.sin(angle);
+            axisLines += `<line x1="${center}" y1="${center}" x2="${x}" y2="${y}" stroke="rgba(100,150,200,0.3)" stroke-width="1"/>`;
+        }
+        
+        return `
+            <svg viewBox="0 0 ${size} ${size}" style="width:100%;max-width:200px;margin:0 auto;">
+                ${gridLines}
+                ${axisLines}
+                <polygon points="${points.join(' ')}" fill="rgba(0,212,255,0.3)" stroke="rgba(0,212,255,0.8)" stroke-width="2"/>
+                ${labels.map(l => `
+                    <text x="${l.x}" y="${l.y}" text-anchor="middle" dominant-baseline="middle" fill="#00d4ff" font-size="10" font-weight="bold">
+                        ${l.value}
+                    </text>
+                `).join('')}
+            </svg>
+        `;
+    }
 
     function renderHome(myLeague, sorted, myPos) {
         return `
@@ -1212,7 +1402,7 @@
                     if (filterPos === 'ATT') return ['ST','CF'].includes(p.position);
                     return true;
                 }).map(p => `
-                    <div class="player-card">
+                    <div class="player-card cursor-pointer hover:border-cyan-400" onclick="showPlayerDetail(game.team.find(x => x.id === '${p.id}'))">
                         <div class="flex justify-between items-center">
                             <div class="flex items-center gap-3">
                                 <div class="player-avatar">
