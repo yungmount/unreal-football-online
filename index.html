@@ -47,6 +47,7 @@
     <script>
     // ==================== Game Name ====================
     const GAME_NAME = 'UFO';
+    let LANG = 'zh';
     const GAME_FULL_NAME = LANG === 'zh' ? '梦幻足球' : 'Dream Football';
 
     // ==================== Player Name Database (FC26 Style) ====================
@@ -250,7 +251,6 @@
         }
     };
 
-    let LANG = 'zh';
     function t(key, ...args) { let text = I18N[LANG][key] || key; args.forEach((v, i) => text = text.replace(`{${i}}`, v)); return text; }
     function fmt(n) { if (n >= 1000000) return '€' + (n / 1000000).toFixed(1) + 'M'; if (n >= 1000) return '€' + (n / 1000).toFixed(0) + 'K'; return '€' + n; }
     const rand = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
