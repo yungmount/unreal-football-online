@@ -726,7 +726,7 @@
     function updateMatch() {
         if (!matchState || !matchState.started || matchState.finished) return;
         
-        matchState.second += 0.5;
+        matchState.second += 1;
         if (matchState.second >= 60) {
             matchState.second = 0;
             matchState.minute++;
@@ -763,7 +763,7 @@
             const dist = Math.hypot(dx, dy);
             
             if (dist > 0.01) {
-                const speed = 0.08;
+                const speed = 0.12;
                 ball.x += (dx / dist) * speed;
                 ball.y += (dy / dist) * speed;
             } else {
@@ -848,7 +848,7 @@
             }
         }
         
-        const moveSpeed = player.speed || 0.025;
+        const moveSpeed = (player.pace / 100) * 0.04 + 0.01;
         const dx = targetX - player.x;
         const dy = targetY - player.y;
         const dist = Math.hypot(dx, dy);
@@ -1263,7 +1263,7 @@
             <div class="card p-4 mb-3">
                 <div class="flex items-center gap-4 mb-4">
                     <div class="player-avatar" style="width:80px;height:80px;">
-                        <img src="${p.avatar || 'data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22%3E%3Ccircle cx=%2250%22 cy=%2250%22 r=%2250%22 fill=%22%23667eea%22/%3E%3C/svg%3E'}" alt="${p.name}" onerror="this.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22%3E%3Ccircle cx=%2250%22 cy=%2250%22 r=%2250%22 fill=%22%23667eea%22/%3E%3C/svg%3E'">
+                        <img src="${p.avatar || 'data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22%3E%3Cdefs%3E%3ClinearGradient id=%22grad%22 x1=%220%25%22 y1=%220%25%22 x2=%22100%25%22 y2=%22100%25%22%3E%3Cstop offset=%220%25%22 style=%22stop-color:%23667eea;stop-opacity:1%22 /%3E%3Cstop offset=%22100%25%22 style=%22stop-color:%238b5cf6;stop-opacity:1%22 /%3E%3C/linearGradient%3E%3C/defs%3E%3Ccircle cx=%2250%22 cy=%2250%22 r=%2250%22 fill=%22url(%23grad)%22/%3E%3Ccircle cx=%2235%22 cy=%2235%22 r=%228%22 fill=%22%23fff%22/%3E%3Ccircle cx=%2265%22 cy=%2235%22 r=%228%22 fill=%22%23fff%22/%3E%3Cpath d=%22M 30 60 Q 50 75 70 60%22 stroke=%22%23fff%22 stroke-width=%223%22 fill=%22none%22/%3E%3C/svg%3E'}" alt="${p.name}" onerror="this.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22%3E%3Cdefs%3E%3ClinearGradient id=%22grad%22 x1=%220%25%22 y1=%220%25%22 x2=%22100%25%22 y2=%22100%25%22%3E%3Cstop offset=%220%25%22 style=%22stop-color:%23667eea;stop-opacity:1%22 /%3E%3Cstop offset=%22100%25%22 style=%22stop-color:%238b5cf6;stop-opacity:1%22 /%3E%3C/linearGradient%3E%3C/defs%3E%3Ccircle cx=%2250%22 cy=%2250%22 r=%2250%22 fill=%22url(%23grad)%22/%3E%3Ccircle cx=%2235%22 cy=%2235%22 r=%228%22 fill=%22%23fff%22/%3E%3Ccircle cx=%2265%22 cy=%2235%22 r=%228%22 fill=%22%23fff%22/%3E%3Cpath d=%22M 30 60 Q 50 75 70 60%22 stroke=%22%23fff%22 stroke-width=%223%22 fill=%22none%22/%3E%3C/svg%3E'">
                     </div>
                     <div>
                         <h2 class="text-2xl font-bold game-title text-cyan-300">${p.name}</h2>
@@ -1430,7 +1430,7 @@
                             <div class="flex justify-between items-center">
                                 <div class="flex items-center gap-2">
                                     <div class="player-avatar">
-                                        <img src="${p.avatar || 'data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22%3E%3Ccircle cx=%2250%22 cy=%2250%22 r=%2250%22 fill=%22%23667eea%22/%3E%3C/svg%3E'}" alt="${p.name}" onerror="this.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22%3E%3Ccircle cx=%2250%22 cy=%2250%22 r=%2250%22 fill=%22%23667eea%22/%3E%3C/svg%3E'">
+                                        <img src="${p.avatar || 'data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22%3E%3Cdefs%3E%3ClinearGradient id=%22grad%22 x1=%220%25%22 y1=%220%25%22 x2=%22100%25%22 y2=%22100%25%22%3E%3Cstop offset=%220%25%22 style=%22stop-color:%23667eea;stop-opacity:1%22 /%3E%3Cstop offset=%22100%25%22 style=%22stop-color:%238b5cf6;stop-opacity:1%22 /%3E%3C/linearGradient%3E%3C/defs%3E%3Ccircle cx=%2250%22 cy=%2250%22 r=%2250%22 fill=%22url(%23grad)%22/%3E%3Ccircle cx=%2235%22 cy=%2235%22 r=%228%22 fill=%22%23fff%22/%3E%3Ccircle cx=%2265%22 cy=%2235%22 r=%228%22 fill=%22%23fff%22/%3E%3Cpath d=%22M 30 60 Q 50 75 70 60%22 stroke=%22%23fff%22 stroke-width=%223%22 fill=%22none%22/%3E%3C/svg%3E'}" alt="${p.name}" onerror="this.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22%3E%3Cdefs%3E%3ClinearGradient id=%22grad%22 x1=%220%25%22 y1=%220%25%22 x2=%22100%25%22 y2=%22100%25%22%3E%3Cstop offset=%220%25%22 style=%22stop-color:%23667eea;stop-opacity:1%22 /%3E%3Cstop offset=%22100%25%22 style=%22stop-color:%238b5cf6;stop-opacity:1%22 /%3E%3C/linearGradient%3E%3C/defs%3E%3Ccircle cx=%2250%22 cy=%2250%22 r=%2250%22 fill=%22url(%23grad)%22/%3E%3Ccircle cx=%2235%22 cy=%2235%22 r=%228%22 fill=%22%23fff%22/%3E%3Ccircle cx=%2265%22 cy=%2235%22 r=%228%22 fill=%22%23fff%22/%3E%3Cpath d=%22M 30 60 Q 50 75 70 60%22 stroke=%22%23fff%22 stroke-width=%223%22 fill=%22none%22/%3E%3C/svg%3E'">
                                     </div>
                                     <div>
                                         <div class="font-bold">${p.name}</div>
@@ -1458,7 +1458,7 @@
                         <div class="flex justify-between items-center bg-slate-800/50 p-2 rounded-lg cursor-pointer hover:bg-slate-700/50" onclick="showPlayerDetail(p)">
                             <div class="flex items-center gap-2">
                                 <div class="player-avatar" style="width:36px;height:36px;">
-                                    <img src="${p.avatar || 'data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22%3E%3Ccircle cx=%2250%22 cy=%2250%22 r=%2250%22 fill=%22%23667eea%22/%3E%3C/svg%3E'}" alt="${p.name}" onerror="this.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22%3E%3Ccircle cx=%2250%22 cy=%2250%22 r=%2250%22 fill=%22%23667eea%22/%3E%3C/svg%3E'">
+                                    <img src="${p.avatar || 'data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22%3E%3Cdefs%3E%3ClinearGradient id=%22grad%22 x1=%220%25%22 y1=%220%25%22 x2=%22100%25%22 y2=%22100%25%22%3E%3Cstop offset=%220%25%22 style=%22stop-color:%23667eea;stop-opacity:1%22 /%3E%3Cstop offset=%22100%25%22 style=%22stop-color:%238b5cf6;stop-opacity:1%22 /%3E%3C/linearGradient%3E%3C/defs%3E%3Ccircle cx=%2250%22 cy=%2250%22 r=%2250%22 fill=%22url(%23grad)%22/%3E%3Ccircle cx=%2235%22 cy=%2235%22 r=%228%22 fill=%22%23fff%22/%3E%3Ccircle cx=%2265%22 cy=%2235%22 r=%228%22 fill=%22%23fff%22/%3E%3Cpath d=%22M 30 60 Q 50 75 70 60%22 stroke=%22%23fff%22 stroke-width=%223%22 fill=%22none%22/%3E%3C/svg%3E'}" alt="${p.name}" onerror="this.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22%3E%3Cdefs%3E%3ClinearGradient id=%22grad%22 x1=%220%25%22 y1=%220%25%22 x2=%22100%25%22 y2=%22100%25%22%3E%3Cstop offset=%220%25%22 style=%22stop-color:%23667eea;stop-opacity:1%22 /%3E%3Cstop offset=%22100%25%22 style=%22stop-color:%238b5cf6;stop-opacity:1%22 /%3E%3C/linearGradient%3E%3C/defs%3E%3Ccircle cx=%2250%22 cy=%2250%22 r=%2250%22 fill=%22url(%23grad)%22/%3E%3Ccircle cx=%2235%22 cy=%2235%22 r=%228%22 fill=%22%23fff%22/%3E%3Ccircle cx=%2265%22 cy=%2235%22 r=%228%22 fill=%22%23fff%22/%3E%3Cpath d=%22M 30 60 Q 50 75 70 60%22 stroke=%22%23fff%22 stroke-width=%223%22 fill=%22none%22/%3E%3C/svg%3E'">
                                 </div>
                                 <div>
                                     <div class="font-medium text-sm">${p.name}</div>
@@ -1518,7 +1518,7 @@
                         <div class="flex justify-between items-center">
                             <div class="flex items-center gap-3">
                                 <div class="player-avatar">
-                                    <img src="${p.avatar || 'data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22%3E%3Ccircle cx=%2250%22 cy=%2250%22 r=%2250%22 fill=%22%23667eea%22/%3E%3C/svg%3E'}" alt="${p.name}" onerror="this.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22%3E%3Ccircle cx=%2250%22 cy=%2250%22 r=%2250%22 fill=%22%23667eea%22/%3E%3C/svg%3E'">
+                                    <img src="${p.avatar || 'data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22%3E%3Cdefs%3E%3ClinearGradient id=%22grad%22 x1=%220%25%22 y1=%220%25%22 x2=%22100%25%22 y2=%22100%25%22%3E%3Cstop offset=%220%25%22 style=%22stop-color:%23667eea;stop-opacity:1%22 /%3E%3Cstop offset=%22100%25%22 style=%22stop-color:%238b5cf6;stop-opacity:1%22 /%3E%3C/linearGradient%3E%3C/defs%3E%3Ccircle cx=%2250%22 cy=%2250%22 r=%2250%22 fill=%22url(%23grad)%22/%3E%3Ccircle cx=%2235%22 cy=%2235%22 r=%228%22 fill=%22%23fff%22/%3E%3Ccircle cx=%2265%22 cy=%2235%22 r=%228%22 fill=%22%23fff%22/%3E%3Cpath d=%22M 30 60 Q 50 75 70 60%22 stroke=%22%23fff%22 stroke-width=%223%22 fill=%22none%22/%3E%3C/svg%3E'}" alt="${p.name}" onerror="this.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22%3E%3Cdefs%3E%3ClinearGradient id=%22grad%22 x1=%220%25%22 y1=%220%25%22 x2=%22100%25%22 y2=%22100%25%22%3E%3Cstop offset=%220%25%22 style=%22stop-color:%23667eea;stop-opacity:1%22 /%3E%3Cstop offset=%22100%25%22 style=%22stop-color:%238b5cf6;stop-opacity:1%22 /%3E%3C/linearGradient%3E%3C/defs%3E%3Ccircle cx=%2250%22 cy=%2250%22 r=%2250%22 fill=%22url(%23grad)%22/%3E%3Ccircle cx=%2235%22 cy=%2235%22 r=%228%22 fill=%22%23fff%22/%3E%3Ccircle cx=%2265%22 cy=%2235%22 r=%228%22 fill=%22%23fff%22/%3E%3Cpath d=%22M 30 60 Q 50 75 70 60%22 stroke=%22%23fff%22 stroke-width=%223%22 fill=%22none%22/%3E%3C/svg%3E'">
                                 </div>
                                 <div>
                                     <div class="font-bold">${p.name}</div>
@@ -1723,90 +1723,127 @@
         const w = matchCanvas.width / window.devicePixelRatio;
         const h = matchCanvas.height / window.devicePixelRatio;
         
+        // 清空画布
         ctx.fillStyle = '#2d8a2d';
         ctx.fillRect(0, 0, w, h);
         
-        ctx.strokeStyle = 'rgba(255,255,255,0.3)';
-        ctx.lineWidth = 1;
+        // 绘制球场线条
+        ctx.strokeStyle = 'rgba(255,255,255,0.4)';
+        ctx.lineWidth = 2;
         
+        // 边界
         ctx.strokeRect(10, 10, w - 20, h - 20);
         
+        // 中线
         ctx.beginPath();
         ctx.moveTo(w / 2, 10);
         ctx.lineTo(w / 2, h - 10);
         ctx.stroke();
         
+        // 中圈
         ctx.beginPath();
-        ctx.arc(w / 2, h / 2, 30, 0, Math.PI * 2);
+        ctx.arc(w / 2, h / 2, 35, 0, Math.PI * 2);
         ctx.stroke();
         
-        ctx.strokeRect(10, h / 2 - 25, 15, 50);
-        ctx.strokeRect(w - 25, h / 2 - 25, 15, 50);
+        // 中点
+        ctx.fillStyle = 'rgba(255,255,255,0.6)';
+        ctx.beginPath();
+        ctx.arc(w / 2, h / 2, 3, 0, Math.PI * 2);
+        ctx.fill();
         
-        ctx.strokeRect(10, h / 4, 30, h / 2);
-        ctx.strokeRect(w - 40, h / 4, 30, h / 2);
+        // 禁区
+        ctx.strokeRect(10, h / 4, 40, h / 2);
+        ctx.strokeRect(w - 50, h / 4, 40, h / 2);
         
+        // 小禁区
+        ctx.strokeRect(10, h / 3, 20, h / 3);
+        ctx.strokeRect(w - 30, h / 3, 20, h / 3);
+        
+        // 绘制我方球员（蓝色）
         matchState.myTeam.forEach((p, i) => {
             const x = p.x * w;
             const y = p.y * h;
             
+            // 球员圆圈
             ctx.beginPath();
-            ctx.arc(x, y, 12, 0, Math.PI * 2);
-            ctx.fillStyle = '#00aaff';
+            ctx.arc(x, y, 14, 0, Math.PI * 2);
+            ctx.fillStyle = '#00d4ff';
             ctx.fill();
             ctx.strokeStyle = '#ffffff';
-            ctx.lineWidth = 2;
+            ctx.lineWidth = 2.5;
             ctx.stroke();
             
-            ctx.fillStyle = '#ffffff';
-            ctx.font = '8px Inter';
+            // 球员号码/名字
+            ctx.fillStyle = '#000';
+            ctx.font = 'bold 9px Arial';
             ctx.textAlign = 'center';
-            const shortName = p.name.split(' ')[0].substring(0, 4);
-            ctx.fillText(shortName, x, y + 22);
+            ctx.textBaseline = 'middle';
+            const shortName = p.name.split(' ')[0].substring(0, 3);
+            ctx.fillText(shortName, x, y);
         });
         
+        // 绘制对方球员（红色）
         matchState.oppTeam.forEach((p, i) => {
             const x = p.x * w;
             const y = p.y * h;
             
             ctx.beginPath();
-            ctx.arc(x, y, 12, 0, Math.PI * 2);
-            ctx.fillStyle = '#ff4444';
+            ctx.arc(x, y, 14, 0, Math.PI * 2);
+            ctx.fillStyle = '#ff6b6b';
             ctx.fill();
             ctx.strokeStyle = '#ffffff';
-            ctx.lineWidth = 2;
+            ctx.lineWidth = 2.5;
             ctx.stroke();
             
-            ctx.fillStyle = '#ffffff';
-            ctx.font = '8px Inter';
+            ctx.fillStyle = '#fff';
+            ctx.font = 'bold 9px Arial';
             ctx.textAlign = 'center';
-            const shortName = p.name.split(' ')[0].substring(0, 4);
-            ctx.fillText(shortName, x, y + 22);
+            ctx.textBaseline = 'middle';
+            const shortName = p.name.split(' ')[0].substring(0, 3);
+            ctx.fillText(shortName, x, y);
         });
         
+        // 绘制球（带阴影）
         const bx = matchState.ball.x * w;
         const by = matchState.ball.y * h;
+        
+        // 球的阴影
+        ctx.fillStyle = 'rgba(0,0,0,0.2)';
         ctx.beginPath();
-        ctx.arc(bx, by, 6, 0, Math.PI * 2);
+        ctx.ellipse(bx, by + 8, 8, 3, 0, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // 球
+        ctx.beginPath();
+        ctx.arc(bx, by, 7, 0, Math.PI * 2);
         ctx.fillStyle = '#ffffff';
         ctx.fill();
-        ctx.strokeStyle = '#000000';
-        ctx.lineWidth = 1;
+        ctx.strokeStyle = '#000';
+        ctx.lineWidth = 1.5;
         ctx.stroke();
         
-        ctx.fillStyle = 'rgba(0,0,0,0.6)';
-        ctx.fillRect(w/2 - 50, 0, 100, 22);
-        ctx.fillStyle = '#ffffff';
-        ctx.font = 'bold 12px Orbitron, monospace';
-        ctx.textAlign = 'center';
-        ctx.fillText(`${matchState.myScore} - ${matchState.oppScore}`, w/2, 15);
+        // 球的纹理
+        ctx.strokeStyle = 'rgba(0,0,0,0.3)';
+        ctx.lineWidth = 0.5;
+        ctx.beginPath();
+        ctx.arc(bx - 2, by - 2, 3, 0, Math.PI * 2);
+        ctx.stroke();
         
-        ctx.fillStyle = 'rgba(0,0,0,0.6)';
-        ctx.fillRect(w - 40, 0, 40, 18);
-        ctx.fillStyle = '#ff4444';
-        ctx.font = 'bold 10px Inter';
+        // 比分显示
+        ctx.fillStyle = 'rgba(0,0,0,0.7)';
+        ctx.fillRect(w/2 - 60, 5, 120, 28);
+        ctx.fillStyle = '#ffffff';
+        ctx.font = 'bold 18px Orbitron';
         ctx.textAlign = 'center';
-        ctx.fillText(`${matchState.minute}'`, w - 20, 13);
+        ctx.fillText(`${matchState.myScore} - ${matchState.oppScore}`, w/2, 24);
+        
+        // 时间显示
+        ctx.fillStyle = 'rgba(0,0,0,0.7)';
+        ctx.fillRect(w - 50, 5, 45, 28);
+        ctx.fillStyle = matchState.minute >= 45 && matchState.minute < 46 ? '#ffff00' : '#ff4444';
+        ctx.font = 'bold 16px Orbitron';
+        ctx.textAlign = 'center';
+        ctx.fillText(`${matchState.minute}'`, w - 27, 24);
     }
 
     // ==================== Actions ====================
