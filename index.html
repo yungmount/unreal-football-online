@@ -14,7 +14,6 @@
             --purple: #9333ea;
             --green: #22c55e;
             --red: #ef4444;
-            --dark: #0a0a1a;
         }
         body { 
             margin: 0; 
@@ -25,13 +24,11 @@
         }
         .game-title { font-family: 'Orbitron', sans-serif; }
         
-        /* Match Canvas */
         #matchCanvas {
             border-radius: 12px;
             background: #1a5d1a;
         }
         
-        /* Events Panel */
         .event-item {
             animation: slideIn 0.3s ease-out;
             border-left: 3px solid;
@@ -45,7 +42,6 @@
         .event-sub { border-color: #8b5cf6; background: rgba(139,92,246,0.1); }
         .event-pass { border-color: #3b82f6; background: rgba(59,130,246,0.1); }
         
-        /* Cards */
         .card {
             background: linear-gradient(145deg, rgba(30,41,59,0.9), rgba(15,23,42,0.95));
             border: 1px solid rgba(0,212,255,0.2);
@@ -53,7 +49,6 @@
             backdrop-filter: blur(10px);
         }
         
-        /* Buttons */
         .btn-game {
             background: linear-gradient(135deg, var(--cyan), #0099cc);
             border: none;
@@ -76,7 +71,6 @@
         .btn-game.red { background: linear-gradient(135deg, var(--red), #dc2626); }
         .btn-game.purple { background: linear-gradient(135deg, var(--purple), #7c3aed); color: #fff; }
         
-        /* Lang Switch */
         .lang-btn {
             padding: 6px 12px;
             border-radius: 20px;
@@ -93,7 +87,6 @@
             border-color: var(--cyan);
         }
         
-        /* Nav */
         .nav-btn {
             display: flex;
             flex-direction: column;
@@ -107,7 +100,6 @@
         .nav-btn .icon { font-size: 18px; }
         .nav-btn .text { font-size: 9px; margin-top: 2px; }
         
-        /* Progress bars */
         .stat-bar {
             height: 6px;
             border-radius: 3px;
@@ -120,7 +112,6 @@
             transition: width 0.3s;
         }
         
-        /* Toast */
         .toast {
             position: fixed;
             top: 80px;
@@ -134,7 +125,6 @@
             box-shadow: 0 4px 20px rgba(34,197,94,0.4);
         }
         
-        /* Standings */
         .standings-row {
             display: grid;
             grid-template-columns: 30px 1fr 40px 50px;
@@ -146,7 +136,6 @@
         }
         .standings-row.me { background: linear-gradient(90deg, rgba(0,212,255,0.3), transparent) !important; border: 1px solid rgba(0,212,255,0.5); }
         
-        /* Player Card */
         .player-card {
             background: linear-gradient(145deg, #1e293b, #0f172a);
             border: 1px solid rgba(255,215,0,0.3);
@@ -176,56 +165,155 @@
             font-family: 'Orbitron', sans-serif;
             box-shadow: 0 2px 8px rgba(0,0,0,0.3);
         }
+        
+        .player-avatar {
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            color: white;
+            font-size: 20px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+            overflow: hidden;
+        }
+        
+        .player-avatar img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
     </style>
 </head>
 <body>
     <div id="app"></div>
     
     <script>
-    // ==================== FC26 Style Names ====================
-    const FIRST_NAMES = [
-        'Marcus', 'Lucas', 'Leon', 'Noah', 'Gabriel', 'Diego', 'Kai', 'Julian', 'Matteo', 'Luca',
-        'Erik', 'Liam', 'Finn', 'Oscar', 'Victor', 'Alex', 'Max', 'Sam', 'James', 'Ben',
-        'Bruno', 'Ruben', 'Dani', 'Mikel', 'Sergio', 'Marco', 'Andrea', 'Paolo', 'Gianluca',
-        'Pierre', 'Antoine', 'Olivier', 'Hugo', 'Kingsley', 'Nabil', 'Karim', 'Ousmane',
-        'Raheem', 'Jadon', 'Phil', 'Mason', 'Declan', 'Jude', 'Bukayo', 'Cole', 'Noni',
-        'Vinicius', 'Rodrygo', 'Endrick', 'Rebe', 'Lautaro', 'Julian', 'Alejandro', 'Dani',
-        'Erling', 'Kylian', 'Pedri', 'Gavi', 'Joao', 'Bernardo', 'Raphinha', 'Bruno'
-    ];
-    
-    const LAST_NAMES = [
-        'Rashford', 'Fernandez', 'Martinez', 'Silva', 'Santos', 'Costa', 'Muller', 'Werner',
-        'Kane', 'Salah', 'Saka', 'Bellingham', 'Rice', 'Haaland', 'Mbappe', 'Vini Jr',
-        'Rodri', 'De Bruyne', 'Foden', 'Grealish', 'Mount', 'Pullic', 'Havertz', 'Sancho',
-        'Dembele', 'Griezmann', 'Morata', 'Felix', 'Joao Felix', 'Nuno Mendes', 'Vitinha',
-        'Leao', 'Tonali', 'Brozovic', 'Calhanoglu', 'Maignan', 'Theo', 'Kramer', 'Schick',
-        'Tielemans', 'Maddison', 'Mount', 'James', 'Trippier', 'Shaw', 'Stones', 'Walker',
-        'Akanji', 'Dias', 'Rodri', 'Cancelo', 'Silva', 'Mahrez', 'Sterling', 'Palmer',
-        'N Williams', 'Saka', 'Martinelli', 'Odegaard', 'Rice', 'Zinchenko', 'Gabriel',
-        'Saliba', 'White', 'Tomiyasu', 'Raya', 'Rashford', 'Hojlund', 'Garnacho', 'Mainoo',
-        'Son', 'Kane', 'Maddison', 'Van Dijk', 'Salah', 'Nunez', 'Diaz', 'Szoboszlai',
-        'Alexander-Arnold', 'Robertson', 'TAA', 'Robbo', 'Dier', 'Romero', 'Udogie', 'Porro',
-        'Lloris', 'Lacazette', 'Giroud', 'Thierry', 'Henry', 'Bergkamp', 'Wenger', 'Ferguson'
-    ];
-    
-    const PinyinNames = [
-        ['Zhang Wei', 'Zhāng Wěi'], ['Wang Fang', 'Wáng Fāng'], ['Li Ming', 'Lǐ Míng'],
-        ['Liu Yang', 'Liú Yáng'], ['Chen Jie', 'Chén Jié'], ['Yang Fan', 'Yáng Fān'],
-        ['Huang Lei', 'Huáng Lěi'], ['Zhao Jun', 'Zhào Jūn'], ['Wu Tao', 'Wú Tāo'],
-        ['Zhou Peng', 'Zhōu Péng'], ['Xu Hao', 'Xú Hào'], ['Sun Jie', 'Sūn Jié'],
-        ['Ma Long', 'Mǎ Lóng'], ['Zheng Kai', 'Zhèng Kǎi'], ['He Yang', 'Hé Yáng'],
-        ['Gao Fei', 'Gāo Fēi'], ['Lin Hui', 'Lín Huì'], ['Zhou Xin', 'Zhōu Xīn'],
-        ['Xie Feng', 'Xiè Fēng'], ['Han Qiu', 'Hán Qiū'], ['Tang Bo', 'Táng Bó']
-    ];
-    
-    function genName(region) {
-        if (region === 'China') {
-            const [en, zh] = PinyinNames[Math.floor(Math.random() * PinyinNames.length)];
-            return { en, zh, full: `${en} (${zh})` };
-        }
-        const first = FIRST_NAMES[Math.floor(Math.random() * FIRST_NAMES.length)];
-        const last = LAST_NAMES[Math.floor(Math.random() * LAST_NAMES.length)];
-        return { en: `${first} ${last}`, zh: `${last}`, full: `${first} ${last}` };
+    // ==================== FC26 Style Names Database ====================
+    const PLAYER_NAMES = {
+        England: [
+            'Harry Kane', 'Jude Bellingham', 'Bukayo Saka', 'Declan Rice', 'Phil Foden',
+            'Mason Mount', 'Jadon Sancho', 'Reece James', 'Luke Shaw', 'John Stones',
+            'Kyle Walker', 'Jordan Pickford', 'Kalvin Phillips', 'James Maddison', 'Trent Alexander-Arnold',
+            'Kieran Trippier', 'Aaron Ramsdale', 'Conor Coady', 'Fikayo Tomori', 'Ollie Watkins',
+            'Tammy Abraham', 'Dominic Solanke', 'Callum Hudson-Odoi', 'Tyrick Mitchell', 'Eberechi Eze'
+        ],
+        Spain: [
+            'Pedri', 'Gavi', 'Ferran Torres', 'Sergio Busquets', 'Sergio Reguilon',
+            'Unai Simon', 'Cesar Azpilicueta', 'Aymeric Laporte', 'Jordi Alba', 'Xavi Simons',
+            'Dani Olmo', 'Mikel Oyarzabal', 'Inigo Martinez', 'Raul Raya', 'Pau Torres',
+            'Alejandro Balde', 'Ferran Torres', 'Alvaro Morata', 'Nico Williams', 'Lamine Yamal'
+        ],
+        Germany: [
+            'Jamal Musiala', 'Florian Wirtz', 'Serge Gnabry', 'Leroy Sane', 'Joshua Kimmich',
+            'Manuel Neuer', 'Antonio Rudiger', 'Mats Hummels', 'Ilkay Gundogan', 'Thomas Muller',
+            'Kai Havertz', 'Niklas Sule', 'Thilo Kehrer', 'Dayot Upamecano', 'Bayer Leverkusen',
+            'Serge Gnabry', 'Kingsley Coman', 'Alphonso Davies', 'Benjamin Pavard', 'Noussair Mazraoui'
+        ],
+        France: [
+            'Kylian Mbappe', 'Aurelien Tchouameni', 'Eduardo Camavinga', 'Dayot Upamecano', 'Jules Kounde',
+            'Theo Hernandez', 'Benjamin Pavard', 'Alphonso Davies', 'Adrien Rabiot', 'N Golo Kante',
+            'Olivier Giroud', 'Antoine Griezmann', 'Ousmane Dembele', 'Kingsley Coman', 'Matteo Guendouzi',
+            'Youssouf Fofana', 'Ferland Mendy', 'Presnel Kimpembe', 'Raphael Varane', 'Hugo Lloris'
+        ],
+        Brazil: [
+            'Vinicius Jr', 'Rodrygo', 'Neymar', 'Casemiro', 'Marquinhos',
+            'Alisson', 'Thiago Silva', 'Danilo', 'Lucas Paqueta', 'Fabinho',
+            'Richarlison', 'Gabriel Jesus', 'Antony', 'Vinícius Júnior', 'Endrick',
+            'Sergej Milinovic-Savic', 'Eder Militao', 'Bremer', 'Renan Lodi', 'Guilherme Arana'
+        ],
+        Argentina: [
+            'Lionel Messi', 'Lautaro Martinez', 'Angel Di Maria', 'Gonzalo Montiel', 'Lisandro Martinez',
+            'Enzo Fernandez', 'Alexis Mac Allister', 'Julian Alvarez', 'Alejandro Garnacho', 'Sergio Gomez',
+            'Cristian Romero', 'Nicolas Otamendi', 'Geronimo Rulli', 'Emiliano Martinez', 'Marcos Acuna',
+            'Nahuel Molina', 'Mateo Kovacic', 'Rodrigo De Paul', 'Leandro Paredes', 'Giovani Lo Celso'
+        ],
+        Italy: [
+            'Alessandro Bastoni', 'Nicolo Barella', 'Matteo Darmian', 'Gigio Donnarumma', 'Leonardo Bonucci',
+            'Giorgio Chiellini', 'Federico Chiesa', 'Ciro Immobile', 'Matteo Politano', 'Sergej Milinovic-Savic',
+            'Alessio Romagnoli', 'Davide Calabria', 'Theo Hernandez', 'Franck Kessie', 'Ismael Bencer',
+            'Riccardo Calafiori', 'Matteo Pessina', 'Jorginho', 'Marco Verratti', 'Gianluigi Buffon'
+        ],
+        Portugal: [
+            'Cristiano Ronaldo', 'Bruno Fernandes', 'Joao Cancelo', 'Ruben Dias', 'Pepe',
+            'Rui Patricio', 'Joao Felix', 'Diogo Jota', 'Nuno Mendes', 'Joao Palhinha',
+            'Matheus Nunes', 'Vitinha', 'Otavio', 'Goncalo Inacio', 'Inacio',
+            'Sergio Oliveira', 'Conor Coady', 'Cedric Soares', 'Dalot', 'Rafa Silva'
+        ],
+        Nigeria: [
+            'Victor Osimhen', 'Wilfred Ndidi', 'Iheanacho', 'Sadiq Umar', 'Kelechi Iheanacho',
+            'Taiwo Awoniyi', 'Chidera Ejuke', 'Samuel Chukwueze', 'Ola Aina', 'Zaidu Sanusi',
+            'Jamilu Collins', 'Obi Mikel', 'Nwankwo Kanu', 'Jay-Jay Okocha', 'Ahmed Musa',
+            'Chukwueze', 'Osimhen', 'Ndidi', 'Iheanacho', 'Awoniyi'
+        ],
+        Japan: [
+            'Takumi Minamino', 'Hirving Lozano', 'Reo Hatate', 'Yuta Nakayama', 'Hiroki Sakai',
+            'Daichi Kamada', 'Wataru Endo', 'Takehiro Tomiyasu', 'Yukinari Sugawara', 'Shoji Tomiyasu',
+            'Gonda Shuichi', 'Nacho Fernandez', 'Ito Junya', 'Suzuki Musashi', 'Tanaka Masatoshi',
+            'Kubo Takefusa', 'Ito Junya', 'Yamane Hiroki', 'Nakayama Yuta', 'Sakai Hiroki'
+        ],
+        Korea: [
+            'Son Heung-min', 'Lee Kang-in', 'Kim Min-jae', 'Hwang Hee-chan', 'Paik Seung-ho',
+            'Cho Gue-sung', 'Jeong Woo-yeong', 'Kang In-lee', 'Lim Young-gwon', 'Kim Young-gwon',
+            'Seongryong Park', 'Seung-ho Paik', 'Woo-yeong Jeong', 'Min-jae Kim', 'Hee-chan Hwang',
+            'Sang-ho Park', 'Kyou-won Kang', 'Jae-sung Lee', 'Tae-oh Kang', 'Sung-ryong Park'
+        ],
+        China: [
+            'Wu Lei', 'Feng Xiaoting', 'Zheng Zhi', 'Jiang Guangtai', 'Liu Yang',
+            'Wang Dalei', 'Yan Junling', 'Kou Zhun', 'Luo Guofu', 'Ding Liren',
+            'Tao Qian', 'Shao Jiayi', 'Gao Lin', 'Hao Junmin', 'Zheng Long',
+            'Xia Weiwei', 'Jiang Zhipeng', 'Luo Senwen', 'Ding Haifeng', 'Qin Sheng'
+        ],
+        USA: [
+            'Christian Pulisic', 'Weston McKennie', 'Sergiño Dest', 'Antonee Robinson', 'Joe Scally',
+            'Yunus Musah', 'Tyler Adams', 'Folarin Balogun', 'Gio Reyna', 'Luca de la Torre',
+            'Gregg Berhalter', 'Kellyn Acosta', 'Lletget', 'Arriola', 'Sargent',
+            'Pepi', 'Reyna', 'Pulisic', 'McKennie', 'Dest'
+        ],
+        Mexico: [
+            'Hirving Lozano', 'Guillermo Ochoa', 'Hector Moreno', 'Edson Alvarez', 'Jorge Sanchez',
+            'Raul Jimenez', 'Alexis Vega', 'Tecatito Corona', 'Andres Guardado', 'Cesar Montes',
+            'Néstor Araujo', 'Julio Dominguez', 'Rafa Marquez', 'Carlos Vela', 'Diego Lainez',
+            'Chucky Lozano', 'Memo Ochoa', 'Moreno', 'Edson', 'Sanchez'
+        ]
+    };
+
+    // ==================== AI Avatar Generator ====================
+    const ETHNICITIES = {
+        England: 'white',
+        Spain: 'white',
+        Germany: 'white',
+        France: 'mixed',
+        Brazil: 'mixed',
+        Argentina: 'white',
+        Italy: 'white',
+        Portugal: 'white',
+        Nigeria: 'black',
+        Japan: 'asian',
+        Korea: 'asian',
+        China: 'asian',
+        USA: 'mixed',
+        Mexico: 'mixed'
+    };
+
+    async function generatePlayerAvatar(name, region) {
+        // Use Dicebear API for realistic avatars
+        const ethnicity = ETHNICITIES[region] || 'mixed';
+        const seed = name.replace(/\s+/g, '').toLowerCase();
+        
+        // Dicebear Avataaars style with ethnicity hints
+        const styles = {
+            white: 'avataaars',
+            black: 'avataaars',
+            asian: 'avataaars',
+            mixed: 'avataaars'
+        };
+        
+        const url = `https://api.dicebear.com/7.x/${styles[ethnicity]}/svg?seed=${seed}&scale=80&backgroundColor=random`;
+        return url;
     }
 
     // ==================== I18n ====================
@@ -311,7 +399,9 @@
     // ==================== Player Creation ====================
     function createPlayer(region, position, quality = 60) {
         const age = rand(17, 35);
-        const name = genName(region);
+        const names = PLAYER_NAMES[region] || PLAYER_NAMES['England'];
+        const name = names[rand(0, names.length - 1)];
+        
         const posBonus = {
             GK: { pace: -20, shooting: -25, defending: 20, passing: 5 },
             CB: { pace: -5, shooting: -15, defending: 25, physical: 20 },
@@ -347,13 +437,14 @@
             value: Math.floor(baseValue * rand(80, 120) / 100),
             wage: Math.floor(baseOvr * 80 * rand(80, 120) / 100),
             goals: 0, assists: 0, matches: 0,
+            avatar: null,
             isGK: position === 'GK'
         };
     }
 
     // ==================== Game Init ====================
     function initGame() {
-        const saved = localStorage.getItem('football_v4_save');
+        const saved = localStorage.getItem('football_v5_save');
         if (saved) {
             try {
                 game = JSON.parse(saved);
@@ -372,7 +463,7 @@
         };
         
         const positions = ['GK','CB','CB','CB','LB','RB','CDM','CM','CM','CAM','LW','RW','ST','ST','CM','CDM','CB','LB','RB','GK','CM','ST'];
-        const regions = ['China','England','Spain','Brazil','Germany','France','Italy','Argentina','France','England','Spain','Brazil','Germany','France','Italy','Argentina','China','England','Spain','Brazil','Germany','France'];
+        const regions = ['England','Spain','Brazil','Germany','France','Italy','Argentina','Portugal','Nigeria','Japan','Korea','China','USA','Mexico','England','Spain','Brazil','Germany','France','Italy','Argentina','Portugal'];
         
         for (let i = 0; i < 22; i++) {
             game.team.push(createPlayer(regions[i], positions[i], rand(58, 72)));
@@ -391,7 +482,7 @@
     }
 
     function save() {
-        localStorage.setItem('football_v4_save', JSON.stringify(game));
+        localStorage.setItem('football_v5_save', JSON.stringify(game));
     }
 
     function getLeagueName(i) {
@@ -402,7 +493,7 @@
     function refreshMarket() {
         const q = 55 + game.facilities.academy * 3;
         game.market = [];
-        const regions = ['England', 'Spain', 'Brazil', 'Germany', 'France', 'Italy', 'Argentina'];
+        const regions = ['England', 'Spain', 'Brazil', 'Germany', 'France', 'Italy', 'Argentina', 'Portugal'];
         for (let i = 0; i < 6; i++) {
             const p = createPlayer(regions[rand(0, regions.length - 1)], ['GK','CB','LB','RB','CDM','CM','CAM','LW','RW','ST'][rand(0, 9)], rand(q - 10, q + 15));
             p.askPrice = Math.floor(p.value * rand(75, 125) / 100);
@@ -446,13 +537,6 @@
     }
 
     // ==================== Match Simulation ====================
-    const FORMATION_POSITIONS = {
-        '4-4-2': [0, 1, 1, 2, 3, 4, 5, 5, 6, 7, 8, 9, 9, 10],
-        '4-3-3': [0, 1, 1, 2, 3, 4, 5, 5, 5, 6, 7, 8, 9, 10],
-        '4-2-3-1': [0, 1, 1, 2, 3, 4, 4, 5, 5, 5, 6, 7, 8, 9],
-        '3-5-2': [0, 1, 1, 1, 2, 3, 4, 5, 5, 6, 7, 8, 9, 10]
-    };
-
     function startMatch() {
         currentTab = 'match';
         render();
@@ -512,7 +596,6 @@
         matchCanvas = canvas;
         matchCtx = canvas.getContext('2d');
         
-        // Set canvas size
         const rect = canvas.getBoundingClientRect();
         canvas.width = rect.width * window.devicePixelRatio;
         canvas.height = rect.height * window.devicePixelRatio;
@@ -535,7 +618,6 @@
     function updateMatch() {
         if (!matchState || !matchState.started || matchState.finished) return;
         
-        // Update time
         matchState.second += 2;
         if (matchState.second >= 60) {
             matchState.second = 0;
@@ -554,16 +636,13 @@
             }
         }
         
-        // Move ball
         moveBall();
         
-        // Generate events
         if (matchState.second >= matchState.nextEventMinute * 2 && !matchState.halftime) {
             generateMatchEvent();
             matchState.nextEventMinute = rand(15, 45);
         }
         
-        // Move players
         movePlayers();
     }
 
@@ -571,21 +650,17 @@
         const ball = matchState.ball;
         
         if (ball.owner) {
-            // Ball follows owner
             ball.x += (ball.owner.x - ball.x) * 0.3;
             ball.y += (ball.owner.y - ball.y) * 0.3;
         } else {
-            // Ball moves freely
             ball.x += ball.vx * 0.02;
             ball.y += ball.vy * 0.02;
             ball.vx *= 0.95;
             ball.vy *= 0.95;
             
-            // Keep in bounds
             ball.x = Math.max(0.02, Math.min(0.98, ball.x));
             ball.y = Math.max(0.02, Math.min(0.98, ball.y));
             
-            // Try to intercept
             if (Math.random() < 0.02) {
                 const attackers = matchState.possession === 'my' ? matchState.oppTeam : matchState.myTeam;
                 const closest = attackers.reduce((best, p) => {
@@ -610,16 +685,13 @@
             
             if (ball.owner) {
                 if (matchState.possession === 'my') {
-                    // Attack - move towards goal
                     targetX = 0.5 + (p.x - 0.5) * 0.5;
                     targetY = 0.3 + Math.random() * 0.4;
                 } else {
-                    // Defend - track back
                     targetX = 0.3 + (p.x - 0.3) * 0.5;
                     targetY = 0.2 + Math.random() * 0.6;
                 }
             } else {
-                // Follow ball
                 targetX = ball.x + (p.x - 0.5) * 0.3;
                 targetY = ball.y + (p.y - 0.5) * 0.3;
             }
@@ -665,59 +737,49 @@
         const eventType = rand(1, 100);
         
         if (eventType <= 25) {
-            // Shot
             const shotQuality = (shooter.shooting + shooter.pace) / 2;
-            const saveChance = myAttack ? (matchState.oppTeam[0].defending + 40) / 2 : (matchState.myTeam[0].defending + 40)            const shooterOvr = shooter.ovr;
+            const saveChance = myAttack ? (matchState.oppTeam[0].defending + 40) / 2 : (matchState.myTeam[0].defending + 40) / 2;
             
             matchState.ball.owner = shooter;
             matchState.ball.x = shooter.x;
             matchState.ball.y = shooter.y;
             
             if (shotQuality > saveChance + 10) {
-                // Goal!
                 if (myAttack) {
                     matchState.myScore++;
                     shooter.goals++;
                 } else {
                     matchState.oppScore++;
                 }
-                addMatchEvent(`⚽ ${shooter.name.en.split(' ')[0]} SCORES! ${matchState.myScore} - ${matchState.oppScore}`, 'goal');
+                addMatchEvent(`⚽ ${shooter.name.split(' ')[0]} SCORES! ${matchState.myScore} - ${matchState.oppScore}`, 'goal');
             } else if (shotQuality > saveChance - 5) {
-                // Saved
-                addMatchEvent(`🧤 ${shooter.name.en.split(' ')[0]} - Saved!`, 'shot');
-                const gk = myAttack ? matchState.oppTeam[0] : matchState.myTeam[0];
+                addMatchEvent(`🧤 ${shooter.name.split(' ')[0]} - Saved!`, 'shot');
                 matchState.ball.owner = null;
                 matchState.ball.vx = (Math.random() - 0.5) * 2;
                 matchState.ball.vy = (Math.random() - 0.5) * 2;
             } else {
-                // Missed
-                addMatchEvent(`❌ ${shooter.name.en.split(' ')[0]} - Missed!`, 'shot');
+                addMatchEvent(`❌ ${shooter.name.split(' ')[0]} - Missed!`, 'shot');
                 matchState.ball.owner = null;
                 matchState.ball.vx = (Math.random() - 0.5) * 3;
                 matchState.ball.vy = (Math.random() - 0.5) * 3;
             }
         } else if (eventType <= 35) {
-            // Foul
             const fouler = attackers[rand(0, attackers.length - 1)];
-            const fouled = myAttack ? matchState.oppTeam[rand(0, 5)] : matchState.myTeam[rand(0, 5)];
             
             if (rand(1, 100) <= 15) {
-                // Yellow card
                 const team = myAttack ? 'my' : 'opp';
                 if (!matchState.yellowCards[team].includes(fouler.id)) {
                     matchState.yellowCards[team].push(fouler.id);
-                    addMatchEvent(`🟨 Yellow Card: ${fouler.name.en.split(' ')[0]}`, 'card');
+                    addMatchEvent(`🟨 Yellow Card: ${fouler.name.split(' ')[0]}`, 'card');
                 } else {
-                    // Second yellow = red
-                    addMatchEvent(`🟥 RED CARD: ${fouler.name.en.split(' ')[0]}`, 'card');
+                    addMatchEvent(`🟥 RED CARD: ${fouler.name.split(' ')[0]}`, 'card');
                 }
             } else {
-                addMatchEvent(`⚠️ Foul by ${fouler.name.en.split(' ')[0]}`, 'foul');
+                addMatchEvent(`⚠️ Foul by ${fouler.name.split(' ')[0]}`, 'foul');
             }
             
             matchState.possession = matchState.possession === 'my' ? 'opp' : 'my';
         } else if (eventType <= 50) {
-            // Pass/Skills
             const passer = attackers[rand(0, 7)];
             const receiver = attackers[rand(0, 7)];
             
@@ -725,12 +787,11 @@
                 matchState.ball.owner = receiver;
                 matchState.ball.x = receiver.x;
                 matchState.ball.y = receiver.y;
-                addMatchEvent(`👟 ${passer.name.en.split(' ')[0]} → ${receiver.name.en.split(' ')[0]}`, 'pass');
+                addMatchEvent(`👟 ${passer.name.split(' ')[0]} → ${receiver.name.split(' ')[0]}`, 'pass');
             }
         } else if (eventType <= 55) {
-            // Substitution
             if (matchState.minute >= 60 && matchState.myTeam.length > 11) {
-                addMatchEvent(`🔄 Substitution: ${matchState.myTeam[11].name.en.split(' ')[0]} ON`, 'sub');
+                addMatchEvent(`🔄 Substitution: ${matchState.myTeam[11].name.split(' ')[0]} ON`, 'sub');
                 matchState.myTeam.shift();
             }
         }
@@ -752,7 +813,6 @@
             cancelAnimationFrame(animationId);
         }
         
-        // Update league
         const myLeague = game.league.find(l => l.name === 'FC United');
         const oppLeague = game.league.find(l => l.name === matchState.oppName);
         
@@ -902,15 +962,16 @@
                         <div class="player-card">
                             <div class="flex justify-between items-center">
                                 <div class="flex items-center gap-2">
-                                    <div class="pos-badge bg-gradient-to-br from-amber-400 to-amber-600 text-black">${p.position}</div>
+                                    <div class="player-avatar">
+                                        <img src="${p.avatar || 'data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22%3E%3Ccircle cx=%2250%22 cy=%2250%22 r=%2250%22 fill=%22%23667eea%22/%3E%3C/svg%3E'}" alt="${p.name}" onerror="this.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22%3E%3Ccircle cx=%2250%22 cy=%2250%22 r=%2250%22 fill=%22%23667eea%22/%3E%3C/svg%3E'">
+                                    </div>
                                     <div>
-                                        <div class="font-bold">${LANG === 'zh' ? p.name.zh : p.name.en}</div>
-                                        <div class="text-xs text-slate-400">${p.age} ${LANG==='zh'?'岁':'yrs'} · ${t('potential')}: ${p.potential}</div>
+                                        <div class="font-bold">${p.name}</div>
+                                        <div class="text-xs text-slate-400">${p.age} yrs · ${t('potential')}: ${p.potential}</div>
                                     </div>
                                 </div>
                                 <div class="text-right">
                                     <div class="text-2xl font-bold game-title ${p.ovr>=70?'text-cyan-300':p.ovr>=60?'text-green-400':'text-slate-400'}">${p.ovr}</div>
-                                    <div class="text-xs text-slate-400">${t('overall')}</div>
                                 </div>
                             </div>
                             <div class="flex gap-1 mt-2">
@@ -929,10 +990,12 @@
                     ${game.market.map(p => `
                         <div class="flex justify-between items-center bg-slate-800/50 p-2 rounded-lg cursor-pointer hover:bg-slate-700/50" onclick="buyPlayer('${p.id}')">
                             <div class="flex items-center gap-2">
-                                <div class="pos-badge ${p.position==='GK'?'bg-green-600':['CB','LB','RB'].includes(p.position)?'bg-blue-600':['CDM','CM','CAM'].includes(p.position)?'bg-yellow-600':'bg-red-600'} text-white text-xs">${p.position}</div>
+                                <div class="player-avatar" style="width:36px;height:36px;">
+                                    <img src="${p.avatar || 'data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22%3E%3Ccircle cx=%2250%22 cy=%2250%22 r=%2250%22 fill=%22%23667eea%22/%3E%3C/svg%3E'}" alt="${p.name}" onerror="this.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22%3E%3Ccircle cx=%2250%22 cy=%2250%22 r=%2250%22 fill=%22%23667eea%22/%3E%3C/svg%3E'">
+                                </div>
                                 <div>
-                                    <div class="font-medium text-sm">${LANG === 'zh' ? p.name.zh : p.name.en}</div>
-                                    <div class="text-xs text-slate-400">${p.age}${LANG==='zh'?'岁':''} · ${p.ovr}⭐</div>
+                                    <div class="font-medium text-sm">${p.name}</div>
+                                    <div class="text-xs text-slate-400">${p.age} yrs · ${p.ovr}⭐</div>
                                 </div>
                             </div>
                             <div class="text-right">
@@ -987,10 +1050,12 @@
                     <div class="player-card">
                         <div class="flex justify-between items-center">
                             <div class="flex items-center gap-3">
-                                <div class="pos-badge ${p.position==='GK'?'bg-gradient-to-br from-green-500 to-green-700':['CB','LB','RB'].includes(p.position)?'bg-gradient-to-br from-blue-500 to-blue-700':['CDM','CM','CAM'].includes(p.position)?'bg-gradient-to-br from-yellow-500 to-yellow-700':'bg-gradient-to-br from-red-500 to-red-700'} text-white text-sm">${p.position}</div>
+                                <div class="player-avatar">
+                                    <img src="${p.avatar || 'data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22%3E%3Ccircle cx=%2250%22 cy=%2250%22 r=%2250%22 fill=%22%23667eea%22/%3E%3C/svg%3E'}" alt="${p.name}" onerror="this.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22%3E%3Ccircle cx=%2250%22 cy=%2250%22 r=%2250%22 fill=%22%23667eea%22/%3E%3C/svg%3E'">
+                                </div>
                                 <div>
-                                    <div class="font-bold">${LANG === 'zh' ? p.name.zh : p.name.en}</div>
-                                    <div class="text-xs text-slate-400">${p.age}${LANG==='zh'?'岁':''} · ${p.region}</div>
+                                    <div class="font-bold">${p.name}</div>
+                                    <div class="text-xs text-slate-400">${p.age} yrs · ${p.region}</div>
                                 </div>
                             </div>
                             <div class="text-right">
@@ -1048,7 +1113,7 @@
                 <div class="space-y-1">
                     ${game.team.slice(0, 11).map(p => `
                         <div class="flex justify-between items-center bg-slate-800/50 p-2 rounded-lg text-sm">
-                            <span>${LANG === 'zh' ? p.name.zh : p.name.en}</span>
+                            <span>${p.name}</span>
                             <span class="text-cyan-400 font-bold">${p.position}</span>
                             <span class="text-amber-400">${p.ovr}</span>
                         </div>
@@ -1078,7 +1143,7 @@
                                 <div class="flex items-center gap-2">
                                     <span class="text-2xl">${f.icon}</span>
                                     <div>
-                                        <div class="font-bold">${LANG === 'zh' ? (f.key === 'training' ? '训练场' : f.key === 'academy' ? '青训营' : '体育场') : f.name}</div>
+                                        <div class="font-bold">${f.name}</div>
                                     </div>
                                 </div>
                                 <div class="text-right">
@@ -1103,7 +1168,6 @@
             return renderMatchView();
         }
         
-        const myLeague = game.league.find(l => l.name === 'FC United');
         const opp = game.league[rand(1, game.league.length - 1)];
         
         return `
@@ -1113,13 +1177,11 @@
                     <div class="text-center">
                         <div class="text-2xl mb-1">🔵</div>
                         <div class="font-bold">${getLeagueName(0)}</div>
-                        <div class="text-xs text-slate-400">#${game.league.sort((a,b)=>b.pts-a.pts).findIndex(l=>l.name==='FC United')+1}</div>
                     </div>
                     <div class="text-3xl font-bold game-title text-slate-500">${t('vs')}</div>
                     <div class="text-center">
                         <div class="text-2xl mb-1">🔴</div>
                         <div class="font-bold">${getLeagueName(opp.index)}</div>
-                        <div class="text-xs text-slate-400">${t('strength')}: ${opp.strength}</div>
                     </div>
                 </div>
             </div>
@@ -1153,7 +1215,7 @@
             </div>
             
             <div class="card p-3" style="max-height:200px;overflow-y:auto;">
-                <h4 class="font-bold text-sm mb-2">📋 ${LANG==='zh'?'赛事':'Events'}</h4>
+                <h4 class="font-bold text-sm mb-2">📋 Events</h4>
                 <div id="matchEvents" class="space-y-1">
                     ${matchState.events.map(e => `
                         <div class="event-item ${e.type === 'goal' ? 'event-goal' : e.type === 'card' ? 'event-card' : e.type === 'shot' ? 'event-shot' : e.type === 'foul' ? 'event-foul' : e.type === 'sub' ? 'event-sub' : 'event-pass'} p-2 rounded text-xs">
@@ -1194,42 +1256,33 @@
         const w = matchCanvas.width / window.devicePixelRatio;
         const h = matchCanvas.height / window.devicePixelRatio;
         
-        // Clear
         ctx.fillStyle = '#2d8a2d';
         ctx.fillRect(0, 0, w, h);
         
-        // Field lines
         ctx.strokeStyle = 'rgba(255,255,255,0.3)';
         ctx.lineWidth = 1;
         
-        // Border
         ctx.strokeRect(10, 10, w - 20, h - 20);
         
-        // Center line
         ctx.beginPath();
         ctx.moveTo(w / 2, 10);
         ctx.lineTo(w / 2, h - 10);
         ctx.stroke();
         
-        // Center circle
         ctx.beginPath();
         ctx.arc(w / 2, h / 2, 30, 0, Math.PI * 2);
         ctx.stroke();
         
-        // Goals
         ctx.strokeRect(10, h / 2 - 25, 15, 50);
         ctx.strokeRect(w - 25, h / 2 - 25, 15, 50);
         
-        // Penalty areas
         ctx.strokeRect(10, h / 4, 30, h / 2);
         ctx.strokeRect(w - 40, h / 4, 30, h / 2);
         
-        // Draw players
         matchState.myTeam.forEach((p, i) => {
             const x = p.x * w;
             const y = p.y * h;
             
-            // Player dot
             ctx.beginPath();
             ctx.arc(x, y, 12, 0, Math.PI * 2);
             ctx.fillStyle = '#00aaff';
@@ -1238,11 +1291,10 @@
             ctx.lineWidth = 2;
             ctx.stroke();
             
-            // Name
             ctx.fillStyle = '#ffffff';
             ctx.font = '8px Inter';
             ctx.textAlign = 'center';
-            const shortName = p.name.en.split(' ')[0].substring(0, 4);
+            const shortName = p.name.split(' ')[0].substring(0, 4);
             ctx.fillText(shortName, x, y + 22);
         });
         
@@ -1250,7 +1302,6 @@
             const x = p.x * w;
             const y = p.y * h;
             
-            // Player dot
             ctx.beginPath();
             ctx.arc(x, y, 12, 0, Math.PI * 2);
             ctx.fillStyle = '#ff4444';
@@ -1259,15 +1310,13 @@
             ctx.lineWidth = 2;
             ctx.stroke();
             
-            // Name
             ctx.fillStyle = '#ffffff';
             ctx.font = '8px Inter';
             ctx.textAlign = 'center';
-            const shortName = p.name.en.split(' ')[0].substring(0, 4);
+            const shortName = p.name.split(' ')[0].substring(0, 4);
             ctx.fillText(shortName, x, y + 22);
         });
         
-        // Draw ball
         const bx = matchState.ball.x * w;
         const by = matchState.ball.y * h;
         ctx.beginPath();
@@ -1278,7 +1327,6 @@
         ctx.lineWidth = 1;
         ctx.stroke();
         
-        // Score overlay
         ctx.fillStyle = 'rgba(0,0,0,0.6)';
         ctx.fillRect(w/2 - 50, 0, 100, 22);
         ctx.fillStyle = '#ffffff';
@@ -1286,7 +1334,6 @@
         ctx.textAlign = 'center';
         ctx.fillText(`${matchState.myScore} - ${matchState.oppScore}`, w/2, 15);
         
-        // Minute
         ctx.fillStyle = 'rgba(0,0,0,0.6)';
         ctx.fillRect(w - 40, 0, 40, 18);
         ctx.fillStyle = '#ff4444';
@@ -1318,7 +1365,7 @@
             game.budget -= Math.floor(p.value * 0.3);
             game.team.push(p);
             game.prospects = game.prospects.filter(x => x.id !== id);
-            addNews(`✅ Signed ${p.name.en}!`);
+            addNews(`✅ Signed ${p.name}!`);
             showToast = t('signed');
             save();
             render();
@@ -1339,7 +1386,7 @@
             game.budget -= p.askPrice;
             game.team.push(p);
             game.market = game.market.filter(x => x.id !== id);
-            addNews(`💰 Signed ${p.name.en}!`);
+            addNews(`💰 Signed ${p.name}!`);
             showToast = t('signed');
             save();
             render();
@@ -1350,10 +1397,29 @@
     }
 
     // ==================== Boot ====================
-    initGame();
-    refreshMarket();
-    scoutAcademy();
-    render();
+    async function boot() {
+        initGame();
+        
+        // Generate avatars for all players
+        for (let p of game.team) {
+            p.avatar = await generatePlayerAvatar(p.name, p.region);
+        }
+        
+        refreshMarket();
+        for (let p of game.market) {
+            p.avatar = await generatePlayerAvatar(p.name, p.region);
+        }
+        
+        scoutAcademy();
+        for (let p of game.prospects) {
+            p.avatar = await generatePlayerAvatar(p.name, p.region);
+        }
+        
+        save();
+        render();
+    }
+
+    boot();
     </script>
 </body>
 </html>
