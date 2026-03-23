@@ -94,82 +94,150 @@
         USA: ['Christian Pulisic','Weston McKennie','Sergiño Dest','Antonee Robinson','Tyler Adams','Yunus Musah','Gio Reyna','Joe Scally','Tim Weah','Brenden Aaronson']
     };
     
-    // ==================== Avatar - Realistic AI Faces ====================
+    // ==================== Avatar - Dicebear Realistic Faces ====================
     function getPlayerAvatar(player) {
-        // 使用 MultiAvatar API - 更真实的人脸
-        // 每个球员有独特的头像
+        // 使用 Dicebear API 生成更真实的头像
+        // avataaars 风格 - 卡通但更真实的人脸
         const seed = player.id || player.name;
-        return `https://api.multiavatar.com/${encodeURIComponent(seed)}.svg`;
+        // 使用 fun-emoji 风格，更加真实
+        return `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(seed)}&backgroundColor=0ea5e9,7c3aed,f59e0b,10b981,ef4444`;
     }
     
     // ==================== 3D Player Model ====================
     function generate3DPlayer(player) {
+        // 根据位置调整体型
+        const positionBodyTypes = {
+            'GK': { shoulder: 1.15, chest: 1.2, leg: 0.9, heightBonus: 8 },  // 门将：宽肩、壮实
+            'CB': { shoulder: 1.1, chest: 1.15, leg: 1.0, heightBonus: 3 },   // 中卫：强壮
+            'LB': { shoulder: 0.95, chest: 1.0, leg: 1.05, heightBonus: 0 },  // 左边卫：匀称
+            'RB': { shoulder: 0.95, chest: 1.0, leg: 1.05, heightBonus: 0 },  // 右边卫：匀称
+            'CDM': { shoulder: 1.05, chest: 1.1, leg: 1.0, heightBonus: 1 },  // 防守中场：偏壮
+            'CM': { shoulder: 1.0, chest: 1.0, leg: 1.0, heightBonus: 0 },    // 中场：标准
+            'CAM': { shoulder: 0.95, chest: 0.95, leg: 1.0, heightBonus: -2 },// 前腰：精瘦
+            'LW': { shoulder: 0.9, chest: 0.9, leg: 1.1, heightBonus: -2 },   // 左边锋：精瘦快速
+            'RW': { shoulder: 0.9, chest: 0.9, leg: 1.1, heightBonus: -2 },   // 右边锋：精瘦快速
+            'ST': { shoulder: 1.0, chest: 1.05, leg: 1.05, heightBonus: 2 }   // 前锋：力量型
+        };
+        
+        const bodyType = positionBodyTypes[player.position] || { shoulder: 1.0, chest: 1.0, leg: 1.0, heightBonus: 0 };
+        
         const heightNorm = (player.height - 170) / 30;
         const weightNorm = (player.weight - 70) / 25;
-        const bodyScale = 1 + weightNorm * 0.2;
-        const heightScale = 1 + heightNorm * 0.15;
+        const baseHeight = 160 + heightNorm * 20 + bodyType.heightBonus;
+        const shoulderWidth = 24 * bodyType.shoulder * (1 + weightNorm * 0.1);
+        const chestWidth = 40 * bodyType.chest * (1 + weightNorm * 0.15);
+        const legLength = 50 * bodyType.leg * (1 + heightNorm * 0.1);
         
         const jerseyNum = Math.floor(Math.random() * 99) + 1;
         const jerseyColors = ['#00d4ff', '#ff4444', '#44ff44', '#ffff44', '#ff44ff'];
         const jerseyColor = jerseyColors[Math.floor(Math.random() * jerseyColors.length)];
         
-        const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 160" width="140" height="220">
+        // 根据位置选择肤色（更真实）
+        const skinTones = ['#FFD7A8', '#F5C89A', '#E8A87C', '#D4A574', '#C68642'];
+        const skinTone = skinTones[Math.floor(Math.random() * skinTones.length)];
+        const skinToneDark = shadeColor(skinTone, -15);
+        
+        const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 ${baseHeight}" width="140" height="${baseHeight * 1.4}">
             <defs>
                 <linearGradient id="body${player.id}" x1="0%" y1="0%" x2="0%" y2="100%">
-                    <stop offset="0%" style="stop-color:#FFD7A8"/>
-                    <stop offset="100%" style="stop-color:#F5C89A"/>
+                    <stop offset="0%" style="stop-color:${skinTone}"/>
+                    <stop offset="100%" style="stop-color:${skinToneDark}"/>
                 </linearGradient>
                 <linearGradient id="jersey${player.id}" x1="0%" y1="0%" x2="0%" y2="100%">
                     <stop offset="0%" style="stop-color:${jerseyColor}"/>
-                    <stop offset="100%" style="stop-color:${jerseyColor}cc"/>
+                    <stop offset="100%" style="stop-color:${shadeColor(jerseyColor, -20)}"/>
                 </linearGradient>
             </defs>
             
             <!-- 头 -->
-            <circle cx="50" cy="20" r="14" fill="url(#body${player.id})"/>
+            <ellipse cx="50" cy="20" rx="${12 + weightNorm * 2}" ry="14" fill="url(#body${player.id})"/>
             
             <!-- 头发 -->
-            <ellipse cx="50" cy="12" rx="14" ry="8" fill="#2C1810"/>
+            <ellipse cx="50" cy="11" rx="${14 + weightNorm * 2}" ry="9" fill="#2C1810"/>
+            <ellipse cx="50" cy="8" rx="10" ry="5" fill="#1a0f08"/>
+            
+            <!-- 眉毛 -->
+            <path d="M 42 15 Q 45 13 48 15" stroke="#1a0f08" stroke-width="1.5" fill="none"/>
+            <path d="M 52 15 Q 55 13 58 15" stroke="#1a0f08" stroke-width="1.5" fill="none"/>
             
             <!-- 眼睛 -->
-            <circle cx="45" cy="19" r="2" fill="#000"/>
-            <circle cx="55" cy="19" r="2" fill="#000"/>
-            <circle cx="45.5" cy="18.5" r="0.8" fill="#fff"/>
-            <circle cx="55.5" cy="18.5" r="0.8" fill="#fff"/>
+            <ellipse cx="45" cy="19" rx="2.5" ry="2" fill="#fff"/>
+            <ellipse cx="55" cy="19" rx="2.5" ry="2" fill="#fff"/>
+            <circle cx="45" cy="19" r="1.5" fill="#3a2a1a"/>
+            <circle cx="55" cy="19" r="1.5" fill="#3a2a1a"/>
+            <circle cx="45.5" cy="18.5" r="0.6" fill="#fff"/>
+            <circle cx="55.5" cy="18.5" r="0.6" fill="#fff"/>
             
             <!-- 鼻子 -->
-            <path d="M 50 21 L 48 25 L 52 25 Z" fill="#E8A87C"/>
+            <path d="M 50 20 L 48 25 L 52 25 Z" fill="${skinToneDark}"/>
             
             <!-- 嘴 -->
-            <path d="M 45 27 Q 50 29 55 27" stroke="#C96B6B" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+            <path d="M 46 28 Q 50 30 54 28" stroke="#a05050" stroke-width="1.5" fill="none" stroke-linecap="round"/>
             
             <!-- 脖子 -->
-            <rect x="46" y="33" width="8" height="8" fill="url(#body${player.id})"/>
+            <rect x="45" y="33" width="10" height="8" fill="url(#body${player.id})"/>
             
-            <!-- 球衣 -->
-            <path d="M 30 41 L 25 45 L 22 ${85 * heightScale} L 30 ${88 * heightScale} L 70 ${88 * heightScale} L 78 ${85 * heightScale} L 75 45 L 70 41 Z" fill="url(#jersey${player.id})" stroke="#fff" stroke-width="1"/>
+            <!-- 球衣主体 - 根据体型调整 -->
+            <path d="M ${50 - shoulderWidth/2} 41 
+                     L ${50 - shoulderWidth/2 - 5} 45 
+                     L ${50 - chestWidth/2 - 3} ${88 + heightNorm * 10} 
+                     L ${50 - chestWidth/2 + 5} ${92 + heightNorm * 10} 
+                     L ${50 + chestWidth/2 - 5} ${92 + heightNorm * 10} 
+                     L ${50 + chestWidth/2 + 3} ${88 + heightNorm * 10} 
+                     L ${50 + shoulderWidth/2 + 5} 45 
+                     L ${50 + shoulderWidth/2} 41 Z" 
+                  fill="url(#jersey${player.id})" stroke="#fff" stroke-width="1"/>
             
             <!-- 球衣号码 -->
-            <text x="50" y="${65 * heightScale}" font-family="Arial Black" font-size="16" font-weight="bold" fill="white" text-anchor="middle">${jerseyNum}</text>
+            <text x="50" y="${68 + heightNorm * 5}" font-family="Arial Black" font-size="14" font-weight="bold" fill="white" text-anchor="middle">${jerseyNum}</text>
             
-            <!-- 手臂 -->
-            <ellipse cx="22" cy="50" rx="6" ry="${20 * heightScale}" fill="url(#body${player.id})"/>
-            <ellipse cx="78" cy="50" rx="6" ry="${20 * heightScale}" fill="url(#body${player.id})"/>
+            <!-- 球衣细节线条 -->
+            <line x1="50" y1="50" x2="50" y2="${70 + heightNorm * 5}" stroke="rgba(255,255,255,0.3)" stroke-width="1"/>
             
-            <!-- 腿 -->
-            <rect x="38" y="${88 * heightScale}" width="8" height="${50 * heightScale}" fill="url(#body${player.id})"/>
-            <rect x="54" y="${88 * heightScale}" width="8" height="${50 * heightScale}" fill="url(#body${player.id})"/>
+            <!-- 手臂 - 根据体型调整粗细 -->
+            <ellipse cx="${50 - shoulderWidth/2 - 5}" cy="55" rx="${6 * bodyType.shoulder}" ry="${22 * (1 + heightNorm * 0.1)}" fill="url(#body${player.id})"/>
+            <ellipse cx="${50 + shoulderWidth/2 + 5}" cy="55" rx="${6 * bodyType.shoulder}" ry="${22 * (1 + heightNorm * 0.1)}" fill="url(#body${player.id})"/>
+            
+            <!-- 短裤 -->
+            <path d="M ${50 - chestWidth/2 + 5} ${92 + heightNorm * 10} 
+                     L ${50 - 12} ${100 + heightNorm * 10 + legLength * 0.3} 
+                     L ${50 - 8} ${100 + heightNorm * 10 + legLength * 0.3} 
+                     L ${50 - 3} ${92 + heightNorm * 10} 
+                     L ${50 + 3} ${92 + heightNorm * 10} 
+                     L ${50 + 8} ${100 + heightNorm * 10 + legLength * 0.3} 
+                     L ${50 + 12} ${100 + heightNorm * 10 + legLength * 0.3} 
+                     L ${50 + chestWidth/2 - 5} ${92 + heightNorm * 10} Z" 
+                  fill="#1a1a2e"/>
+            
+            <!-- 腿 - 根据体型调整 -->
+            <rect x="${50 - 10}" y="${100 + heightNorm * 10 + legLength * 0.3}" width="8" height="${legLength * 0.6}" rx="3" fill="url(#body${player.id})"/>
+            <rect x="${50 + 2}" y="${100 + heightNorm * 10 + legLength * 0.3}" width="8" height="${legLength * 0.6}" rx="3" fill="url(#body${player.id})"/>
             
             <!-- 球袜 -->
-            <rect x="37" y="${130 * heightScale}" width="10" height="12" fill="${jerseyColor}" opacity="0.8"/>
-            <rect x="53" y="${130 * heightScale}" width="10" height="12" fill="${jerseyColor}" opacity="0.8"/>
+            <rect x="${50 - 11}" y="${100 + heightNorm * 10 + legLength * 0.8}" width="10" height="14" rx="2" fill="${jerseyColor}" opacity="0.85"/>
+            <rect x="${50 + 1}" y="${100 + heightNorm * 10 + legLength * 0.8}" width="10" height="14" rx="2" fill="${jerseyColor}" opacity="0.85"/>
             
             <!-- 球鞋 -->
-            <ellipse cx="42" cy="${145 * heightScale}" rx="7" ry="5" fill="#1a1a1a"/>
-            <ellipse cx="58" cy="${145 * heightScale}" rx="7" ry="5" fill="#1a1a1a"/>
+            <ellipse cx="${50 - 6}" cy="${118 + heightNorm * 10 + legLength * 0.75}" rx="8" ry="5" fill="#1a1a1a"/>
+            <ellipse cx="${50 + 6}" cy="${118 + heightNorm * 10 + legLength * 0.75}" rx="8" ry="5" fill="#1a1a1a"/>
+            <!-- 鞋钉 -->
+            <rect x="${50 - 10}" y="${120 + heightNorm * 10 + legLength * 0.75}" width="2" height="3" fill="#333"/>
+            <rect x="${50 - 6}" y="${121 + heightNorm * 10 + legLength * 0.75}" width="2" height="3" fill="#333"/>
+            <rect x="${50 + 4}" y="${121 + heightNorm * 10 + legLength * 0.75}" width="2" height="3" fill="#333"/>
+            <rect x="${50 + 8}" y="${120 + heightNorm * 10 + legLength * 0.75}" width="2" height="3" fill="#333"/>
         </svg>`;
         
         return 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+    }
+    
+    // 颜色调节辅助函数
+    function shadeColor(color, percent) {
+        const num = parseInt(color.replace('#', ''), 16);
+        const amt = Math.round(2.55 * percent);
+        const R = Math.max(0, Math.min(255, (num >> 16) + amt));
+        const G = Math.max(0, Math.min(255, (num >> 8 & 0x00FF) + amt));
+        const B = Math.max(0, Math.min(255, (num & 0x0000FF) + amt));
+        return '#' + (0x1000000 + R * 0x10000 + G * 0x100 + B).toString(16).slice(1);
     }
     
     // ==================== Game State ====================
@@ -323,23 +391,33 @@
         console.log('Match started:', matchState.myTeam.length, 'vs', matchState.oppTeam.length);
         
         let lastTime = performance.now();
+        let lastEventTime = 0;
+        
         function loop(time) {
             if (!matchState || !matchState.started || matchState.finished) return;
             
             const dt = Math.min((time - lastTime) / 1000, 0.05);
             lastTime = time;
             
-            // 更新比赛
-            matchState.second += dt;
+            // 更新比赛时间
+            matchState.second += dt * 60; // 加速时间流逝 (1秒 = 1分钟比赛时间)
             if (matchState.second >= 60) {
                 matchState.second = 0;
                 matchState.minute++;
+                
+                // 每分钟检查进球事件
+                simulateMatchEvents();
+                
                 if (matchState.minute >= 90) {
                     matchState.finished = true;
+                    endMatch();
                     render();
                     return;
                 }
             }
+            
+            // 移动球员和球
+            updatePlayerPositions(dt);
             
             // 渲染
             renderMatchCanvas();
@@ -347,6 +425,99 @@
         }
         
         animationId = requestAnimationFrame(loop);
+    }
+    
+    function simulateMatchEvents() {
+        if (!matchState) return;
+        
+        // 计算球队实力
+        const myStrength = matchState.myTeam.reduce((sum, p) => sum + p.ovr, 0) / 11;
+        const oppStrength = matchState.oppTeam.reduce((sum, p) => sum + p.ovr, 0) / 11;
+        
+        // 进球概率基于实力差
+        const myGoalChance = 0.02 + (myStrength - oppStrength) * 0.001;
+        const oppGoalChance = 0.02 + (oppStrength - myStrength) * 0.001;
+        
+        if (Math.random() < myGoalChance) {
+            matchState.myScore++;
+            const scorer = matchState.myTeam[rand(8, 10)] || matchState.myTeam[rand(0, 10)];
+            matchState.events.push({ minute: matchState.minute, type: 'goal', team: 'my', player: scorer.name });
+        }
+        
+        if (Math.random() < oppGoalChance) {
+            matchState.oppScore++;
+            const scorer = matchState.oppTeam[rand(8, 10)] || matchState.oppTeam[rand(0, 10)];
+            matchState.events.push({ minute: matchState.minute, type: 'goal', team: 'opp', player: scorer.name });
+        }
+    }
+    
+    function updatePlayerPositions(dt) {
+        if (!matchState) return;
+        
+        // 更新球位置
+        matchState.ball.x += matchState.ball.vx * dt;
+        matchState.ball.y += matchState.ball.vy * dt;
+        
+        // 球场边界
+        if (matchState.ball.x < 0 || matchState.ball.x > 1) matchState.ball.vx *= -0.8;
+        if (matchState.ball.y < 0 || matchState.ball.y > 1) matchState.ball.vy *= -0.8;
+        matchState.ball.x = Math.max(0, Math.min(1, matchState.ball.x));
+        matchState.ball.y = Math.max(0, Math.min(1, matchState.ball.y));
+        
+        // 随机球移动
+        if (Math.random() < 0.05) {
+            matchState.ball.vx = (Math.random() - 0.5) * 0.5;
+            matchState.ball.vy = (Math.random() - 0.5) * 0.5;
+        }
+        
+        // 球员追球
+        const allPlayers = [...matchState.myTeam, ...matchState.oppTeam];
+        allPlayers.forEach(p => {
+            const dx = matchState.ball.x - p.x;
+            const dy = matchState.ball.y - p.y;
+            const dist = Math.sqrt(dx*dx + dy*dy);
+            
+            // 如果球近，追球
+            if (dist < 0.3 && Math.random() < 0.1) {
+                p.vx += dx * 0.02;
+                p.vy += dy * 0.02;
+            } else {
+                // 回归原位
+                p.vx += (p.homeX - p.x) * 0.01;
+                p.vy += (p.homeY - p.y) * 0.01;
+            }
+            
+            // 更新位置
+            p.x += p.vx * dt;
+            p.y += p.vy * dt;
+            p.vx *= 0.95;
+            p.vy *= 0.95;
+            
+            // 边界
+            p.x = Math.max(0.02, Math.min(0.98, p.x));
+            p.y = Math.max(0.02, Math.min(0.98, p.y));
+        });
+    }
+    
+    function endMatch() {
+        // 更新联赛积分
+        const myLeague = game.league[0];
+        myLeague.played++;
+        myLeague.gf += matchState.myScore;
+        myLeague.ga += matchState.oppScore;
+        
+        if (matchState.myScore > matchState.oppScore) {
+            myLeague.won++;
+            myLeague.pts += 3;
+        } else if (matchState.myScore < matchState.oppScore) {
+            myLeague.lost++;
+        } else {
+            myLeague.drawn++;
+            myLeague.pts += 1;
+        }
+        
+        game.week++;
+        save();
     }
     
     function renderMatchCanvas() {
@@ -406,7 +577,6 @@
         ctx.fillStyle = '#ff4444';
         ctx.font = 'bold 14px Arial';
         ctx.fillText(`${matchState.minute}'`, w-25, 24);
-    }
     }
     
     function renderMatch() {
@@ -596,18 +766,42 @@
     
     function renderMatchTab() {
         if (matchState && matchState.started) {
+            const recentEvents = matchState.events.slice(-5).reverse();
             return `
                 <div class="card p-3 mb-3">
                     <div class="flex justify-between items-center">
                         <div class="text-center"><div class="text-xs text-slate-400">FC联</div><div class="text-4xl font-bold game-title text-cyan-300">${matchState.myScore}</div></div>
-                        <div class="text-center"><div class="text-xs text-red-400 font-bold animate-pulse">${t('live')}</div><div class="text-2xl font-bold game-title">${matchState.minute}'</div></div>
+                        <div class="text-center"><div class="text-xs text-red-400 font-bold ${matchState.finished?'':'animate-pulse'}">${matchState.finished?'终场':t('live')}</div><div class="text-2xl font-bold game-title">${matchState.minute}'</div></div>
                         <div class="text-center"><div class="text-xs text-slate-400">${matchState.oppName}</div><div class="text-4xl font-bold game-title text-red-400">${matchState.oppScore}</div></div>
                     </div>
                 </div>
                 <div class="card p-2 mb-3" style="background:#1a5d1a;border-radius:12px;">
                     <canvas id="matchCanvas" width="350" height="200" style="width:100%;height:auto;border-radius:8px;"></canvas>
                 </div>
-                ${matchState.finished ? `<div class="text-center"><button onclick="currentTab='home';matchState=null;render()" class="btn-game gold">${t('back')}</button></div>` : ''}
+                ${recentEvents.length > 0 ? `
+                    <div class="card p-3 mb-3">
+                        <h4 class="font-bold text-sm mb-2">⚽ 比赛事件</h4>
+                        <div class="space-y-1 text-sm">
+                            ${recentEvents.map(e => `
+                                <div class="flex items-center gap-2 ${e.team==='my'?'text-cyan-300':'text-red-400'}">
+                                    <span class="font-bold">${e.minute}'</span>
+                                    <span>⚽</span>
+                                    <span>${e.player}</span>
+                                    <span class="text-xs text-slate-500">${e.team==='my'?'FC联':matchState.oppName}</span>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                ` : ''}
+                ${matchState.finished ? `
+                    <div class="card p-4 mb-3 text-center">
+                        <h3 class="font-bold text-xl mb-2 ${matchState.myScore > matchState.oppScore ? 'text-green-400' : matchState.myScore < matchState.oppScore ? 'text-red-400' : 'text-amber-400'}">
+                            ${matchState.myScore > matchState.oppScore ? '🏆 胜利!' : matchState.myScore < matchState.oppScore ? '😢 失利' : '🤝 平局'}
+                        </h3>
+                        <p class="text-sm text-slate-400">比赛结束，${matchState.myScore} - ${matchState.oppScore}</p>
+                    </div>
+                    <div class="text-center"><button onclick="currentTab='home';matchState=null;render()" class="btn-game gold">${t('back')}</button></div>
+                ` : ''}
             `;
         }
         
