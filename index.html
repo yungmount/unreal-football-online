@@ -537,26 +537,91 @@
     }
 
     // ==================== Match Simulation ====================
+    // ==================== Formation Positions ====================
+    const TACTICS = {
+        attack: { att: 15, def: -10 },
+        balance: { att: 0, def: 0 },
+        defend: { att: -10, def: 15 }
+    };
+
+    const FORMATION_POSITIONS = {
+        '4-4-2': [
+            { x: 0.1, y: 0.5 },   // GK
+            { x: 0.25, y: 0.2 }, { x: 0.25, y: 0.5 }, { x: 0.25, y: 0.8 }, // CB
+            { x: 0.2, y: 0.15 }, { x: 0.2, y: 0.85 }, // LB RB
+            { x: 0.4, y: 0.25 }, { x: 0.4, y: 0.5 }, { x: 0.4, y: 0.75 }, // CM
+            { x: 0.5, y: 0.35 }, { x: 0.5, y: 0.65 }  // ST
+        ],
+        '4-3-3': [
+            { x: 0.1, y: 0.5 },   // GK
+            { x: 0.25, y: 0.15 }, { x: 0.25, y: 0.4 }, { x: 0.25, y: 0.6 }, { x: 0.25, y: 0.85 }, // CB LB RB
+            { x: 0.4, y: 0.3 }, { x: 0.4, y: 0.5 }, { x: 0.4, y: 0.7 }, // CDM CM
+            { x: 0.5, y: 0.2 }, { x: 0.5, y: 0.5 }, { x: 0.5, y: 0.8 }  // LW ST RW
+        ],
+        '4-2-3-1': [
+            { x: 0.1, y: 0.5 },   // GK
+            { x: 0.25, y: 0.15 }, { x: 0.25, y: 0.4 }, { x: 0.25, y: 0.6 }, { x: 0.25, y: 0.85 }, // CB LB RB
+            { x: 0.35, y: 0.35 }, { x: 0.35, y: 0.65 }, // CDM
+            { x: 0.45, y: 0.25 }, { x: 0.45, y: 0.5 }, { x: 0.45, y: 0.75 }, // CAM
+            { x: 0.55, y: 0.5 }   // ST
+        ],
+        '3-5-2': [
+            { x: 0.1, y: 0.5 },   // GK
+            { x: 0.25, y: 0.25 }, { x: 0.25, y: 0.5 }, { x: 0.25, y: 0.75 }, // CB
+            { x: 0.35, y: 0.1 }, { x: 0.35, y: 0.9 }, // LWB RWB
+            { x: 0.4, y: 0.3 }, { x: 0.4, y: 0.5 }, { x: 0.4, y: 0.7 }, // CM
+            { x: 0.5, y: 0.35 }, { x: 0.5, y: 0.65 }  // ST
+        ]
+    };
+
+    function getFormationPositions(formation, isOpponent = false) {
+        const positions = FORMATION_POSITIONS[formation] || FORMATION_POSITIONS['4-4-2'];
+        if (isOpponent) {
+            return positions.map(p => ({ x: 1 - p.x, y: p.y }));
+        }
+        return positions;
+    }
+
     function startMatch() {
         currentTab = 'match';
         render();
         
-        const myTeam = game.team.slice(0, 11).map((p, i) => ({
-            ...p,
-            x: 0.15 + (i % 4) * 0.08,
-            y: 0.2 + Math.floor(i / 4) * 0.15,
-            targetX: 0.15 + (i % 4) * 0.08,
-            targetY: 0.2 + Math.floor(i / 4) * 0.15,
-            vx: 0, vy: 0
-        }));
+        const formationPos = getFormationPositions(game.formation, false);
+        const myTeam = game.team.slice(0, 11).map((p, i) => {
+            const pos = formationPos[i] || { x: 0.3, y: 0.5 };
+            return {
+                ...p,
+                x: pos.x,
+                y: pos.y,
+                targetX: pos.x,
+                targetY: pos.y,
+                homeX: pos.x,
+                homeY: pos.y,
+                vx: 0, vy: 0,
+                speed: 0.02 + (p.pace / 100) * 0.03
+            };
+        });
         
         const oppIdx = rand(1, game.league.length - 1);
         const oppStrength = game.league[oppIdx].strength;
         const oppRegion = ['England', 'Spain', 'Brazil', 'Germany', 'France'][rand(0, 4)];
         const oppTeam = [];
         const oppPositions = ['GK','CB','CB','LB','RB','CDM','CM','CM','LW','ST','RW'];
+        
+        const oppFormationPos = getFormationPositions('4-3-3', true);
         for (let i = 0; i < 11; i++) {
-            oppTeam.push(createPlayer(oppRegion, oppPositions[i], oppStrength));
+            const p = createPlayer(oppRegion, oppPositions[i], oppStrength);
+            const pos = oppFormationPos[i] || { x: 0.7, y: 0.5 };
+            p.x = pos.x;
+            p.y = pos.y;
+            p.targetX = pos.x;
+            p.targetY = pos.y;
+            p.homeX = pos.x;
+            p.homeY = pos.y;
+            p.vx = 0;
+            p.vy = 0;
+            p.speed = 0.02 + (p.pace / 100) * 0.03;
+            oppTeam.push(p);
         }
         
         matchState = {
@@ -568,15 +633,16 @@
             minute: 0,
             second: 0,
             events: [],
-            ball: { x: 0.5, y: 0.5, vx: 0, vy: 0, owner: null },
+            ball: { x: 0.5, y: 0.5, vx: 0, vy: 0, owner: null, lastOwner: null },
             possession: 'my',
             phase: 'kickoff',
-            nextEventMinute: rand(1, 3),
+            nextEventMinute: rand(2, 5),
             started: false,
             finished: false,
             halftime: false,
             yellowCards: { my: [], opp: [] },
-            substitutions: { my: [], opp: [] }
+            substitutions: { my: [], opp: [] },
+            passChain: 0
         };
         
         addNews(`⚽ Match started: FC United vs ${matchState.oppName}`);
@@ -618,11 +684,10 @@
     function updateMatch() {
         if (!matchState || !matchState.started || matchState.finished) return;
         
-        matchState.second += 2;
+        matchState.second += 1.5;
         if (matchState.second >= 60) {
             matchState.second = 0;
             matchState.minute++;
-            matchState.nextEventMinute = rand(15, 45);
             
             if (matchState.minute === 45 && !matchState.halftime) {
                 matchState.halftime = true;
@@ -637,40 +702,56 @@
         }
         
         moveBall();
-        
-        if (matchState.second >= matchState.nextEventMinute * 2 && !matchState.halftime) {
-            generateMatchEvent();
-            matchState.nextEventMinute = rand(15, 45);
-        }
-        
         movePlayers();
+        
+        // Generate events less frequently
+        if (matchState.minute % 5 === 0 && matchState.second < 2 && !matchState.halftime) {
+            generateMatchEvent();
+        }
     }
 
     function moveBall() {
         const ball = matchState.ball;
         
         if (ball.owner) {
-            ball.x += (ball.owner.x - ball.x) * 0.3;
-            ball.y += (ball.owner.y - ball.y) * 0.3;
+            // Ball follows owner smoothly
+            const dx = ball.owner.x - ball.x;
+            const dy = ball.owner.y - ball.y;
+            const dist = Math.hypot(dx, dy);
+            
+            if (dist > 0.02) {
+                ball.x += (dx / dist) * 0.04;
+                ball.y += (dy / dist) * 0.04;
+            } else {
+                ball.x = ball.owner.x;
+                ball.y = ball.owner.y;
+            }
         } else {
-            ball.x += ball.vx * 0.02;
-            ball.y += ball.vy * 0.02;
-            ball.vx *= 0.95;
-            ball.vy *= 0.95;
+            // Ball rolls freely
+            ball.x += ball.vx;
+            ball.y += ball.vy;
+            ball.vx *= 0.96;
+            ball.vy *= 0.96;
             
-            ball.x = Math.max(0.02, Math.min(0.98, ball.x));
-            ball.y = Math.max(0.02, Math.min(0.98, ball.y));
+            // Bounce off walls
+            if (ball.x < 0.02) { ball.x = 0.02; ball.vx *= -0.5; }
+            if (ball.x > 0.98) { ball.x = 0.98; ball.vx *= -0.5; }
+            if (ball.y < 0.02) { ball.y = 0.02; ball.vy *= -0.5; }
+            if (ball.y > 0.98) { ball.y = 0.98; ball.vy *= -0.5; }
             
-            if (Math.random() < 0.02) {
-                const attackers = matchState.possession === 'my' ? matchState.oppTeam : matchState.myTeam;
-                const closest = attackers.reduce((best, p) => {
+            // Try to intercept
+            if (Math.random() < 0.015) {
+                const defenders = matchState.possession === 'my' ? matchState.oppTeam : matchState.myTeam;
+                const closest = defenders.reduce((best, p) => {
                     const dist = Math.hypot(p.x - ball.x, p.y - ball.y);
                     return dist < best.dist ? { p, dist } : best;
                 }, { p: null, dist: Infinity });
                 
-                if (closest.dist < 0.08) {
+                if (closest.dist < 0.1) {
                     ball.owner = closest.p;
+                    ball.lastOwner = closest.p;
                     matchState.possession = matchState.possession === 'my' ? 'opp' : 'my';
+                    matchState.passChain = 0;
                 }
             }
         }
@@ -678,51 +759,122 @@
 
     function movePlayers() {
         const ball = matchState.ball;
+        const tactics = TACTICS[game.tactic] || { att: 0, def: 0 };
         
+        // Move my team
         matchState.myTeam.forEach((p, i) => {
-            let targetX = p.x;
-            let targetY = p.y;
+            let targetX = p.homeX;
+            let targetY = p.homeY;
             
-            if (ball.owner) {
-                if (matchState.possession === 'my') {
-                    targetX = 0.5 + (p.x - 0.5) * 0.5;
-                    targetY = 0.3 + Math.random() * 0.4;
+            if (matchState.possession === 'my') {
+                // Attacking - spread out, move forward
+                if (ball.owner && matchState.myTeam.includes(ball.owner)) {
+                    // Support ball carrier
+                    const dx = ball.owner.x - p.x;
+                    const dy = ball.owner.y - p.y;
+                    const dist = Math.hypot(dx, dy);
+                    
+                    if (dist > 0.15 && dist < 0.4) {
+                        // Move to support position
+                        targetX = p.homeX + 0.1;
+                        targetY = p.homeY + (Math.random() - 0.5) * 0.1;
+                    } else {
+                        // Move forward
+                        targetX = Math.min(0.55, p.homeX + 0.08);
+                        targetY = p.homeY + (Math.random() - 0.5) * 0.05;
+                    }
                 } else {
-                    targetX = 0.3 + (p.x - 0.3) * 0.5;
-                    targetY = 0.2 + Math.random() * 0.6;
+                    targetX = p.homeX;
+                    targetY = p.homeY;
                 }
             } else {
-                targetX = ball.x + (p.x - 0.5) * 0.3;
-                targetY = ball.y + (p.y - 0.5) * 0.3;
+                // Defending - mark opponents, stay compact
+                const oppWithBall = matchState.oppTeam.find(op => op === ball.owner);
+                if (oppWithBall) {
+                    // Mark nearest opponent
+                    const closest = matchState.oppTeam.reduce((best, op) => {
+                        const dist = Math.hypot(op.x - p.x, op.y - p.y);
+                        return dist < best.dist ? { op, dist } : best;
+                    }, { op: null, dist: Infinity });
+                    
+                    if (closest.dist < 0.2) {
+                        targetX = closest.op.x - 0.05;
+                        targetY = closest.op.y;
+                    } else {
+                        targetX = p.homeX - 0.05;
+                        targetY = p.homeY;
+                    }
+                } else {
+                    targetX = p.homeX - 0.05;
+                    targetY = p.homeY;
+                }
             }
             
-            p.x += (targetX - p.x) * 0.05;
-            p.y += (targetY - p.y) * 0.05;
+            // Smooth movement
+            const dx = targetX - p.x;
+            const dy = targetY - p.y;
+            const dist = Math.hypot(dx, dy);
+            
+            if (dist > 0.01) {
+                p.x += (dx / dist) * p.speed;
+                p.y += (dy / dist) * p.speed;
+            }
+            
+            // Keep in bounds
             p.x = Math.max(0.05, Math.min(0.5, p.x));
-            p.y = Math.max(0.05, Math.min(0.95, p.y));
+            p.y = Math.max(0.02, Math.min(0.98, p.y));
         });
         
+        // Move opponent team
         matchState.oppTeam.forEach((p, i) => {
-            let targetX = p.x;
-            let targetY = p.y;
+            let targetX = p.homeX;
+            let targetY = p.homeY;
             
-            if (ball.owner) {
-                if (matchState.possession === 'opp') {
-                    targetX = 0.5 + (p.x - 0.5) * 0.5;
-                    targetY = 0.3 + Math.random() * 0.4;
+            if (matchState.possession === 'opp') {
+                // Attacking
+                if (ball.owner && matchState.oppTeam.includes(ball.owner)) {
+                    const dx = ball.owner.x - p.x;
+                    const dy = ball.owner.y - p.y;
+                    const dist = Math.hypot(dx, dy);
+                    
+                    if (dist > 0.15 && dist < 0.4) {
+                        targetX = p.homeX - 0.1;
+                        targetY = p.homeY + (Math.random() - 0.5) * 0.1;
+                    } else {
+                        targetX = Math.max(0.45, p.homeX - 0.08);
+                        targetY = p.homeY + (Math.random() - 0.5) * 0.05;
+                    }
                 } else {
-                    targetX = 0.7 - (0.5 - p.x) * 0.5;
-                    targetY = 0.2 + Math.random() * 0.6;
+                    targetX = p.homeX;
+                    targetY = p.homeY;
                 }
             } else {
-                targetX = ball.x + (p.x - 0.5) * 0.3;
-                targetY = ball.y + (p.y - 0.5) * 0.3;
+                // Defending
+                const closest = matchState.myTeam.reduce((best, my) => {
+                    const dist = Math.hypot(my.x - p.x, my.y - p.y);
+                    return dist < best.dist ? { my, dist } : best;
+                }, { my: null, dist: Infinity });
+                
+                if (closest.dist < 0.2) {
+                    targetX = closest.my.x + 0.05;
+                    targetY = closest.my.y;
+                } else {
+                    targetX = p.homeX + 0.05;
+                    targetY = p.homeY;
+                }
             }
             
-            p.x += (targetX - p.x) * 0.05;
-            p.y += (targetY - p.y) * 0.05;
+            const dx = targetX - p.x;
+            const dy = targetY - p.y;
+            const dist = Math.hypot(dx, dy);
+            
+            if (dist > 0.01) {
+                p.x += (dx / dist) * p.speed;
+                p.y += (dy / dist) * p.speed;
+            }
+            
             p.x = Math.max(0.5, Math.min(0.95, p.x));
-            p.y = Math.max(0.05, Math.min(0.95, p.y));
+            p.y = Math.max(0.02, Math.min(0.98, p.y));
         });
     }
 
@@ -731,20 +883,24 @@
         
         const myAttack = matchState.possession === 'my';
         const attackers = myAttack ? matchState.myTeam : matchState.oppTeam;
-        const shooters = attackers.filter(p => ['ST', 'LW', 'RW', 'CAM'].includes(p.position));
-        const shooter = shooters[rand(0, shooters.length - 1)] || attackers[rand(0, 5)];
         
+        // Decide action type
         const eventType = rand(1, 100);
         
-        if (eventType <= 25) {
+        if (eventType <= 20 && matchState.passChain > 2) {
+            // Shot attempt
+            const shooters = attackers.filter(p => ['ST', 'LW', 'RW', 'CAM'].includes(p.position));
+            const shooter = shooters[rand(0, shooters.length - 1)] || attackers[rand(0, 5)];
+            
             const shotQuality = (shooter.shooting + shooter.pace) / 2;
-            const saveChance = myAttack ? (matchState.oppTeam[0].defending + 40) / 2 : (matchState.myTeam[0].defending + 40) / 2;
+            const gk = myAttack ? matchState.oppTeam[0] : matchState.myTeam[0];
+            const saveChance = (gk.defending + 40) / 2;
             
-            matchState.ball.owner = shooter;
-            matchState.ball.x = shooter.x;
-            matchState.ball.y = shooter.y;
+            matchState.ball.owner = null;
+            matchState.ball.vx = (Math.random() - 0.5) * 0.3;
+            matchState.ball.vy = (Math.random() - 0.5) * 0.3;
             
-            if (shotQuality > saveChance + 10) {
+            if (shotQuality > saveChance + 15) {
                 if (myAttack) {
                     matchState.myScore++;
                     shooter.goals++;
@@ -754,19 +910,31 @@
                 addMatchEvent(`⚽ ${shooter.name.split(' ')[0]} SCORES! ${matchState.myScore} - ${matchState.oppScore}`, 'goal');
             } else if (shotQuality > saveChance - 5) {
                 addMatchEvent(`🧤 ${shooter.name.split(' ')[0]} - Saved!`, 'shot');
-                matchState.ball.owner = null;
-                matchState.ball.vx = (Math.random() - 0.5) * 2;
-                matchState.ball.vy = (Math.random() - 0.5) * 2;
             } else {
                 addMatchEvent(`❌ ${shooter.name.split(' ')[0]} - Missed!`, 'shot');
-                matchState.ball.owner = null;
-                matchState.ball.vx = (Math.random() - 0.5) * 3;
-                matchState.ball.vy = (Math.random() - 0.5) * 3;
             }
-        } else if (eventType <= 35) {
-            const fouler = attackers[rand(0, attackers.length - 1)];
             
-            if (rand(1, 100) <= 15) {
+            matchState.passChain = 0;
+        } else if (eventType <= 35) {
+            // Pass
+            const passer = attackers[rand(0, Math.min(7, attackers.length - 1))];
+            const receivers = attackers.filter(p => p.id !== passer.id);
+            const receiver = receivers[rand(0, receivers.length - 1)];
+            
+            if (passer && receiver) {
+                matchState.ball.owner = receiver;
+                matchState.ball.x = receiver.x;
+                matchState.ball.y = receiver.y;
+                matchState.passChain++;
+                addMatchEvent(`👟 ${passer.name.split(' ')[0]} → ${receiver.name.split(' ')[0]}`, 'pass');
+            }
+        } else if (eventType <= 45) {
+            // Foul/Tackle
+            const fouler = attackers[rand(0, attackers.length - 1)];
+            const defenders = myAttack ? matchState.oppTeam : matchState.myTeam;
+            const fouled = defenders[rand(0, defenders.length - 1)];
+            
+            if (rand(1, 100) <= 20) {
                 const team = myAttack ? 'my' : 'opp';
                 if (!matchState.yellowCards[team].includes(fouler.id)) {
                     matchState.yellowCards[team].push(fouler.id);
@@ -779,21 +947,18 @@
             }
             
             matchState.possession = matchState.possession === 'my' ? 'opp' : 'my';
-        } else if (eventType <= 50) {
-            const passer = attackers[rand(0, 7)];
-            const receiver = attackers[rand(0, 7)];
-            
-            if (passer && receiver && passer.id !== receiver.id) {
-                matchState.ball.owner = receiver;
-                matchState.ball.x = receiver.x;
-                matchState.ball.y = receiver.y;
-                addMatchEvent(`👟 ${passer.name.split(' ')[0]} → ${receiver.name.split(' ')[0]}`, 'pass');
-            }
+            matchState.passChain = 0;
         } else if (eventType <= 55) {
-            if (matchState.minute >= 60 && matchState.myTeam.length > 11) {
-                addMatchEvent(`🔄 Substitution: ${matchState.myTeam[11].name.split(' ')[0]} ON`, 'sub');
-                matchState.myTeam.shift();
-            }
+            // Interception
+            const defenders = myAttack ? matchState.oppTeam : matchState.myTeam;
+            const interceptor = defenders[rand(0, defenders.length - 1)];
+            
+            matchState.ball.owner = interceptor;
+            matchState.ball.x = interceptor.x;
+            matchState.ball.y = interceptor.y;
+            matchState.possession = matchState.possession === 'my' ? 'opp' : 'my';
+            matchState.passChain = 0;
+            addMatchEvent(`🔄 ${interceptor.name.split(' ')[0]} - Interception!`, 'pass');
         }
     }
 
