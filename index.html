@@ -96,9 +96,10 @@
     
     // ==================== Avatar - Realistic AI Faces ====================
     function getPlayerAvatar(player) {
-        // 使用 Dicebear API 生成真实风格头像
+        // 使用 MultiAvatar API - 更真实的人脸
+        // 每个球员有独特的头像
         const seed = player.id || player.name;
-        return `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(seed)}&scale=80`;
+        return `https://api.multiavatar.com/${encodeURIComponent(seed)}.svg`;
     }
     
     // ==================== 3D Player Model ====================
@@ -298,13 +299,20 @@
                 started: true, finished: false
             };
             
+            // 关键：重新渲染界面以显示比赛
+            render();
+            
             startMatchLoop();
         }, 100);
     }
     
     function startMatchLoop() {
         canvas = document.getElementById('matchCanvas');
-        if (!canvas) return;
+        if (!canvas) {
+            console.error('Canvas not found, retrying...');
+            setTimeout(startMatchLoop, 100);
+            return;
+        }
         
         ctx = canvas.getContext('2d');
         const rect = canvas.getBoundingClientRect();
@@ -312,14 +320,16 @@
         canvas.height = rect.height * window.devicePixelRatio;
         ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
         
-        let lastTime = performance.now();
+        console.log('Match started:', matchState.myTeam.length, 'vs', matchState.oppTeam.length);
         
+        let lastTime = performance.now();
         function loop(time) {
             if (!matchState || !matchState.started || matchState.finished) return;
             
             const dt = Math.min((time - lastTime) / 1000, 0.05);
             lastTime = time;
             
+            // 更新比赛
             matchState.second += dt;
             if (matchState.second >= 60) {
                 matchState.second = 0;
@@ -331,26 +341,72 @@
                 }
             }
             
-            // 简单的球运动
-            matchState.ball.x += matchState.ball.vx * dt;
-            matchState.ball.y += matchState.ball.vy * dt;
-            matchState.ball.vx *= 0.95;
-            matchState.ball.vy *= 0.95;
-            
-            if (matchState.ball.x < 0.02 || matchState.ball.x > 0.98) matchState.ball.vx *= -0.8;
-            if (matchState.ball.y < 0.02 || matchState.ball.y > 0.98) matchState.ball.vy *= -0.8;
-            
-            // 随机进球
-            if (Math.random() < 0.001) {
-                if (Math.random() < 0.5) matchState.myScore++;
-                else matchState.oppScore++;
-            }
-            
-            renderMatch();
+            // 渲染
+            renderMatchCanvas();
             animationId = requestAnimationFrame(loop);
         }
         
         animationId = requestAnimationFrame(loop);
+    }
+    
+    function renderMatchCanvas() {
+        if (!canvas || !ctx || !matchState) return;
+        
+        const w = canvas.width / window.devicePixelRatio;
+        const h = canvas.height / window.devicePixelRatio;
+        
+        // 草地
+        ctx.fillStyle = '#2d8a2d';
+        ctx.fillRect(0, 0, w, h);
+        
+        // 球场线
+        ctx.strokeStyle = 'rgba(255,255,255,0.5)';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(15, 15, w-30, h-30);
+        ctx.beginPath(); ctx.moveTo(w/2, 15); ctx.lineTo(w/2, h-15); ctx.stroke();
+        
+        // 球员
+        matchState.myTeam.forEach(p => {
+            ctx.beginPath();
+            ctx.arc(p.x * w, p.y * h, 10, 0, Math.PI*2);
+            ctx.fillStyle = '#00d4ff';
+            ctx.fill();
+            ctx.strokeStyle = '#fff';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+        });
+        
+        matchState.oppTeam.forEach(p => {
+            ctx.beginPath();
+            ctx.arc(p.x * w, p.y * h, 10, 0, Math.PI*2);
+            ctx.fillStyle = '#ff6b6b';
+            ctx.fill();
+            ctx.strokeStyle = '#fff';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+        });
+        
+        // 球
+        ctx.beginPath();
+        ctx.arc(matchState.ball.x * w, matchState.ball.y * h, 6, 0, Math.PI*2);
+        ctx.fillStyle = '#fff';
+        ctx.fill();
+        
+        // 比分
+        ctx.fillStyle = 'rgba(0,0,0,0.8)';
+        ctx.fillRect(w/2-50, 5, 100, 30);
+        ctx.fillStyle = '#fff';
+        ctx.font = 'bold 18px Arial';
+        ctx.textAlign = 'center';
+        ctx.fillText(`${matchState.myScore} - ${matchState.oppScore}`, w/2, 28);
+        
+        // 时间
+        ctx.fillStyle = 'rgba(0,0,0,0.8)';
+        ctx.fillRect(w-45, 5, 40, 22);
+        ctx.fillStyle = '#ff4444';
+        ctx.font = 'bold 14px Arial';
+        ctx.fillText(`${matchState.minute}'`, w-25, 24);
+    }
     }
     
     function renderMatch() {
