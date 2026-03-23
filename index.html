@@ -8,379 +8,162 @@
     <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
         * { font-family: 'Inter', sans-serif; -webkit-tap-highlight-color: transparent; user-select: none; }
-        :root {
-            --gold: #ffd700;
-            --cyan: #00d4ff;
-            --purple: #9333ea;
-            --green: #22c55e;
-            --red: #ef4444;
-        }
-        body { 
-            margin: 0; 
-            min-height: 100vh; 
-            background: linear-gradient(135deg, #0a0a1a 0%, #1a1a3a 100%);
-            color: #fff;
-            overflow-x: hidden;
-        }
+        :root { --gold: #ffd700; --cyan: #00d4ff; --purple: #9333ea; --green: #22c55e; --red: #ef4444; }
+        body { margin: 0; min-height: 100vh; background: linear-gradient(135deg, #0a0a1a 0%, #1a1a3a 100%); color: #fff; overflow-x: hidden; }
         .game-title { font-family: 'Orbitron', sans-serif; }
-        
-        #matchCanvas {
-            border-radius: 12px;
-            background: #1a5d1a;
-        }
-        
-        .event-item {
-            animation: slideIn 0.3s ease-out;
-            border-left: 3px solid;
-        }
-        @keyframes slideIn { from { opacity: 0; transform: translateX(-10px); } to { opacity: 1; transform: translateX(0); } }
-        
+        .card { background: linear-gradient(145deg, rgba(30,41,59,0.9), rgba(15,23,42,0.95)); border: 1px solid rgba(0,212,255,0.2); border-radius: 16px; backdrop-filter: blur(10px); }
+        .btn-game { background: linear-gradient(135deg, var(--cyan), #0099cc); border: none; border-radius: 12px; padding: 12px 20px; font-weight: 700; color: #000; cursor: pointer; transition: all 0.2s; box-shadow: 0 4px 15px rgba(0,212,255,0.3); text-transform: uppercase; letter-spacing: 1px; }
+        .btn-game:active { transform: scale(0.95); }
+        .btn-game.gold { background: linear-gradient(135deg, var(--gold), #b8860b); box-shadow: 0 4px 15px rgba(255,215,0,0.4); }
+        .btn-game.green { background: linear-gradient(135deg, var(--green), #16a34a); }
+        .btn-game.red { background: linear-gradient(135deg, var(--red), #dc2626); }
+        .btn-game.purple { background: linear-gradient(135deg, var(--purple), #7c3aed); color: #fff; }
+        .lang-btn { padding: 6px 12px; border-radius: 20px; font-size: 12px; font-weight: 600; border: 1px solid rgba(255,255,255,0.3); background: rgba(255,255,255,0.1); color: #fff; cursor: pointer; }
+        .lang-btn.active { background: var(--cyan); color: #000; border-color: var(--cyan); }
+        .nav-btn { display: flex; flex-direction: column; align-items: center; padding: 8px 12px; color: rgba(255,255,255,0.5); cursor: pointer; transition: all 0.2s; }
+        .nav-btn.active { color: var(--cyan); }
+        .nav-btn .icon { font-size: 18px; }
+        .nav-btn .text { font-size: 9px; margin-top: 2px; }
+        .stat-bar { height: 6px; border-radius: 3px; background: rgba(0,0,0,0.5); overflow: hidden; }
+        .stat-fill { height: 100%; border-radius: 3px; transition: width 0.3s; }
+        .toast { position: fixed; top: 80px; left: 50%; transform: translateX(-50%); background: linear-gradient(135deg, rgba(34,197,94,0.95), rgba(22,163,74,0.95)); padding: 12px 24px; border-radius: 30px; font-weight: 600; z-index: 100; box-shadow: 0 4px 20px rgba(34,197,94,0.4); }
+        .player-card { background: linear-gradient(145deg, #1e293b, #0f172a); border: 1px solid rgba(255,215,0,0.3); border-radius: 12px; padding: 12px; position: relative; cursor: pointer; transition: all 0.2s; }
+        .player-card:hover { border-color: var(--cyan); transform: translateY(-2px); }
+        .player-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px; background: linear-gradient(90deg, var(--gold), var(--cyan), var(--gold)); }
+        .player-avatar { width: 48px; height: 48px; border-radius: 50%; background: linear-gradient(135deg, #667eea, #764ba2); display: flex; align-items: center; justify-content: center; font-weight: bold; color: white; font-size: 18px; box-shadow: 0 2px 8px rgba(0,0,0,0.3); overflow: hidden; }
+        .player-avatar img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; }
         .event-goal { border-color: #22c55e; background: rgba(34,197,94,0.1); }
         .event-shot { border-color: #f59e0b; background: rgba(245,158,11,0.1); }
         .event-foul { border-color: #ef4444; background: rgba(239,68,68,0.1); }
         .event-card { border-color: #fbbf24; background: rgba(251,191,36,0.1); }
-        .event-sub { border-color: #8b5cf6; background: rgba(139,92,246,0.1); }
         .event-pass { border-color: #3b82f6; background: rgba(59,130,246,0.1); }
-        
-        .card {
-            background: linear-gradient(145deg, rgba(30,41,59,0.9), rgba(15,23,42,0.95));
-            border: 1px solid rgba(0,212,255,0.2);
-            border-radius: 16px;
-            backdrop-filter: blur(10px);
-        }
-        
-        .btn-game {
-            background: linear-gradient(135deg, var(--cyan), #0099cc);
-            border: none;
-            border-radius: 12px;
-            padding: 12px 20px;
-            font-weight: 700;
-            color: #000;
-            cursor: pointer;
-            transition: all 0.2s;
-            box-shadow: 0 4px 15px rgba(0,212,255,0.3);
-            text-transform: uppercase;
-            letter-spacing: 1px;
-        }
-        .btn-game:active { transform: scale(0.95); }
-        .btn-game.gold {
-            background: linear-gradient(135deg, var(--gold), #b8860b);
-            box-shadow: 0 4px 15px rgba(255,215,0,0.4);
-        }
-        .btn-game.green { background: linear-gradient(135deg, var(--green), #16a34a); }
-        .btn-game.red { background: linear-gradient(135deg, var(--red), #dc2626); }
-        .btn-game.purple { background: linear-gradient(135deg, var(--purple), #7c3aed); color: #fff; }
-        
-        .lang-btn {
-            padding: 6px 12px;
-            border-radius: 20px;
-            font-size: 12px;
-            font-weight: 600;
-            border: 1px solid rgba(255,255,255,0.3);
-            background: rgba(255,255,255,0.1);
-            color: #fff;
-            cursor: pointer;
-        }
-        .lang-btn.active {
-            background: var(--cyan);
-            color: #000;
-            border-color: var(--cyan);
-        }
-        
-        .nav-btn {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            padding: 8px 12px;
-            color: rgba(255,255,255,0.5);
-            cursor: pointer;
-            transition: all 0.2s;
-        }
-        .nav-btn.active { color: var(--cyan); }
-        .nav-btn .icon { font-size: 18px; }
-        .nav-btn .text { font-size: 9px; margin-top: 2px; }
-        
-        .stat-bar {
-            height: 6px;
-            border-radius: 3px;
-            background: rgba(0,0,0,0.5);
-            overflow: hidden;
-        }
-        .stat-fill {
-            height: 100%;
-            border-radius: 3px;
-            transition: width 0.3s;
-        }
-        
-        .toast {
-            position: fixed;
-            top: 80px;
-            left: 50%;
-            transform: translateX(-50%);
-            background: linear-gradient(135deg, rgba(34,197,94,0.95), rgba(22,163,74,0.95));
-            padding: 12px 24px;
-            border-radius: 30px;
-            font-weight: 600;
-            z-index: 100;
-            box-shadow: 0 4px 20px rgba(34,197,94,0.4);
-        }
-        
-        .standings-row {
-            display: grid;
-            grid-template-columns: 30px 1fr 40px 50px;
-            padding: 8px 12px;
-            border-radius: 8px;
-            margin-bottom: 4px;
-            align-items: center;
-            font-size: 13px;
-        }
+        .standings-row { display: grid; grid-template-columns: 30px 1fr 40px 50px; padding: 8px 12px; border-radius: 8px; margin-bottom: 4px; align-items: center; font-size: 13px; }
         .standings-row.me { background: linear-gradient(90deg, rgba(0,212,255,0.3), transparent) !important; border: 1px solid rgba(0,212,255,0.5); }
-        
-        .player-card {
-            background: linear-gradient(145deg, #1e293b, #0f172a);
-            border: 1px solid rgba(255,215,0,0.3);
-            border-radius: 12px;
-            padding: 12px;
-            position: relative;
-        }
-        .player-card::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            height: 3px;
-            background: linear-gradient(90deg, var(--gold), var(--cyan), var(--gold));
-        }
-        
-        .pos-badge {
-            width: 32px;
-            height: 32px;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-weight: 900;
-            font-size: 10px;
-            font-family: 'Orbitron', sans-serif;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
-        }
-        
-        .player-avatar {
-            width: 48px;
-            height: 48px;
-            border-radius: 50%;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-weight: bold;
-            color: white;
-            font-size: 20px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
-            overflow: hidden;
-        }
-        
-        .player-avatar img {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-        }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+        .animate-pulse { animation: pulse 1s infinite; }
     </style>
 </head>
 <body>
     <div id="app"></div>
     
     <script>
-    // ==================== FC26 Style Names Database ====================
+    // ==================== Player Name Database (FC26 Style) ====================
     const PLAYER_NAMES = {
-        England: [
-            'Harry Kane', 'Jude Bellingham', 'Bukayo Saka', 'Declan Rice', 'Phil Foden',
-            'Mason Mount', 'Jadon Sancho', 'Reece James', 'Luke Shaw', 'John Stones',
-            'Kyle Walker', 'Jordan Pickford', 'Kalvin Phillips', 'James Maddison', 'Trent Alexander-Arnold',
-            'Kieran Trippier', 'Aaron Ramsdale', 'Conor Coady', 'Fikayo Tomori', 'Ollie Watkins',
-            'Tammy Abraham', 'Dominic Solanke', 'Callum Hudson-Odoi', 'Tyrick Mitchell', 'Eberechi Eze'
-        ],
-        Spain: [
-            'Pedri', 'Gavi', 'Ferran Torres', 'Sergio Busquets', 'Sergio Reguilon',
-            'Unai Simon', 'Cesar Azpilicueta', 'Aymeric Laporte', 'Jordi Alba', 'Xavi Simons',
-            'Dani Olmo', 'Mikel Oyarzabal', 'Inigo Martinez', 'Raul Raya', 'Pau Torres',
-            'Alejandro Balde', 'Ferran Torres', 'Alvaro Morata', 'Nico Williams', 'Lamine Yamal'
-        ],
-        Germany: [
-            'Jamal Musiala', 'Florian Wirtz', 'Serge Gnabry', 'Leroy Sane', 'Joshua Kimmich',
-            'Manuel Neuer', 'Antonio Rudiger', 'Mats Hummels', 'Ilkay Gundogan', 'Thomas Muller',
-            'Kai Havertz', 'Niklas Sule', 'Thilo Kehrer', 'Dayot Upamecano', 'Bayer Leverkusen',
-            'Serge Gnabry', 'Kingsley Coman', 'Alphonso Davies', 'Benjamin Pavard', 'Noussair Mazraoui'
-        ],
-        France: [
-            'Kylian Mbappe', 'Aurelien Tchouameni', 'Eduardo Camavinga', 'Dayot Upamecano', 'Jules Kounde',
-            'Theo Hernandez', 'Benjamin Pavard', 'Alphonso Davies', 'Adrien Rabiot', 'N Golo Kante',
-            'Olivier Giroud', 'Antoine Griezmann', 'Ousmane Dembele', 'Kingsley Coman', 'Matteo Guendouzi',
-            'Youssouf Fofana', 'Ferland Mendy', 'Presnel Kimpembe', 'Raphael Varane', 'Hugo Lloris'
-        ],
-        Brazil: [
-            'Vinicius Jr', 'Rodrygo', 'Neymar', 'Casemiro', 'Marquinhos',
-            'Alisson', 'Thiago Silva', 'Danilo', 'Lucas Paqueta', 'Fabinho',
-            'Richarlison', 'Gabriel Jesus', 'Antony', 'Vinícius Júnior', 'Endrick',
-            'Sergej Milinovic-Savic', 'Eder Militao', 'Bremer', 'Renan Lodi', 'Guilherme Arana'
-        ],
-        Argentina: [
-            'Lionel Messi', 'Lautaro Martinez', 'Angel Di Maria', 'Gonzalo Montiel', 'Lisandro Martinez',
-            'Enzo Fernandez', 'Alexis Mac Allister', 'Julian Alvarez', 'Alejandro Garnacho', 'Sergio Gomez',
-            'Cristian Romero', 'Nicolas Otamendi', 'Geronimo Rulli', 'Emiliano Martinez', 'Marcos Acuna',
-            'Nahuel Molina', 'Mateo Kovacic', 'Rodrigo De Paul', 'Leandro Paredes', 'Giovani Lo Celso'
-        ],
-        Italy: [
-            'Alessandro Bastoni', 'Nicolo Barella', 'Matteo Darmian', 'Gigio Donnarumma', 'Leonardo Bonucci',
-            'Giorgio Chiellini', 'Federico Chiesa', 'Ciro Immobile', 'Matteo Politano', 'Sergej Milinovic-Savic',
-            'Alessio Romagnoli', 'Davide Calabria', 'Theo Hernandez', 'Franck Kessie', 'Ismael Bencer',
-            'Riccardo Calafiori', 'Matteo Pessina', 'Jorginho', 'Marco Verratti', 'Gianluigi Buffon'
-        ],
-        Portugal: [
-            'Cristiano Ronaldo', 'Bruno Fernandes', 'Joao Cancelo', 'Ruben Dias', 'Pepe',
-            'Rui Patricio', 'Joao Felix', 'Diogo Jota', 'Nuno Mendes', 'Joao Palhinha',
-            'Matheus Nunes', 'Vitinha', 'Otavio', 'Goncalo Inacio', 'Inacio',
-            'Sergio Oliveira', 'Conor Coady', 'Cedric Soares', 'Dalot', 'Rafa Silva'
-        ],
-        Nigeria: [
-            'Victor Osimhen', 'Wilfred Ndidi', 'Iheanacho', 'Sadiq Umar', 'Kelechi Iheanacho',
-            'Taiwo Awoniyi', 'Chidera Ejuke', 'Samuel Chukwueze', 'Ola Aina', 'Zaidu Sanusi',
-            'Jamilu Collins', 'Obi Mikel', 'Nwankwo Kanu', 'Jay-Jay Okocha', 'Ahmed Musa',
-            'Chukwueze', 'Osimhen', 'Ndidi', 'Iheanacho', 'Awoniyi'
-        ],
-        Japan: [
-            'Takumi Minamino', 'Hirving Lozano', 'Reo Hatate', 'Yuta Nakayama', 'Hiroki Sakai',
-            'Daichi Kamada', 'Wataru Endo', 'Takehiro Tomiyasu', 'Yukinari Sugawara', 'Shoji Tomiyasu',
-            'Gonda Shuichi', 'Nacho Fernandez', 'Ito Junya', 'Suzuki Musashi', 'Tanaka Masatoshi',
-            'Kubo Takefusa', 'Ito Junya', 'Yamane Hiroki', 'Nakayama Yuta', 'Sakai Hiroki'
-        ],
-        Korea: [
-            'Son Heung-min', 'Lee Kang-in', 'Kim Min-jae', 'Hwang Hee-chan', 'Paik Seung-ho',
-            'Cho Gue-sung', 'Jeong Woo-yeong', 'Kang In-lee', 'Lim Young-gwon', 'Kim Young-gwon',
-            'Seongryong Park', 'Seung-ho Paik', 'Woo-yeong Jeong', 'Min-jae Kim', 'Hee-chan Hwang',
-            'Sang-ho Park', 'Kyou-won Kang', 'Jae-sung Lee', 'Tae-oh Kang', 'Sung-ryong Park'
-        ],
-        China: [
-            'Wu Lei', 'Feng Xiaoting', 'Zheng Zhi', 'Jiang Guangtai', 'Liu Yang',
-            'Wang Dalei', 'Yan Junling', 'Kou Zhun', 'Luo Guofu', 'Ding Liren',
-            'Tao Qian', 'Shao Jiayi', 'Gao Lin', 'Hao Junmin', 'Zheng Long',
-            'Xia Weiwei', 'Jiang Zhipeng', 'Luo Senwen', 'Ding Haifeng', 'Qin Sheng'
-        ],
-        USA: [
-            'Christian Pulisic', 'Weston McKennie', 'Sergiño Dest', 'Antonee Robinson', 'Joe Scally',
-            'Yunus Musah', 'Tyler Adams', 'Folarin Balogun', 'Gio Reyna', 'Luca de la Torre',
-            'Gregg Berhalter', 'Kellyn Acosta', 'Lletget', 'Arriola', 'Sargent',
-            'Pepi', 'Reyna', 'Pulisic', 'McKennie', 'Dest'
-        ],
-        Mexico: [
-            'Hirving Lozano', 'Guillermo Ochoa', 'Hector Moreno', 'Edson Alvarez', 'Jorge Sanchez',
-            'Raul Jimenez', 'Alexis Vega', 'Tecatito Corona', 'Andres Guardado', 'Cesar Montes',
-            'Néstor Araujo', 'Julio Dominguez', 'Rafa Marquez', 'Carlos Vela', 'Diego Lainez',
-            'Chucky Lozano', 'Memo Ochoa', 'Moreno', 'Edson', 'Sanchez'
-        ]
+        England: ['Harry Kane','Jude Bellingham','Bukayo Saka','Declan Rice','Phil Foden','Mason Mount','Trent Alexander-Arnold','John Stones','Kyle Walker','Jordan Pickford','James Maddison','Jarrod Bowen','Ollie Watkins','Ivan Toney','Cole Palmer','Noni Madueke','Angel Gomes','Levi Colwill','Morgan Gibbs-White','Kyle Walker-Peters'],
+        Spain: ['Pedri','Gavi','Ferran Torres','Sergio Busquets','Unai Simon','Cesar Azpilicueta','Aymeric Laporte','Jordi Alba','Dani Olmo','Mikel Oyarzabal','Nico Williams','Lamine Yamal','Alejandro Balde','Pau Torres','Robin Le Normand','Mikel Bilbao','Bryan Gil','Sergio Reguilon','David Raya','Aleix Garcia'],
+        Germany: ['Jamal Musiala','Florian Wirtz','Kai Havertz','Joshua Kimmich','Manuel Neuer','Antonio Rudiger','Ilkay Gundogan','Thomas Muller','Leroy Sane','Jamal Musiala','Jonathan Tah','Florian Wirtz','Chris Fuhrich','Lukas Podolski','Jonas Hofmann','Maximilian Beier','Deniz Undav','Kevin Schade','Luca Beermann','Jeremie Frimpong'],
+        France: ['Kylian Mbappe','Aurelien Tchouameni','Eduardo Camavinga','Theo Hernandez','Adrien Rabiot','N Golo Kante','Ousmane Dembele','Kingsley Coman','Ferland Mendy','Raphael Varane','William Saliba','Ibrahima Konate','Jules Kounde','Mike Maignan','Bradley Barcola','Warren Zaire-Emery','Manuel Ugarte','Jean-Claire Todibo','Nicolas Jackson','Malick Yalcouye'],
+        Brazil: ['Vinicius Jr','Rodrygo','Casemiro','Marquinhos','Alisson','Thiago Silva','Lucas Paqueta','Fabinho','Richarlison','Gabriel Jesus','Antony','Eder Militao','Bremer','Bruno Guimaraes','Raphinha','Gabriel Martinelli','Casemiro','Andre','Joao Pedro','Marlon'],
+        Argentina: ['Lionel Messi','Lautaro Martinez','Julian Alvarez','Angel Di Maria','Gonzalo Montiel','Lisandro Martinez','Enzo Fernandez','Alexis Mac Allister','Cristian Romero','Emiliano Martinez','Nicolas Otamendi','Nahuel Molina','Marcos Acuna','Giovani Lo Celso','Rodrigo De Paul','Leandro Paredes','Julian Alvarez','Exequiel Palacios','Geronimo Rulli','Juan Foyth'],
+        Italy: ['Gianluigi Donnarumma','Alessandro Bastoni','Nicolo Barella','Leonardo Bonucci','Federico Chiesa','Ciro Immobile','Rafael Leao','Mike Maignan','Theo Hernandez','Sandro Tonali','Davide Calabria','Alessio Romagnoli','Gianluca Mancini','Bryan Cristante','Lorenzo Pellegrini','Gianluca Scamacca','Matteo Politano','Domenico Berardi','Lorenzo Lucca','Patrick Cutrone'],
+        Nigeria: ['Victor Osimhen','Wilfred Ndidi','Kelechi Iheanacho','Samuel Chukwueze','Ola Aina','Zaidu Sanusi','Chidera Ejuke','Taiwo Awoniyi','Chukwueze','Nathaniel Tiole','Brighton','Akintola','Kelechi Iheanacho','John Obi Mikel','William Troost-Ekong','Semi Ajayi','Leon Balogun','Calvin Bassey','Moses Simon','Ademola Lookman'],
+        Japan: ['Takefusa Kubo','Daichi Kamada','Wataru Endo','Takehiro Tomiyasu','Kaoru Mitoma','Junya Ito','Hiroki Sakai','Wataru Endo','Daizen Maeda','Ayase Ueda','Kaoru Mitoma','Daichi Kamada','Takefusa Kubo','Ritsu Doan','Junya Ito','Ko Itakura','Yuki Kobayashi','Shogo Taniguchi','Wataru Ito','Koki Saito'],
+        Korea: ['Son Heung-min','Lee Kang-in','Kim Min-jae','Hwang Hee-chan','Cho Gue-sung','Kim Young-gwon','Seol Ki-hyeon','Lee Jae-sung','Hwang In-beom','Park Ji-soo','Kim Jin-hyeon','Seung-gyu Kim','Young-gwon Kim','Woo-young Jung','Hee-chan Hwang','Gue-sung Cho','Kang-in Lee','Seung-ho Paik','Min-jae Kim','Jae-sung Lee'],
+        China: ['Wu Lei','Zhang Yuning','Wang Dalei','Yan Junling','Kou Zhun','Gao Lin','Zheng Zhi','Feng Xiaoting','Wu Lei','Zhang Yuning','Wei Shihao','Liu Yang','Jiang Guangtai','Dai Lin','Li Kai','Zhang Jiazhen','Zhang Ruofan','Liu Binbin','Wei Shihao','Tan Tianxiao'],
+        USA: ['Christian Pulisic','Weston McKennie','Sergiño Dest','Antonee Robinson','Tyler Adams','Yunus Musah','Gio Reyna','Folarin Balogun','Joe Scally','Tim Weah','Brenden Aaronson','Ricardo Pepi','Mark McKenzie','Cameron Carter-Vickers','Miles Robinson','Aaron Long','DeJuan Jones','Kristoffer Olsson','Gabriel Heinze','Sebastian Lletget']
     };
 
-    // ==================== AI Avatar Generator ====================
-    const ETHNICITIES = {
-        England: 'white',
-        Spain: 'white',
-        Germany: 'white',
-        France: 'mixed',
-        Brazil: 'mixed',
-        Argentina: 'white',
-        Italy: 'white',
-        Portugal: 'white',
-        Nigeria: 'black',
-        Japan: 'asian',
-        Korea: 'asian',
-        China: 'asian',
-        USA: 'mixed',
-        Mexico: 'mixed'
-    };
-
-    async function generatePlayerAvatar(name, region) {
-        // 使用多个头像 API 作为备选
-        const seed = name.replace(/\s+/g, '').toLowerCase();
-        const ethnicity = ETHNICITIES[region] || 'mixed';
+    // ==================== Avatar Generation (Local SVG) ====================
+    function generateLocalAvatar(name, region) {
+        // 生成一个基于名字的独特 SVG 头像
+        const seed = name.split('').reduce((a, c) => a + c.charCodeAt(0), 0);
         
-        // 优先使用 Dicebear Avataaars（最稳定）
-        const urls = [
-            `https://api.dicebear.com/7.x/avataaars/svg?seed=${seed}&scale=85&backgroundColor=random`,
-            `https://api.dicebear.com/7.x/lorelei/svg?seed=${seed}&scale=85&backgroundColor=random`,
-            `https://api.dicebear.com/7.x/personas/svg?seed=${seed}&scale=85&backgroundColor=random`
+        const skinTones = {
+            England: ['#FFDFC4', '#F0C8A0', '#E8B796'],
+            Spain: ['#FFDFC4', '#F0C8A0', '#D4A574'],
+            Germany: ['#FFE0BD', '#F5D0A9', '#E8C4A0'],
+            France: ['#FFDFC4', '#F0C8A0', '#E8B796'],
+            Brazil: ['#D4A574', '#C4956A', '#B07850'],
+            Argentina: ['#FFDFC4', '#E8C4A0', '#D4A574'],
+            Italy: ['#FFDFC4', '#F0C8A0', '#E8B796'],
+            Nigeria: ['#8B5A2B', '#704214', '#5C3317'],
+            Japan: ['#FFE4C4', '#F5D0A9', '#E8C4A0'],
+            Korea: ['#FFE4C4', '#F5D0A9', '#E8C4A0'],
+            China: ['#FFE4C4', '#F5D0A9', '#E8C4A0'],
+            USA: ['#FFDFC4', '#F0C8A0', '#D4A574', '#8B5A2B']
+        };
+        
+        const colors = skinTones[region] || skinTones['USA'];
+        const skinColor = colors[seed % colors.length];
+        
+        const hairColors = ['#2C1810', '#4A3728', '#8B4513', '#D4A574', '#1C1C1C', '#8B0000'];
+        const hairColor = hairColors[seed % hairColors.length];
+        
+        // 根据名字首字母决定发型
+        const firstChar = name.charCodeAt(0);
+        const hairStyle = firstChar % 3; // 0: 短发, 1: 中发, 2: 长发
+        
+        const hairPaths = [
+            // 短发
+            `<ellipse cx="50" cy="25" rx="28" ry="15" fill="${hairColor}"/>`,
+            // 中发
+            `<ellipse cx="50" cy="25" rx="30" ry="18" fill="${hairColor}"/><ellipse cx="25" cy="40" rx="8" ry="15" fill="${hairColor}"/><ellipse cx="75" cy="40" rx="8" ry="15" fill="${hairColor}"/>`,
+            // 长发
+            `<ellipse cx="50" cy="25" rx="32" ry="20" fill="${hairColor}"/><ellipse cx="22" cy="45" rx="10" ry="20" fill="${hairColor}"/><ellipse cx="78" cy="45" rx="10" ry="20" fill="${hairColor}"/>`
         ];
         
-        return urls[0]; // 返回第一个 URL，浏览器会自动加载
+        const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+            <defs>
+                <linearGradient id="bg${seed}" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" style="stop-color:#667eea"/>
+                    <stop offset="100%" style="stop-color:#764ba2"/>
+                </linearGradient>
+                <filter id="shadow${seed}">
+                    <feDropShadow dx="0" dy="2" stdDeviation="2" flood-opacity="0.3"/>
+                </filter>
+            </defs>
+            <circle cx="50" cy="50" r="50" fill="url(#bg${seed})"/>
+            ${hairPaths[hairStyle]}
+            <ellipse cx="50" cy="55" rx="28" ry="30" fill="${skinColor}"/>
+            <ellipse cx="50" cy="50" rx="25" ry="25" fill="${skinColor}"/>
+            <circle cx="40" cy="46" r="4" fill="#1a1a1a"/>
+            <circle cx="60" cy="46" r="4" fill="#1a1a1a"/>
+            <circle cx="41" cy="45" r="1.5" fill="white"/>
+            <circle cx="61" cy="45" r="1.5" fill="white"/>
+            <ellipse cx="50" cy="56" rx="3" ry="2" fill="#E8A87C"/>
+            <path d="M 42 64 Q 50 70 58 64" stroke="#C96B6B" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+            <ellipse cx="35" cy="52" rx="5" ry="3" fill="rgba(255,150,150,0.3)"/>
+            <ellipse cx="65" cy="52" rx="5" ry="3" fill="rgba(255,150,150,0.3)"/>
+        </svg>`;
+        
+        return 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
     }
 
     // ==================== I18n ====================
     const I18N = {
         en: {
-            appName: "Dream Football",
-            home: "Home", team: "Squad", tactics: "Tactics", facility: "Facility", match: "Match",
-            budget: "Budget", round: "Round {0}", season: "Season {0}", rank: "Rank",
-            record: "Record", gd: "GD", win: "W", draw: "D", lose: "L", pts: "PTS",
-            play: "Play Match", train: "Train", refresh: "Refresh", academy: "Academy",
-            market: "Transfer Market", standings: "Standings", sign: "Sign", reject: "Release",
-            goals: "G", assists: "A", matches: "M", fitness: "FIT", morale: "MOR",
-            pace: "PAC", shooting: "SHO", passing: "PAS", defending: "DEF", physical: "PHY",
-            formation: "Formation", style: "Style", upgrade: "Upgrade", attack: "Attack",
-            balance: "Balance", defend: "Defend", income: "Income", level: "Level",
-            goal: "GOAL!", shot: "Shot", foul: "Foul", yellowCard: "Yellow Card",
-            redCard: "Red Card", substitution: "Substitution", kickoff: "Kick Off",
-            halftime: "Half Time", fulltime: "Full Time", minute: "'", vs: "VS",
-            squad: "Squad ({0})", selectPlayer: "Select Player", sell: "Sell",
-            currentTeam: "Current XI", nextMatch: "Next Match", strength: "STR",
-            points: "Points", signFee: "Sign Fee", wage: "Wage", value: "Value",
-            training: "Training", youthAcademy: "Youth Academy", stadium: "Stadium",
-            trainingEff: "Training Eff.", youthQuality: "Youth Quality", matchIncome: "Match Income",
-            signed: "Signed!", noMoney: "Not enough funds!", trained: "Trained!",
-            upgraded: "Upgraded!", all: "All", goalkeeper: "GK", defenders: "DEF",
-            midfielders: "MID", attackers: "ATT", position: "Position", potential: "Potential",
-            age: "Age", overall: "OVR", back: "Back", playMatch: "Play Match",
-            watching: "Watching Match", live: "LIVE"
+            appName: "Dream Football", home: "Home", team: "Squad", tactics: "Tactics", facility: "Facility", match: "Match",
+            budget: "Budget", round: "Round {0}", season: "Season {0}", rank: "Rank", record: "Record", gd: "GD",
+            win: "W", draw: "D", lose: "L", pts: "PTS", play: "Play Match", train: "Train", refresh: "Refresh",
+            academy: "Academy", market: "Transfer Market", standings: "Standings", sign: "Sign", reject: "Release",
+            goals: "G", assists: "A", matches: "M", fitness: "FIT", morale: "MOR", pace: "PAC", shooting: "SHO",
+            passing: "PAS", defending: "DEF", physical: "PHY", formation: "Formation", style: "Style", upgrade: "Upgrade",
+            attack: "Attack", balance: "Balance", defend: "Defend", income: "Income", level: "Level", potential: "Potential",
+            age: "Age", overall: "OVR", height: "Height", weight: "Weight", value: "Value", wage: "Wage", position: "Position",
+            signed: "Signed!", noMoney: "Not enough funds!", trained: "Trained!", upgraded: "Upgraded!", back: "Back",
+            all: "All", goalkeeper: "GK", defenders: "DEF", midfielders: "MID", attackers: "ATT", live: "LIVE",
+            halfTime: "Half Time", fullTime: "Full Time", extraTime: "Extra Time", penalties: "Penalties",
+            details: "Details", buy: "Buy", sell: "Sell", signFee: "Sign Fee", abilities: "Abilities"
         },
         zh: {
-            appName: "梦幻足球",
-            home: "首页", team: "阵容", tactics: "战术", facility: "设施", match: "比赛",
-            budget: "资金", round: "第{0}轮", season: "赛季{0}", rank: "排名",
-            record: "战绩", gd: "净胜", win: "胜", draw: "平", lose: "负", pts: "分",
-            play: "开始比赛", train: "训练", refresh: "刷新", academy: "青训",
-            market: "转会市场", standings: "积分榜", sign: "签约", reject: "放弃",
-            goals: "球", assists: "助", matches: "场", fitness: "体", morale: "气",
-            pace: "速", shooting: "射", passing: "传", defending: "防", physical: "体",
-            formation: "阵型", style: "战术", upgrade: "升级", attack: "进攻",
-            balance: "平衡", defend: "防守", income: "收入", level: "等级",
-            goal: "进球!", shot: "射门", foul: "犯规", yellowCard: "黄牌",
-            redCard: "红牌", substitution: "换人", kickoff: "开球", halftime: "半场",
-            fulltime: "全场", minute: "'", vs: "VS",
-            squad: "阵容 ({0})", selectPlayer: "选择球员", sell: "出售",
-            currentTeam: "当前首发", nextMatch: "下一场", strength: "实力",
-            points: "积分", signFee: "签约费", wage: "周薪", value: "身价",
-            training: "训练场", youthAcademy: "青训营", stadium: "体育场",
-            trainingEff: "训练效率", youthQuality: "青训质量", matchIncome: "比赛收入",
-            signed: "签约成功!", noMoney: "资金不足!", trained: "训练完成!",
-            upgraded: "升级成功!", all: "全部", goalkeeper: "门将", defenders: "后卫",
-            midfielders: "中场", attackers: "前锋", position: "位置", potential: "潜力",
-            age: "年龄", overall: "总评", back: "返回", playMatch: "比赛",
-            watching: "观看比赛", live: "直播"
+            appName: "梦幻足球", home: "首页", team: "阵容", tactics: "战术", facility: "设施", match: "比赛",
+            budget: "资金", round: "第{0}轮", season: "赛季{0}", rank: "排名", record: "战绩", gd: "净胜",
+            win: "胜", draw: "平", lose: "负", pts: "分", play: "开始比赛", train: "训练", refresh: "刷新",
+            academy: "青训", market: "转会市场", standings: "积分榜", sign: "签约", reject: "放弃",
+            goals: "球", assists: "助", matches: "场", fitness: "体", morale: "气", pace: "速", shooting: "射",
+            passing: "传", defending: "防", physical: "体", formation: "阵型", style: "战术", upgrade: "升级",
+            attack: "进攻", balance: "平衡", defend: "防守", income: "收入", level: "等级", potential: "潜力",
+            age: "年龄", overall: "总评", height: "身高", weight: "体重", value: "身价", wage: "周薪", position: "位置",
+            signed: "签约成功!", noMoney: "资金不足!", trained: "训练完成!", upgraded: "升级成功!", back: "返回",
+            all: "全部", goalkeeper: "门将", defenders: "后卫", midfielders: "中场", attackers: "前锋", live: "直播",
+            halfTime: "半场", fullTime: "全场", extraTime: "加时赛", penalties: "点球大战",
+            details: "详情", buy: "购买", sell: "出售", signFee: "签约费", abilities: "能力"
         }
     };
 
     let LANG = 'en';
-    function t(key, ...args) {
-        let text = I18N[LANG][key] || key;
-        args.forEach((v, i) => text = text.replace(`{${i}}`, v));
-        return text;
-    }
-
-    function fmt(n) {
-        if (n >= 1000000) return '€' + (n / 1000000).toFixed(1) + 'M';
-        if (n >= 1000) return '€' + (n / 1000).toFixed(0) + 'K';
-        return '€' + n;
-    }
-
+    function t(key, ...args) { let text = I18N[LANG][key] || key; args.forEach((v, i) => text = text.replace(`{${i}}`, v)); return text; }
+    function fmt(n) { if (n >= 1000000) return '€' + (n / 1000000).toFixed(1) + 'M'; if (n >= 1000) return '€' + (n / 1000).toFixed(0) + 'K'; return '€' + n; }
     const rand = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
     const uid = () => 'p' + Date.now() + Math.random().toString(36).substr(2, 6);
 
@@ -390,49 +173,18 @@
     let filterPos = 'all';
     let showToast = null;
     let matchState = null;
-    let matchCanvas = null;
-    let matchCtx = null;
-    let animationId = null;
     let selectedPlayer = null;
+    let canvas, ctx;
+    let animationId = null;
 
     // ==================== Player Creation ====================
-    // ==================== Player Height/Weight System ====================
-    function calculateHeight(age, baseHeight) {
-        // 人类身高生长曲线：16岁前快速生长，16-20岁缓慢生长，20岁后基本定型
-        if (age < 16) {
-            // 16岁前：快速生长期
-            const growthRate = 0.08; // 每年增长8cm
-            return baseHeight - (20 - age) * growthRate;
-        } else if (age < 20) {
-            // 16-20岁：缓慢生长期
-            const growthRate = 0.02; // 每年增长2cm
-            return baseHeight - (20 - age) * growthRate;
-        } else {
-            // 20岁后：定型
-            return baseHeight;
-        }
-    }
-
     function generatePlayerStats(position, age) {
-        // 根据位置生成基础身高
-        const heightBase = {
-            GK: rand(188, 195),
-            CB: rand(185, 193),
-            LB: rand(178, 185),
-            RB: rand(178, 185),
-            CDM: rand(180, 188),
-            CM: rand(178, 185),
-            CAM: rand(175, 182),
-            LW: rand(173, 180),
-            RW: rand(173, 180),
-            ST: rand(180, 190)
-        };
-        
+        const heightBase = { GK: rand(188, 196), CB: rand(184, 193), LB: rand(177, 185), RB: rand(177, 185), CDM: rand(180, 188), CM: rand(177, 185), CAM: rand(175, 182), LW: rand(172, 180), RW: rand(172, 180), ST: rand(179, 191) };
         const base = heightBase[position] || 180;
-        const height = calculateHeight(age, base);
-        const weight = Math.round(height * 0.65 + rand(-5, 5)); // 身高*0.65 ± 5kg
-        
-        return { height: Math.round(height), weight };
+        const growthFactor = age < 20 ? (20 - age) * 0.08 : 0;
+        const height = Math.round(base - growthFactor);
+        const weight = Math.round(height * 0.65 + rand(-5, 5));
+        return { height, weight };
     }
 
     function createPlayer(region, position, quality = 60) {
@@ -452,57 +204,45 @@
             RW: { pace: 22, shooting: 18, defending: -10, passing: 10 },
             ST: { pace: 12, shooting: 25, defending: -15, physical: 15 }
         };
+        
         const b = posBonus[position] || {};
         const potential = Math.min(99, quality + rand(5, 22));
         const baseOvr = Math.max(30, Math.min(99, quality + rand(-8, 8)));
         const baseValue = Math.floor(baseOvr * 8000 * (age < 22 ? 1.6 : age < 26 ? 1.2 : age < 30 ? 0.8 : 0.35));
-        
         const stats = generatePlayerStats(position, age);
         
         return {
-            id: uid(),
-            name,
-            region,
-            position,
-            age,
-            ovr: baseOvr,
+            id: uid(), name, region, position, age, ovr: baseOvr,
             pace: Math.max(30, Math.min(99, rand(50, 85) + (b.pace || 0))),
             shooting: Math.max(30, Math.min(99, rand(40, 80) + (b.shooting || 0))),
             passing: Math.max(30, Math.min(99, rand(45, 85) + (b.passing || 0))),
             defending: Math.max(30, Math.min(99, rand(40, 80) + (b.defending || 0))),
             physical: Math.max(30, Math.min(99, rand(50, 85) + (b.physical || 0))),
-            potential,
-            fitness: rand(75, 100),
-            morale: rand(60, 100),
+            potential, fitness: rand(75, 100), morale: rand(60, 100),
             value: Math.floor(baseValue * rand(80, 120) / 100),
             wage: Math.floor(baseOvr * 80 * rand(80, 120) / 100),
             goals: 0, assists: 0, matches: 0,
-            avatar: null,
-            isGK: position === 'GK',
-            height: stats.height,
-            weight: stats.weight
+            height: stats.height, weight: stats.weight,
+            avatar: generateLocalAvatar(name, region)
         };
     }
 
     // ==================== Game Init ====================
     function initGame() {
-        const saved = localStorage.getItem('football_v5_save');
+        const saved = localStorage.getItem('football_v10_save');
         if (saved) {
             try {
                 game = JSON.parse(saved);
+                // 重新生成头像
+                game.team.forEach(p => p.avatar = generateLocalAvatar(p.name, p.region));
+                game.market.forEach(p => p.avatar = generateLocalAvatar(p.name, p.region));
+                game.prospects.forEach(p => p.avatar = generateLocalAvatar(p.name, p.region));
                 return;
             } catch(e) {}
         }
         
-        game = {
-            budget: 5000000,
-            team: [],
-            league: [],
-            facilities: { training: 1, academy: 1, stadium: 1 },
-            season: 1, week: 1, day: 0,
-            formation: '4-4-2', tactic: 'balance',
-            market: [], prospects: [], news: []
-        };
+        game = { budget: 5000000, team: [], league: [], facilities: { training: 1, academy: 1, stadium: 1 },
+            season: 1, week: 1, day: 0, formation: '4-4-2', tactic: 'balance', market: [], prospects: [], news: [] };
         
         const positions = ['GK','CB','CB','CB','LB','RB','CDM','CM','CM','CAM','LW','RW','ST','ST','CM','CDM','CB','LB','RB','GK','CM','ST'];
         const regions = ['England','Spain','Brazil','Germany','France','Italy','Argentina','Portugal','Nigeria','Japan','Korea','China','USA','Mexico','England','Spain','Brazil','Germany','France','Italy','Argentina','Portugal'];
@@ -512,30 +252,22 @@
         }
         
         const teamNames = {
-            en: ['FC United', 'Athletic Club', 'Dragon FC', 'Lion SC', 'Red Stars', 'Blue Moon', 'Green FC', 'Phoenix FC', 'Silver Eagles', 'Golden Snakes', 'Violets', 'Panthers'],
-            zh: ['FC联', '竞技俱乐部', '龙之队', '雄狮FC', '红星队', '蓝月亮', '绿茵FC', '凤凰FC', '银鹰SC', '金蛇队', '紫百合', '黑豹FC']
+            en: ['FC United','Athletic Club','Dragon FC','Lion SC','Red Stars','Blue Moon','Green FC','Phoenix FC','Silver Eagles','Golden Snakes','Violets','Panthers'],
+            zh: ['FC联','竞技俱乐部','龙之队','雄狮FC','红星队','蓝月亮','绿茵FC','凤凰FC','银鹰SC','金蛇队','紫百合','黑豹FC']
         };
         
-        game.league = teamNames.en.map((name, i) => ({
-            name, index: i, strength: rand(40, 88),
-            played: 0, won: 0, drawn: 0, lost: 0, gf: 0, ga: 0, pts: 0
-        }));
+        game.league = teamNames.en.map((name, i) => ({ name, index: i, strength: rand(40, 88), played: 0, won: 0, drawn: 0, lost: 0, gf: 0, ga: 0, pts: 0 }));
         game.leagueNames = teamNames;
     }
 
-    function save() {
-        localStorage.setItem('football_v5_save', JSON.stringify(game));
-    }
-
-    function getLeagueName(i) {
-        return LANG === 'zh' ? game.leagueNames.zh[i] : game.leagueNames.en[i];
-    }
+    function save() { localStorage.setItem('football_v10_save', JSON.stringify(game)); }
+    function getLeagueName(i) { return LANG === 'zh' ? game.leagueNames.zh[i] : game.leagueNames.en[i]; }
 
     // ==================== Game Actions ====================
     function refreshMarket() {
         const q = 55 + game.facilities.academy * 3;
         game.market = [];
-        const regions = ['England', 'Spain', 'Brazil', 'Germany', 'France', 'Italy', 'Argentina', 'Portugal'];
+        const regions = ['England', 'Spain', 'Brazil', 'Germany', 'France', 'Italy', 'Argentina'];
         for (let i = 0; i < 6; i++) {
             const p = createPlayer(regions[rand(0, regions.length - 1)], ['GK','CB','LB','RB','CDM','CM','CAM','LW','RW','ST'][rand(0, 9)], rand(q - 10, q + 15));
             p.askPrice = Math.floor(p.value * rand(75, 125) / 100);
@@ -573,581 +305,522 @@
         save();
     }
 
-    function addNews(text) {
-        game.news.unshift({ text, time: Date.now() });
-        if (game.news.length > 20) game.news = game.news.slice(0, 20);
+    function addNews(text) { game.news.unshift({ text, time: Date.now() }); if (game.news.length > 20) game.news = game.news.slice(0, 20); }
+
+    // ==================== Player Detail ====================
+    function showPlayerDetail(player) {
+        if (!player) return;
+        selectedPlayer = player;
+        currentTab = 'playerDetail';
+        render();
     }
 
-    // ==================== Match Simulation ====================
-    // ==================== Formation Positions ====================
-    const TACTICS = {
-        attack: { att: 15, def: -10 },
-        balance: { att: 0, def: 0 },
-        defend: { att: -10, def: 15 }
-    };
+    function renderPlayerDetail() {
+        const p = selectedPlayer;
+        if (!p) return '';
+        
+        const stats = [
+            { label: t('pace'), value: p.pace, color: '#00d4ff' },
+            { label: t('shooting'), value: p.shooting, color: '#ef4444' },
+            { label: t('passing'), value: p.passing, color: '#fbbf24' },
+            { label: t('defending'), value: p.defending, color: '#22c55e' },
+            { label: t('physical'), value: p.physical, color: '#8b5cf6' }
+        ];
+        
+        return `
+            <div class="card p-4 mb-3">
+                <div class="flex items-center gap-4 mb-4">
+                    <div class="player-avatar" style="width:80px;height:80px;">
+                        <img src="${p.avatar}" alt="${p.name}">
+                    </div>
+                    <div>
+                        <h2 class="text-2xl font-bold game-title text-cyan-300">${p.name}</h2>
+                        <p class="text-sm text-slate-400">${t('position')}: ${p.position}</p>
+                        <p class="text-sm text-slate-400">${p.region}</p>
+                        <p class="text-lg font-bold text-amber-400 mt-1">${p.ovr} OVR ${p.potential > p.ovr ? '<span class="text-green-400 text-sm">(↑' + (p.potential - p.ovr) + ')</span>' : ''}</p>
+                    </div>
+                </div>
+                
+                <div class="grid grid-cols-4 gap-2 mb-4">
+                    <div class="bg-slate-800/50 p-2 rounded-lg text-center">
+                        <div class="text-xs text-slate-400">${t('age')}</div>
+                        <div class="text-xl font-bold">${p.age}</div>
+                    </div>
+                    <div class="bg-slate-800/50 p-2 rounded-lg text-center">
+                        <div class="text-xs text-slate-400">${t('height')}</div>
+                        <div class="text-xl font-bold">${p.height}cm</div>
+                    </div>
+                    <div class="bg-slate-800/50 p-2 rounded-lg text-center">
+                        <div class="text-xs text-slate-400">${t('weight')}</div>
+                        <div class="text-xl font-bold">${p.weight}kg</div>
+                    </div>
+                    <div class="bg-slate-800/50 p-2 rounded-lg text-center">
+                        <div class="text-xs text-slate-400">${t('matches')}</div>
+                        <div class="text-xl font-bold">${p.matches}</div>
+                    </div>
+                </div>
+                
+                <div class="bg-slate-800/50 p-4 rounded-lg mb-4">
+                    <h3 class="font-bold text-sm mb-3">📊 ${t('abilities')}</h3>
+                    <div class="space-y-2">
+                        ${stats.map(s => `
+                            <div class="flex items-center gap-2">
+                                <span class="text-xs text-slate-400 w-12">${s.label}</span>
+                                <div class="flex-1 stat-bar">
+                                    <div class="stat-fill" style="width:${s.value}%;background:${s.color}"></div>
+                                </div>
+                                <span class="text-sm font-bold w-8 text-right">${s.value}</span>
+                            </div>
+                        `).join('')}
+                    </div>
+                    <div class="grid grid-cols-2 gap-2 mt-3">
+                        <div class="text-center p-2 rounded bg-green-900/30">
+                            <div class="text-2xl font-bold text-green-400">${p.goals}</div>
+                            <div class="text-xs text-slate-400">${t('goals')}</div>
+                        </div>
+                        <div class="text-center p-2 rounded bg-cyan-900/30">
+                            <div class="text-2xl font-bold text-cyan-400">${p.assists}</div>
+                            <div class="text-xs text-slate-400">${t('assists')}</div>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-2 gap-2 mt-3">
+                        <div class="bg-slate-700/50 p-2 rounded">
+                            <div class="text-xs text-slate-400">${t('value')}</div>
+                            <div class="text-sm font-bold text-green-400">${fmt(p.value)}</div>
+                        </div>
+                        <div class="bg-slate-700/50 p-2 rounded">
+                            <div class="text-xs text-slate-400">${t('wage')}</div>
+                            <div class="text-sm font-bold text-amber-400">${fmt(p.wage)}/w</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="flex gap-2">
+                    <button onclick="currentTab='home';selectedPlayer=null;render()" class="btn-game purple flex-1">${t('back')}</button>
+                </div>
+            </div>
+        `;
+    }
 
+    // ==================== Match System ====================
     const FORMATION_POSITIONS = {
         '4-4-2': [
-            { x: 0.1, y: 0.5 },   // GK
-            { x: 0.25, y: 0.2 }, { x: 0.25, y: 0.5 }, { x: 0.25, y: 0.8 }, // CB
-            { x: 0.2, y: 0.15 }, { x: 0.2, y: 0.85 }, // LB RB
-            { x: 0.4, y: 0.25 }, { x: 0.4, y: 0.5 }, { x: 0.4, y: 0.75 }, // CM
-            { x: 0.5, y: 0.35 }, { x: 0.5, y: 0.65 }  // ST
+            {x:0.08,y:0.5},{x:0.22,y:0.15},{x:0.22,y:0.4},{x:0.22,y:0.6},{x:0.22,y:0.85},
+            {x:0.38,y:0.2},{x:0.38,y:0.5},{x:0.38,y:0.8},
+            {x:0.52,y:0.3},{x:0.52,y:0.7}
         ],
         '4-3-3': [
-            { x: 0.1, y: 0.5 },   // GK
-            { x: 0.25, y: 0.15 }, { x: 0.25, y: 0.4 }, { x: 0.25, y: 0.6 }, { x: 0.25, y: 0.85 }, // CB LB RB
-            { x: 0.4, y: 0.3 }, { x: 0.4, y: 0.5 }, { x: 0.4, y: 0.7 }, // CDM CM
-            { x: 0.5, y: 0.2 }, { x: 0.5, y: 0.5 }, { x: 0.5, y: 0.8 }  // LW ST RW
+            {x:0.08,y:0.5},{x:0.22,y:0.15},{x:0.22,y:0.4},{x:0.22,y:0.6},{x:0.22,y:0.85},
+            {x:0.38,y:0.3},{x:0.38,y:0.5},{x:0.38,y:0.7},
+            {x:0.55,y:0.2},{x:0.55,y:0.5},{x:0.55,y:0.8}
         ],
         '4-2-3-1': [
-            { x: 0.1, y: 0.5 },   // GK
-            { x: 0.25, y: 0.15 }, { x: 0.25, y: 0.4 }, { x: 0.25, y: 0.6 }, { x: 0.25, y: 0.85 }, // CB LB RB
-            { x: 0.35, y: 0.35 }, { x: 0.35, y: 0.65 }, // CDM
-            { x: 0.45, y: 0.25 }, { x: 0.45, y: 0.5 }, { x: 0.45, y: 0.75 }, // CAM
-            { x: 0.55, y: 0.5 }   // ST
+            {x:0.08,y:0.5},{x:0.22,y:0.15},{x:0.22,y:0.4},{x:0.22,y:0.6},{x:0.22,y:0.85},
+            {x:0.35,y:0.35},{x:0.35,y:0.65},
+            {x:0.48,y:0.2},{x:0.48,y:0.5},{x:0.48,y:0.8},
+            {x:0.58,y:0.5}
         ],
         '3-5-2': [
-            { x: 0.1, y: 0.5 },   // GK
-            { x: 0.25, y: 0.25 }, { x: 0.25, y: 0.5 }, { x: 0.25, y: 0.75 }, // CB
-            { x: 0.35, y: 0.1 }, { x: 0.35, y: 0.9 }, // LWB RWB
-            { x: 0.4, y: 0.3 }, { x: 0.4, y: 0.5 }, { x: 0.4, y: 0.7 }, // CM
-            { x: 0.5, y: 0.35 }, { x: 0.5, y: 0.65 }  // ST
+            {x:0.08,y:0.5},{x:0.22,y:0.25},{x:0.22,y:0.5},{x:0.22,y:0.75},
+            {x:0.38,y:0.1},{x:0.38,y:0.35},{x:0.38,y:0.5},{x:0.38,y:0.65},{x:0.38,y:0.9},
+            {x:0.52,y:0.35},{x:0.52,y:0.65}
         ]
     };
 
-    function getFormationPositions(formation, isOpponent = false) {
-        const positions = FORMATION_POSITIONS[formation] || FORMATION_POSITIONS['4-4-2'];
-        if (isOpponent) {
-            return positions.map(p => ({ x: 1 - p.x, y: p.y }));
-        }
-        return positions;
-    }
-
     function startMatch() {
         currentTab = 'match';
+        matchState = null;
         render();
         
-        const formationPos = getFormationPositions(game.formation, false);
+        const formationPos = FORMATION_POSITIONS[game.formation] || FORMATION_POSITIONS['4-4-2'];
         const myTeam = game.team.slice(0, 11).map((p, i) => {
-            const pos = formationPos[i] || { x: 0.3, y: 0.5 };
-            return {
-                ...p,
-                x: pos.x,
-                y: pos.y,
-                targetX: pos.x,
-                targetY: pos.y,
-                homeX: pos.x,
-                homeY: pos.y,
-                vx: 0, vy: 0,
-                speed: 0.02 + (p.pace / 100) * 0.03
-            };
+            const pos = formationPos[i] || {x:0.3 + (i%3)*0.1, y:0.2 + Math.floor(i/3)*0.2};
+            return {...p, x: pos.x, y: pos.y, vx: 0, vy: 0, homeX: pos.x, homeY: pos.y};
         });
         
         const oppIdx = rand(1, game.league.length - 1);
         const oppStrength = game.league[oppIdx].strength;
-        const oppRegion = ['England', 'Spain', 'Brazil', 'Germany', 'France'][rand(0, 4)];
+        const oppRegion = ['England','Spain','Brazil','Germany','France'][rand(0,4)];
         const oppTeam = [];
-        const oppPositions = ['GK','CB','CB','LB','RB','CDM','CM','CM','LW','ST','RW'];
-        
-        const oppFormationPos = getFormationPositions('4-3-3', true);
-        for (let i = 0; i < 11; i++) {
-            const p = createPlayer(oppRegion, oppPositions[i], oppStrength);
-            const pos = oppFormationPos[i] || { x: 0.7, y: 0.5 };
-            p.x = pos.x;
-            p.y = pos.y;
-            p.targetX = pos.x;
-            p.targetY = pos.y;
-            p.homeX = pos.x;
-            p.homeY = pos.y;
-            p.vx = 0;
-            p.vy = 0;
-            p.speed = 0.02 + (p.pace / 100) * 0.03;
-            oppTeam.push(p);
-        }
+        const oppPos = formationPos.map(p => ({x: 1-p.x, y: p.y}));
+        ['GK','CB','CB','LB','RB','CDM','CM','CM','LW','ST','RW'].forEach((pos, i) => {
+            const p = createPlayer(oppRegion, pos, oppStrength);
+            const o = oppPos[i] || {x:0.7, y:0.5};
+            oppTeam.push({...p, x: o.x, y: o.y, vx: 0, vy: 0, homeX: o.x, homeY: o.y});
+        });
         
         matchState = {
-            myTeam,
-            oppTeam,
+            myTeam, oppTeam,
             oppName: getLeagueName(oppIdx),
-            myScore: 0,
-            oppScore: 0,
-            minute: 0,
-            second: 0,
+            myScore: 0, oppScore: 0,
+            minute: 0, second: 0, extraTime: false, penalties: false,
             events: [],
-            ball: { x: 0.5, y: 0.5, vx: 0, vy: 0, owner: null, lastOwner: null },
+            ball: {x:0.5, y:0.5, vx:0, vy:0, owner:null, targetX:0.5, targetY:0.5, flying:false},
             possession: 'my',
             phase: 'kickoff',
-            nextEventMinute: rand(2, 5),
-            started: false,
-            finished: false,
-            halftime: false,
-            yellowCards: { my: [], opp: [] },
-            substitutions: { my: [], opp: [] },
-            passChain: 0
+            started: false, finished: false, halftime: false,
+            yellowCards: {my:[], opp:[]},
+            possessionTime: {my:0, opp:0},
+            shots: {my:0, opp:0}
         };
         
         addNews(`⚽ Match started: FC United vs ${matchState.oppName}`);
         
         setTimeout(() => {
             matchState.started = true;
-            startMatchAnimation();
+            startMatchLoop();
         }, 1000);
     }
 
-    function startMatchAnimation() {
-        if (!matchState || matchState.finished) return;
-        
-        const canvas = document.getElementById('matchCanvas');
+    function startMatchLoop() {
+        canvas = document.getElementById('matchCanvas');
         if (!canvas) return;
-        
-        matchCanvas = canvas;
-        matchCtx = canvas.getContext('2d');
+        ctx = canvas.getContext('2d');
         
         const rect = canvas.getBoundingClientRect();
         canvas.width = rect.width * window.devicePixelRatio;
         canvas.height = rect.height * window.devicePixelRatio;
-        matchCtx.scale(window.devicePixelRatio, window.devicePixelRatio);
+        ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
         
-        function gameLoop() {
-            if (!matchState || !matchState.started) return;
+        let lastTime = performance.now();
+        
+        function loop(time) {
+            if (!matchState || !matchState.started || matchState.finished) return;
             
-            updateMatch();
-            renderMatch();
+            const dt = Math.min((time - lastTime) / 1000, 0.1);
+            lastTime = time;
             
-            if (!matchState.finished) {
-                animationId = requestAnimationFrame(gameLoop);
-            }
+            updateMatchPhysics(dt);
+            updateMatchEvents();
+            renderMatchCanvas();
+            
+            animationId = requestAnimationFrame(loop);
         }
         
-        animationId = requestAnimationFrame(gameLoop);
+        animationId = requestAnimationFrame(loop);
     }
 
-    function updateMatch() {
-        if (!matchState || !matchState.started || matchState.finished) return;
+    function updateMatchPhysics(dt) {
+        if (!matchState) return;
         
-        matchState.second += 1;
+        // 时间推进 (1秒游戏时间 = 1秒真实时间)
+        matchState.second += dt;
         if (matchState.second >= 60) {
             matchState.second = 0;
             matchState.minute++;
             
             if (matchState.minute === 45 && !matchState.halftime) {
                 matchState.halftime = true;
-                matchState.phase = 'halftime';
                 addMatchEvent('⏱️ HALF TIME', 'info');
             }
             
+            // 90分钟后进入加时赛
             if (matchState.minute >= 90) {
-                endMatch();
-                return;
-            }
-        }
-        
-        // 已在 updateMatch 中调用
-        
-        updateBallPhysics();
-        updatePlayerMovement();
-        
-        if (Math.floor(matchState.second) % 3 === 0 && matchState.second < 1 && !matchState.halftime) {
-            if (Math.random() < 0.3) generateMatchEvent();
-        }
-    }
-
-
-    function updateBallPhysics() {
-        const ball = matchState.ball;
-        
-        if (ball.owner) {
-            const dx = ball.owner.x - ball.x;
-            const dy = ball.owner.y - ball.y;
-            const dist = Math.hypot(dx, dy);
-            
-            if (dist > 0.01) {
-                const speed = 0.12;
-                ball.x += (dx / dist) * speed;
-                ball.y += (dy / dist) * speed;
-            } else {
-                ball.x = ball.owner.x;
-                ball.y = ball.owner.y;
-            }
-            ball.vx = 0;
-            ball.vy = 0;
-        } else {
-            ball.x += ball.vx;
-            ball.y += ball.vy;
-            ball.vx *= 0.94;
-            ball.vy *= 0.94;
-            
-            if (ball.x < 0.02) { ball.x = 0.02; ball.vx = Math.abs(ball.vx) * 0.6; }
-            if (ball.x > 0.98) { ball.x = 0.98; ball.vx = -Math.abs(ball.vx) * 0.6; }
-            if (ball.y < 0.02) { ball.y = 0.02; ball.vy = Math.abs(ball.vy) * 0.6; }
-            if (ball.y > 0.98) { ball.y = 0.98; ball.vy = -Math.abs(ball.vy) * 0.6; }
-            
-            const ballSpeed = Math.hypot(ball.vx, ball.vy);
-            if (ballSpeed < 0.01) {
-                const defenders = matchState.possession === 'my' ? matchState.oppTeam : matchState.myTeam;
-                const closest = defenders.reduce((best, p) => {
-                    const dist = Math.hypot(p.x - ball.x, p.y - ball.y);
-                    return dist < best.dist ? { p, dist } : best;
-                }, { p: null, dist: Infinity });
+                if (!matchState.extraTime && !matchState.finished) {
+                    matchState.extraTime = true;
+                    matchState.minute = 90;
+                    addMatchEvent('⏱️ EXTRA TIME!', 'info');
+                }
                 
-                if (closest.dist < 0.12) {
-                    ball.owner = closest.p;
-                    matchState.possession = matchState.possession === 'my' ? 'opp' : 'my';
-                    matchState.passChain = 0;
+                // 加时赛30分钟
+                if (matchState.minute >= 120) {
+                    endMatch();
+                    return;
                 }
             }
         }
+        
+        // 球运动
+        updateBall(dt);
+        
+        // 球员AI
+        updatePlayersAI(dt);
+        
+        // 持球时间统计
+        if (matchState.possession === 'my') matchState.possessionTime.my += dt;
+        else matchState.possessionTime.opp += dt;
     }
 
-    function updatePlayerMovement() {
+    function updateBall(dt) {
         const ball = matchState.ball;
         
-        matchState.myTeam.forEach((p, i) => {
-            updatePlayerAI(p, matchState.myTeam, matchState.oppTeam, ball, 'my');
-        });
-        
-        matchState.oppTeam.forEach((p, i) => {
-            updatePlayerAI(p, matchState.oppTeam, matchState.myTeam, ball, 'opp');
-        });
-    }
-
-    function updatePlayerAI(player, team, opponents, ball, side) {
-        let targetX = player.homeX;
-        let targetY = player.homeY;
-        
-        if (matchState.possession === (side === 'my' ? 'my' : 'opp')) {
-            if (ball.owner && team.includes(ball.owner)) {
-                const dx = ball.owner.x - player.x;
-                const dy = ball.owner.y - player.y;
-                const dist = Math.hypot(dx, dy);
-                
-                if (dist > 0.12 && dist < 0.35) {
-                    targetX = player.homeX + (side === 'my' ? 0.08 : -0.08);
-                    targetY = player.homeY + (Math.random() - 0.5) * 0.08;
-                } else if (dist > 0.35) {
-                    targetX = player.homeX + (side === 'my' ? 0.12 : -0.12);
-                    targetY = player.homeY + (Math.random() - 0.5) * 0.06;
-                }
-            } else {
-                targetX = player.homeX;
-                targetY = player.homeY;
-            }
-        } else {
-            const closestOpponent = opponents.reduce((best, opp) => {
-                const dist = Math.hypot(opp.x - player.x, opp.y - player.y);
-                return dist < best.dist ? { opp, dist } : best;
-            }, { opp: null, dist: Infinity });
-            
-            if (closestOpponent.dist < 0.25) {
-                targetX = closestOpponent.opp.x + (side === 'my' ? -0.04 : 0.04);
-                targetY = closestOpponent.opp.y;
-            } else {
-                targetX = player.homeX;
-                targetY = player.homeY;
-            }
-        }
-        
-        const moveSpeed = (player.pace / 100) * 0.04 + 0.01;
-        const dx = targetX - player.x;
-        const dy = targetY - player.y;
-        const dist = Math.hypot(dx, dy);
-        
-        if (dist > 0.005) {
-            player.x += (dx / dist) * moveSpeed;
-            player.y += (dy / dist) * moveSpeed;
-        }
-        
-        if (side === 'my') {
-            player.x = Math.max(0.05, Math.min(0.5, player.x));
-        } else {
-            player.x = Math.max(0.5, Math.min(0.95, player.x));
-        }
-        player.y = Math.max(0.02, Math.min(0.98, player.y));
-    }
-
-    function moveBall() {
-        const ball = matchState.ball;
-        
-        if (ball.owner) {
-            // Ball follows owner smoothly
-            const dx = ball.owner.x - ball.x;
-            const dy = ball.owner.y - ball.y;
+        if (ball.flying) {
+            // 球在空中飞向目标
+            const dx = ball.targetX - ball.x;
+            const dy = ball.targetY - ball.y;
             const dist = Math.hypot(dx, dy);
             
             if (dist > 0.02) {
-                ball.x += (dx / dist) * 0.04;
-                ball.y += (dy / dist) * 0.04;
+                const speed = 0.8; // 传球速度
+                ball.x += (dx / dist) * speed * dt;
+                ball.y += (dy / dist) * speed * dt;
+                
+                // 抛物线效果
+                const progress = 1 - (dist / Math.hypot(ball.targetX - ball.startX, ball.targetY - ball.startY));
+                ball.z = Math.sin(progress * Math.PI) * 0.15;
             } else {
-                ball.x = ball.owner.x;
-                ball.y = ball.owner.y;
+                ball.x = ball.targetX;
+                ball.y = ball.targetY;
+                ball.flying = false;
+                ball.vx = 0;
+                ball.vy = 0;
+                
+                // 落地后拦截检测
+                if (Math.random() < 0.3) {
+                    const defenders = matchState.possession === 'my' ? matchState.oppTeam : matchState.myTeam;
+                    const closest = defenders.reduce((best, p) => {
+                        const d = Math.hypot(p.x - ball.x, p.y - ball.y);
+                        return d < best.dist ? {p, dist: d} : best;
+                    }, {p: null, dist: Infinity});
+                    
+                    if (closest.dist < 0.15) {
+                        ball.owner = closest.p;
+                        matchState.possession = matchState.possession === 'my' ? 'opp' : 'my';
+                    }
+                }
             }
+        } else if (ball.owner) {
+            // 球跟随持球者
+            ball.x += (ball.owner.x - ball.x) * 8 * dt;
+            ball.y += (ball.owner.y - ball.y) * 8 * dt;
         } else {
-            // Ball rolls freely
-            ball.x += ball.vx;
-            ball.y += ball.vy;
-            ball.vx *= 0.96;
-            ball.vy *= 0.96;
+            // 球自由滚动
+            ball.x += ball.vx * dt;
+            ball.y += ball.vy * dt;
+            ball.vx *= 0.92;
+            ball.vy *= 0.92;
             
-            // Bounce off walls
+            // 边界反弹
             if (ball.x < 0.02) { ball.x = 0.02; ball.vx *= -0.5; }
             if (ball.x > 0.98) { ball.x = 0.98; ball.vx *= -0.5; }
             if (ball.y < 0.02) { ball.y = 0.02; ball.vy *= -0.5; }
             if (ball.y > 0.98) { ball.y = 0.98; ball.vy *= -0.5; }
-            
-            // Try to intercept
-            if (Math.random() < 0.015) {
-                const defenders = matchState.possession === 'my' ? matchState.oppTeam : matchState.myTeam;
-                const closest = defenders.reduce((best, p) => {
-                    const dist = Math.hypot(p.x - ball.x, p.y - ball.y);
-                    return dist < best.dist ? { p, dist } : best;
-                }, { p: null, dist: Infinity });
-                
-                if (closest.dist < 0.1) {
-                    ball.owner = closest.p;
-                    ball.lastOwner = closest.p;
-                    matchState.possession = matchState.possession === 'my' ? 'opp' : 'my';
-                    matchState.passChain = 0;
-                }
-            }
         }
     }
 
-    function movePlayers() {
+    function updatePlayersAI(dt) {
         const ball = matchState.ball;
-        const tactics = TACTICS[game.tactic] || { att: 0, def: 0 };
+        const myAttacking = matchState.possession === 'my';
         
-        // Move my team
+        // 我方球员
         matchState.myTeam.forEach((p, i) => {
-            let targetX = p.homeX;
-            let targetY = p.homeY;
-            
-            if (matchState.possession === 'my') {
-                // Attacking - spread out, move forward
-                if (ball.owner && matchState.myTeam.includes(ball.owner)) {
-                    // Support ball carrier
-                    const dx = ball.owner.x - p.x;
-                    const dy = ball.owner.y - p.y;
-                    const dist = Math.hypot(dx, dy);
-                    
-                    if (dist > 0.15 && dist < 0.4) {
-                        // Move to support position
-                        targetX = p.homeX + 0.1;
-                        targetY = p.homeY + (Math.random() - 0.5) * 0.1;
-                    } else {
-                        // Move forward
-                        targetX = Math.min(0.55, p.homeX + 0.08);
-                        targetY = p.homeY + (Math.random() - 0.5) * 0.05;
-                    }
-                } else {
-                    targetX = p.homeX;
-                    targetY = p.homeY;
-                }
-            } else {
-                // Defending - mark opponents, stay compact
-                const oppWithBall = matchState.oppTeam.find(op => op === ball.owner);
-                if (oppWithBall) {
-                    // Mark nearest opponent
-                    const closest = matchState.oppTeam.reduce((best, op) => {
-                        const dist = Math.hypot(op.x - p.x, op.y - p.y);
-                        return dist < best.dist ? { op, dist } : best;
-                    }, { op: null, dist: Infinity });
-                    
-                    if (closest.dist < 0.2) {
-                        targetX = closest.op.x - 0.05;
-                        targetY = closest.op.y;
-                    } else {
-                        targetX = p.homeX - 0.05;
-                        targetY = p.homeY;
-                    }
-                } else {
-                    targetX = p.homeX - 0.05;
-                    targetY = p.homeY;
-                }
-            }
-            
-            // Smooth movement
-            const dx = targetX - p.x;
-            const dy = targetY - p.y;
-            const dist = Math.hypot(dx, dy);
-            
-            if (dist > 0.01) {
-                p.x += (dx / dist) * p.speed;
-                p.y += (dy / dist) * p.speed;
-            }
-            
-            // Keep in bounds
-            p.x = Math.max(0.05, Math.min(0.5, p.x));
-            p.y = Math.max(0.02, Math.min(0.98, p.y));
+            const target = getPlayerTarget(p, myAttacking, myAttacking, matchState.myTeam, matchState.oppTeam, ball);
+            movePlayer(p, target.x, target.y, dt, 'my');
         });
         
-        // Move opponent team
+        // 对方球员
         matchState.oppTeam.forEach((p, i) => {
-            let targetX = p.homeX;
-            let targetY = p.homeY;
-            
-            if (matchState.possession === 'opp') {
-                // Attacking
-                if (ball.owner && matchState.oppTeam.includes(ball.owner)) {
-                    const dx = ball.owner.x - p.x;
-                    const dy = ball.owner.y - p.y;
-                    const dist = Math.hypot(dx, dy);
-                    
-                    if (dist > 0.15 && dist < 0.4) {
-                        targetX = p.homeX - 0.1;
-                        targetY = p.homeY + (Math.random() - 0.5) * 0.1;
-                    } else {
-                        targetX = Math.max(0.45, p.homeX - 0.08);
-                        targetY = p.homeY + (Math.random() - 0.5) * 0.05;
-                    }
-                } else {
-                    targetX = p.homeX;
-                    targetY = p.homeY;
-                }
-            } else {
-                // Defending
-                const closest = matchState.myTeam.reduce((best, my) => {
-                    const dist = Math.hypot(my.x - p.x, my.y - p.y);
-                    return dist < best.dist ? { my, dist } : best;
-                }, { my: null, dist: Infinity });
-                
-                if (closest.dist < 0.2) {
-                    targetX = closest.my.x + 0.05;
-                    targetY = closest.my.y;
-                } else {
-                    targetX = p.homeX + 0.05;
-                    targetY = p.homeY;
-                }
-            }
-            
-            const dx = targetX - p.x;
-            const dy = targetY - p.y;
-            const dist = Math.hypot(dx, dy);
-            
-            if (dist > 0.01) {
-                p.x += (dx / dist) * p.speed;
-                p.y += (dy / dist) * p.speed;
-            }
-            
-            p.x = Math.max(0.5, Math.min(0.95, p.x));
-            p.y = Math.max(0.02, Math.min(0.98, p.y));
+            const target = getPlayerTarget(p, !myAttacking, myAttacking, matchState.oppTeam, matchState.myTeam, ball);
+            movePlayer(p, target.x, target.y, dt, 'opp');
         });
     }
 
+    function getPlayerTarget(player, isMyTeam, isAttacking, team, opponents, ball) {
+        let tx = player.homeX;
+        let ty = player.homeY;
+        
+        if (isAttacking) {
+            // 进攻模式
+            if (ball.owner && team.includes(ball.owner)) {
+                const dist = Math.hypot(ball.owner.x - player.x, ball.owner.y - player.y);
+                
+                if (dist > 0.2) {
+                    // 跑位支持
+                    tx = player.homeX + (isMyTeam ? 0.08 : -0.08);
+                    ty = player.homeY + (Math.random() - 0.5) * 0.15;
+                } else if (dist > 0.4) {
+                    // 前插
+                    tx = player.homeX + (isMyTeam ? 0.12 : -0.12);
+                }
+            } else if (!ball.owner) {
+                // 球在空中的预判
+                tx = ball.x + (isMyTeam ? 0.05 : -0.05);
+                ty = ball.y;
+            }
+        } else {
+            // 防守模式
+            const closest = opponents.reduce((best, opp) => {
+                const d = Math.hypot(opp.x - player.x, opp.y - player.y);
+                return d < best.dist ? {opp, dist: d} : best;
+            }, {opp: null, dist: Infinity});
+            
+            if (closest.dist < 0.3) {
+                tx = closest.opp.x + (isMyTeam ? -0.05 : 0.05);
+                ty = closest.opp.y;
+            } else {
+                tx = player.homeX + (isMyTeam ? -0.05 : 0.05);
+            }
+        }
+        
+        return {x: tx, y: ty};
+    }
+
+    function movePlayer(player, tx, ty, dt, side) {
+        const dx = tx - player.x;
+        const dy = ty - player.y;
+        const dist = Math.hypot(dx, dy);
+        
+        if (dist > 0.01) {
+            // 根据速度属性计算加速度
+            const maxSpeed = (player.pace / 100) * 0.6 + 0.15;
+            const speed = Math.min(dist * 3, maxSpeed);
+            
+            player.x += (dx / dist) * speed * dt;
+            player.y += (dy / dist) * speed * dt;
+        }
+        
+        // 边界限制
+        if (side === 'my') {
+            player.x = Math.max(0.05, Math.min(0.55, player.x));
+        } else {
+            player.x = Math.max(0.45, Math.min(0.95, player.x));
+        }
+        player.y = Math.max(0.02, Math.min(0.98, player.y));
+    }
+
+    function updateMatchEvents() {
+        if (!matchState || !matchState.started || matchState.finished || matchState.halftime && matchState.minute === 45) return;
+        
+        // 每3-5秒产生一个事件
+        if (Math.random() < 0.008) {
+            generateMatchEvent();
+        }
+    }
+
     function generateMatchEvent() {
-        if (!matchState || matchState.finished || matchState.halftime) return;
+        if (!matchState) return;
         
         const myAttack = matchState.possession === 'my';
         const attackers = myAttack ? matchState.myTeam : matchState.oppTeam;
+        const shooters = attackers.filter(p => ['ST','LW','RW','CAM'].includes(p.position));
+        const shooter = shooters[rand(0, shooters.length - 1)] || attackers[rand(0, 5)];
         
-        // Decide action type
         const eventType = rand(1, 100);
         
-        if (eventType <= 20 && matchState.passChain > 2) {
-            // Shot attempt
-            const shooters = attackers.filter(p => ['ST', 'LW', 'RW', 'CAM'].includes(p.position));
-            const shooter = shooters[rand(0, shooters.length - 1)] || attackers[rand(0, 5)];
-            
+        if (eventType <= 25) {
+            // 射门
             const shotQuality = (shooter.shooting + shooter.pace) / 2;
             const gk = myAttack ? matchState.oppTeam[0] : matchState.myTeam[0];
             const saveChance = (gk.defending + 40) / 2;
             
-            matchState.ball.owner = null;
-            matchState.ball.vx = (Math.random() - 0.5) * 0.3;
-            matchState.ball.vy = (Math.random() - 0.5) * 0.3;
+            matchState.shots[myAttack ? 'my' : 'opp']++;
             
-            if (shotQuality > saveChance + 15) {
-                if (myAttack) {
-                    matchState.myScore++;
-                    shooter.goals++;
-                } else {
-                    matchState.oppScore++;
-                }
-                addMatchEvent(`⚽ ${shooter.name.split(' ')[0]} SCORES! ${matchState.myScore} - ${matchState.oppScore}`, 'goal');
-            } else if (shotQuality > saveChance - 5) {
+            // 传球到射门位置
+            const targetX = myAttack ? 0.85 : 0.15;
+            const targetY = 0.3 + Math.random() * 0.4;
+            
+            matchState.ball.startX = matchState.ball.x;
+            matchState.ball.startY = matchState.ball.y;
+            matchState.ball.targetX = targetX;
+            matchState.ball.targetY = targetY;
+            matchState.ball.flying = true;
+            matchState.ball.owner = shooter;
+            
+            if (shotQuality > saveChance + 12) {
+                // 进球
+                if (myAttack) { matchState.myScore++; shooter.goals++; }
+                else { matchState.oppScore++; }
+                addMatchEvent(`⚽ ${shooter.name.split(' ')[0]} SCORES! ${matchState.myScore}-${matchState.oppScore}`, 'goal');
+            } else if (shotQuality > saveChance - 8) {
                 addMatchEvent(`🧤 ${shooter.name.split(' ')[0]} - Saved!`, 'shot');
             } else {
                 addMatchEvent(`❌ ${shooter.name.split(' ')[0]} - Missed!`, 'shot');
             }
-            
-            matchState.passChain = 0;
-        } else if (eventType <= 35) {
-            // Pass
-            const passer = attackers[rand(0, Math.min(7, attackers.length - 1))];
-            const receivers = attackers.filter(p => p.id !== passer.id);
+        } else if (eventType <= 40) {
+            // 传球
+            const passer = ball.owner || attackers[rand(0, attackers.length - 1)];
+            const receivers = attackers.filter(p => p.id !== passer?.id);
             const receiver = receivers[rand(0, receivers.length - 1)];
             
-            if (passer && receiver) {
+            if (receiver) {
+                const dist = Math.hypot(receiver.x - passer.x, receiver.y - passer.y);
+                
+                matchState.ball.startX = matchState.ball.x;
+                matchState.ball.startY = matchState.ball.y;
+                matchState.ball.targetX = receiver.x + (Math.random() - 0.5) * 0.05;
+                matchState.ball.targetY = receiver.y + (Math.random() - 0.5) * 0.05;
+                matchState.ball.flying = true;
                 matchState.ball.owner = receiver;
-                matchState.ball.x = receiver.x;
-                matchState.ball.y = receiver.y;
-                matchState.passChain++;
-                addMatchEvent(`👟 ${passer.name.split(' ')[0]} → ${receiver.name.split(' ')[0]}`, 'pass');
+                
+                addMatchEvent(`👟 ${passer?.name.split(' ')[0] || 'Player'} → ${receiver.name.split(' ')[0]}`, 'pass');
             }
-        } else if (eventType <= 45) {
-            // Foul/Tackle
+        } else if (eventType <= 50) {
+            // 犯规
             const fouler = attackers[rand(0, attackers.length - 1)];
             const defenders = myAttack ? matchState.oppTeam : matchState.myTeam;
-            const fouled = defenders[rand(0, defenders.length - 1)];
+            const defender = defenders[rand(0, defenders.length - 1)];
             
-            if (rand(1, 100) <= 20) {
-                const team = myAttack ? 'my' : 'opp';
-                if (!matchState.yellowCards[team].includes(fouler.id)) {
-                    matchState.yellowCards[team].push(fouler.id);
-                    addMatchEvent(`🟨 Yellow Card: ${fouler.name.split(' ')[0]}`, 'card');
+            if (defender) {
+                matchState.ball.owner = null;
+                matchState.ball.vx = (Math.random() - 0.5) * 0.2;
+                matchState.ball.vy = (Math.random() - 0.5) * 0.2;
+                matchance = defender;
+                
+                if (rand(1, 100) <= 15) {
+                    const team = myAttack ? 'my' : 'opp';
+                    if (!matchState.yellowCards[team].includes(fouler?.id)) {
+                        matchState.yellowCards[team].push(fouler?.id);
+                        addMatchEvent(`🟨 Yellow: ${fouler?.name.split(' ')[0] || 'Player'}`, 'card');
+                    }
                 } else {
-                    addMatchEvent(`🟥 RED CARD: ${fouler.name.split(' ')[0]}`, 'card');
+                    addMatchEvent(`⚠️ Foul by ${defender.name.split(' ')[0]}`, 'foul');
                 }
-            } else {
-                addMatchEvent(`⚠️ Foul by ${fouler.name.split(' ')[0]}`, 'foul');
             }
-            
-            matchState.possession = matchState.possession === 'my' ? 'opp' : 'my';
-            matchState.passChain = 0;
         } else if (eventType <= 55) {
-            // Interception
+            // 拦截
             const defenders = myAttack ? matchState.oppTeam : matchState.myTeam;
             const interceptor = defenders[rand(0, defenders.length - 1)];
             
-            matchState.ball.owner = interceptor;
-            matchState.ball.x = interceptor.x;
-            matchState.ball.y = interceptor.y;
-            matchState.possession = matchState.possession === 'my' ? 'opp' : 'my';
-            matchState.passChain = 0;
-            addMatchEvent(`🔄 ${interceptor.name.split(' ')[0]} - Interception!`, 'pass');
+            if (interceptor) {
+                matchState.ball.owner = interceptor;
+                matchState.possession = myAttack ? 'opp' : 'my';
+                addMatchEvent(`🔄 ${interceptor.name.split(' ')[0]} - Interception!`, 'pass');
+            }
+        } else if (eventType <= 60 && matchState.minute >= 60) {
+            // 换人
+            if (myAttack && matchState.myTeam.length > 11) {
+                const sub = matchState.myTeam[11];
+                addMatchEvent(`🔄 ${sub.name.split(' ')[0]} ON`, 'pass');
+            }
         }
     }
 
     function addMatchEvent(text, type) {
         if (!matchState) return;
         matchState.events.unshift({ text, type, time: `${matchState.minute}'` });
-        if (matchState.events.length > 15) matchState.events.pop();
+        if (matchState.events.length > 20) matchState.events.pop();
         renderMatchUI();
     }
 
     function endMatch() {
         if (!matchState) return;
         matchState.finished = true;
-        matchState.phase = 'fulltime';
         
-        if (animationId) {
-            cancelAnimationFrame(animationId);
+        if (animationId) cancelAnimationFrame(animationId);
+        
+        // 加时赛进球决胜
+        if (matchState.myScore === matchState.oppScore) {
+            // 点球大战
+            const myPK = rand(3, 5);
+            const oppPK = rand(3, 5);
+            matchState.myScore += myPK;
+            matchState.oppScore += oppPK;
+            addMatchEvent(`⚽ PENALTIES: ${myPK}-${oppPK}`, 'goal');
         }
         
-        const myLeague = game.league.find(l => l.name === 'FC United');
-        const oppLeague = game.league.find(l => l.name === matchState.oppName);
+        addMatchEvent(`🏁 FULL TIME: ${matchState.myScore} - ${matchState.oppScore}`, 'info');
         
-        myLeague.played++; oppLeague.played++;
-        myLeague.gf += matchState.myScore; myLeague.ga += matchState.oppScore;
-        oppLeague.gf += matchState.oppScore; oppLeague.ga += matchState.myScore;
+        // 更新联赛
+        const myL = game.league.find(l => l.name === 'FC United');
+        const oppL = game.league.find(l => l.name === matchState.oppName);
         
-        if (matchState.myScore > matchState.oppScore) {
-            myLeague.won++; myLeague.pts += 3; oppLeague.lost++;
-        } else if (matchState.myScore === matchState.oppScore) {
-            myLeague.drawn++; myLeague.pts += 1; oppLeague.drawn++; oppLeague.pts += 1;
-        } else {
-            myLeague.lost++; oppLeague.won++; oppLeague.pts += 3;
-        }
+        myL.played++; oppL.played++;
+        myL.gf += matchState.myScore; myL.ga += matchState.oppScore;
+        oppL.gf += matchState.oppScore; oppL.ga += matchState.myScore;
+        
+        if (matchState.myScore > matchState.oppScore) { myL.won++; myL.pts += 3; oppL.lost++; }
+        else if (matchState.myScore === matchState.oppScore) { myL.drawn++; myL.pts += 1; oppL.drawn++; oppL.pts += 1; }
+        else { myL.lost++; oppL.won++; oppL.pts += 3; }
         
         const income = 120000 * game.facilities.stadium;
         game.budget += income;
@@ -1160,18 +833,18 @@
         });
         
         game.week++;
-        const resultText = matchState.myScore > matchState.oppScore ? '🎉 WIN!' : matchState.myScore === matchState.oppScore ? '🤝 DRAW!' : '😢 LOSS...';
-        addNews(`${resultText} FC United ${matchState.myScore}-${matchState.oppScore} ${matchState.oppName}`);
+        const res = matchState.myScore > matchState.oppScore ? '🎉 WIN!' : matchState.myScore === matchState.oppScore ? '🤝 DRAW!' : '😢 LOSS...';
+        addNews(`${res} FC United ${matchState.myScore}-${matchState.oppScore} ${matchState.oppName}`);
         
         if (game.week > 38) {
             game.season++;
             game.week = 1;
             game.league.sort((a, b) => b.pts - a.pts);
             const pos = game.league.findIndex(l => l.name === 'FC United') + 1;
-            addNews(`🏆 Season ${game.season - 1} ended! Rank #${pos}`);
+            addNews(`🏆 Season ${game.season-1} ended! Rank #${pos}`);
             game.league.forEach(l => {
                 if (l.name !== 'FC United') l.strength = Math.max(35, Math.min(95, l.strength + rand(-6, 6)));
-                l.played = l.won = l.drawn = l.lost = l.gf = l.ga = l.pts = 0;
+                l.played=l.won=l.drawn=l.lost=l.gf=l.ga=l.pts=0;
             });
             game.budget += 2500000;
         }
@@ -1180,16 +853,16 @@
         renderMatchUI();
     }
 
-    // ==================== Render Functions ====================
+    // ==================== Render ====================
     function render() {
-        const myLeague = game.league.find(l => l.name === 'FC United');
+        const myL = game.league.find(l => l.name === 'FC United');
         const sorted = [...game.league].sort((a, b) => b.pts - a.pts);
         const myPos = sorted.findIndex(l => l.name === 'FC United') + 1;
         const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
         
         let main = '';
         if (currentTab === 'playerDetail') main = renderPlayerDetail();
-        else if (currentTab === 'home') main = renderHome(myLeague, sorted, myPos);
+        else if (currentTab === 'home') main = renderHome(myL, sorted, myPos);
         else if (currentTab === 'team') main = renderTeam();
         else if (currentTab === 'tactics') main = renderTactics();
         else if (currentTab === 'facility') main = renderFacility();
@@ -1211,196 +884,34 @@
                     </div>
                 </div>
             </header>
-            
             <main class="max-w-md mx-auto p-3 pb-24">${main}</main>
-            
             <nav class="fixed bottom-0 left-0 right-0 bg-gradient-to-t from-slate-900 to-slate-900/95 border-t border-cyan-500/30 p-2 z-30">
                 <div class="max-w-md mx-auto flex justify-around">
-                    ${currentTab !== 'playerDetail' ? `
-                        ${['home', 'match', 'team', 'tactics', 'facility'].map(tab => `
-                            <button onclick="switchTab('${tab}')" class="nav-btn ${currentTab===tab?'active':''}">
-                                <span class="icon">${tab==='home'?'🏠':tab==='match'?'⚽':tab==='team'?'👥':tab==='tactics'?'⚙️':'🏟️'}</span>
-                                <span class="text">${t(tab)}</span>
-                            </button>
-                        `).join('')}
-                    ` : ''}
+                    ${currentTab !== 'playerDetail' ? ['home','match','team','tactics','facility'].map(tab => `
+                        <button onclick="switchTab('${tab}')" class="nav-btn ${currentTab===tab?'active':''}">
+                            <span class="icon">${tab==='home'?'🏠':tab==='match'?'⚽':tab==='team'?'👥':tab==='tactics'?'⚙️':'🏟️'}</span>
+                            <span class="text">${t(tab)}</span>
+                        </button>
+                    `).join('') : ''}
                 </div>
             </nav>
-            
             ${showToast ? `<div class="toast">${showToast}</div>` : ''}
         `;
         
-        if (showToast) {
-            setTimeout(() => { showToast = null; render(); }, 2000);
-        }
+        if (showToast) setTimeout(() => { showToast = null; render(); }, 2000);
     }
 
-    function switchTab(tab) { currentTab = tab; render(); }
+    function switchTab(tab) { currentTab = tab; selectedPlayer = null; render(); }
     function setLang(lang) { LANG = lang; render(); }
 
-    function showPlayerDetail(player) {
-        selectedPlayer = player;
-        currentTab = 'playerDetail';
-        render();
-    }
-
-    function renderPlayerDetail() {
-        if (!selectedPlayer) return '';
-        
-        const p = selectedPlayer;
-        const stats = [
-            { label: t('pace'), value: p.pace },
-            { label: t('shooting'), value: p.shooting },
-            { label: t('passing'), value: p.passing },
-            { label: t('defending'), value: p.defending },
-            { label: t('physical'), value: p.physical }
-        ];
-        
-        // 生成雷达图 SVG
-        const radarSvg = generateRadarChart(stats);
-        
-        return `
-            <div class="card p-4 mb-3">
-                <div class="flex items-center gap-4 mb-4">
-                    <div class="player-avatar" style="width:80px;height:80px;">
-                        <img src="${p.avatar || 'data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22%3E%3Cdefs%3E%3ClinearGradient id=%22grad%22 x1=%220%25%22 y1=%220%25%22 x2=%22100%25%22 y2=%22100%25%22%3E%3Cstop offset=%220%25%22 style=%22stop-color:%23667eea;stop-opacity:1%22 /%3E%3Cstop offset=%22100%25%22 style=%22stop-color:%238b5cf6;stop-opacity:1%22 /%3E%3C/linearGradient%3E%3C/defs%3E%3Ccircle cx=%2250%22 cy=%2250%22 r=%2250%22 fill=%22url(%23grad)%22/%3E%3Ccircle cx=%2235%22 cy=%2235%22 r=%228%22 fill=%22%23fff%22/%3E%3Ccircle cx=%2265%22 cy=%2235%22 r=%228%22 fill=%22%23fff%22/%3E%3Cpath d=%22M 30 60 Q 50 75 70 60%22 stroke=%22%23fff%22 stroke-width=%223%22 fill=%22none%22/%3E%3C/svg%3E'}" alt="${p.name}" onerror="this.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22%3E%3Cdefs%3E%3ClinearGradient id=%22grad%22 x1=%220%25%22 y1=%220%25%22 x2=%22100%25%22 y2=%22100%25%22%3E%3Cstop offset=%220%25%22 style=%22stop-color:%23667eea;stop-opacity:1%22 /%3E%3Cstop offset=%22100%25%22 style=%22stop-color:%238b5cf6;stop-opacity:1%22 /%3E%3C/linearGradient%3E%3C/defs%3E%3Ccircle cx=%2250%22 cy=%2250%22 r=%2250%22 fill=%22url(%23grad)%22/%3E%3Ccircle cx=%2235%22 cy=%2235%22 r=%228%22 fill=%22%23fff%22/%3E%3Ccircle cx=%2265%22 cy=%2235%22 r=%228%22 fill=%22%23fff%22/%3E%3Cpath d=%22M 30 60 Q 50 75 70 60%22 stroke=%22%23fff%22 stroke-width=%223%22 fill=%22none%22/%3E%3C/svg%3E'">
-                    </div>
-                    <div>
-                        <h2 class="text-2xl font-bold game-title text-cyan-300">${p.name}</h2>
-                        <p class="text-sm text-slate-400">${t('position')}: ${p.position}</p>
-                        <p class="text-sm text-slate-400">${p.region}</p>
-                        <p class="text-lg font-bold text-amber-400 mt-1">${p.ovr} OVR</p>
-                    </div>
-                </div>
-                
-                <div class="grid grid-cols-2 gap-3 mb-4">
-                    <div class="bg-slate-800/50 p-3 rounded-lg">
-                        <div class="text-xs text-slate-400">${t('age')}</div>
-                        <div class="text-2xl font-bold">${p.age}</div>
-                    </div>
-                    <div class="bg-slate-800/50 p-3 rounded-lg">
-                        <div class="text-xs text-slate-400">${t('potential')}</div>
-                        <div class="text-2xl font-bold text-cyan-300">${p.potential}</div>
-                    </div>
-                    <div class="bg-slate-800/50 p-3 rounded-lg">
-                        <div class="text-xs text-slate-400">Height</div>
-                        <div class="text-2xl font-bold">${p.height}cm</div>
-                    </div>
-                    <div class="bg-slate-800/50 p-3 rounded-lg">
-                        <div class="text-xs text-slate-400">Weight</div>
-                        <div class="text-2xl font-bold">${p.weight}kg</div>
-                    </div>
-                </div>
-                
-                <div class="bg-slate-800/50 p-4 rounded-lg mb-4">
-                    <h3 class="font-bold text-sm mb-3">📊 Abilities</h3>
-                    ${radarSvg}
-                </div>
-                
-                <div class="grid grid-cols-2 gap-2 mb-4">
-                    <div class="bg-slate-800/50 p-3 rounded-lg">
-                        <div class="text-xs text-slate-400">${t('value')}</div>
-                        <div class="text-sm font-bold text-green-400">${fmt(p.value)}</div>
-                    </div>
-                    <div class="bg-slate-800/50 p-3 rounded-lg">
-                        <div class="text-xs text-slate-400">${t('wage')}</div>
-                        <div class="text-sm font-bold text-amber-400">${fmt(p.wage)}/week</div>
-                    </div>
-                    <div class="bg-slate-800/50 p-3 rounded-lg">
-                        <div class="text-xs text-slate-400">${t('matches')}</div>
-                        <div class="text-sm font-bold">${p.matches}</div>
-                    </div>
-                    <div class="bg-slate-800/50 p-3 rounded-lg">
-                        <div class="text-xs text-slate-400">${t('goals')}</div>
-                        <div class="text-sm font-bold text-red-400">${p.goals}</div>
-                    </div>
-                </div>
-                
-                <button onclick="selectedPlayer=null;currentTab='home';render()" class="btn-game w-full">${t('back')}</button>
-            </div>
-        `;
-    }
-
-    function generateRadarChart(stats) {
-        const size = 150;
-        const center = size / 2;
-        const maxValue = 100;
-        const numStats = stats.length;
-        const angleSlice = (Math.PI * 2) / numStats;
-        
-        let points = [];
-        let labels = [];
-        
-        stats.forEach((stat, i) => {
-            const angle = angleSlice * i - Math.PI / 2;
-            const radius = (stat.value / maxValue) * (size / 2 - 20);
-            const x = center + radius * Math.cos(angle);
-            const y = center + radius * Math.sin(angle);
-            points.push(`${x},${y}`);
-            
-            const labelRadius = (size / 2 - 5);
-            const labelX = center + labelRadius * Math.cos(angle);
-            const labelY = center + labelRadius * Math.sin(angle);
-            labels.push({ x: labelX, y: labelY, text: stat.label, value: stat.value });
-        });
-        
-        // 生成网格
-        let gridLines = '';
-        for (let i = 1; i <= 5; i++) {
-            const r = (size / 2 - 20) * (i / 5);
-            let gridPoints = [];
-            for (let j = 0; j < numStats; j++) {
-                const angle = angleSlice * j - Math.PI / 2;
-                const x = center + r * Math.cos(angle);
-                const y = center + r * Math.sin(angle);
-                gridPoints.push(`${x},${y}`);
-            }
-            gridLines += `<polygon points="${gridPoints.join(' ')}" fill="none" stroke="rgba(100,150,200,0.2)" stroke-width="1"/>`;
-        }
-        
-        // 生成轴线
-        let axisLines = '';
-        for (let i = 0; i < numStats; i++) {
-            const angle = angleSlice * i - Math.PI / 2;
-            const x = center + (size / 2 - 20) * Math.cos(angle);
-            const y = center + (size / 2 - 20) * Math.sin(angle);
-            axisLines += `<line x1="${center}" y1="${center}" x2="${x}" y2="${y}" stroke="rgba(100,150,200,0.3)" stroke-width="1"/>`;
-        }
-        
-        return `
-            <svg viewBox="0 0 ${size} ${size}" style="width:100%;max-width:200px;margin:0 auto;">
-                ${gridLines}
-                ${axisLines}
-                <polygon points="${points.join(' ')}" fill="rgba(0,212,255,0.3)" stroke="rgba(0,212,255,0.8)" stroke-width="2"/>
-                ${labels.map(l => `
-                    <text x="${l.x}" y="${l.y}" text-anchor="middle" dominant-baseline="middle" fill="#00d4ff" font-size="10" font-weight="bold">
-                        ${l.value}
-                    </text>
-                `).join('')}
-            </svg>
-        `;
-    }
-
-    function renderHome(myLeague, sorted, myPos) {
+    function renderHome(myL, sorted, myPos) {
         return `
             <div class="card p-3 mb-3">
                 <div class="grid grid-cols-4 gap-2 text-center">
-                    <div class="bg-slate-800/50 rounded-lg p-2">
-                        <div class="text-cyan-300 font-bold text-lg game-title">#${myPos}</div>
-                        <div class="text-xs text-slate-400">${t('rank')}</div>
-                    </div>
-                    <div class="bg-slate-800/50 rounded-lg p-2">
-                        <div class="text-white font-bold text-lg">${myLeague.won}-${myLeague.drawn}-${myLeague.lost}</div>
-                        <div class="text-xs text-slate-400">${t('record')}</div>
-                    </div>
-                    <div class="bg-slate-800/50 rounded-lg p-2">
-                        <div class="${myLeague.gf-myLeague.ga>=0?'text-green-400':'text-red-400'} font-bold text-lg">${myLeague.gf-myLeague.ga>0?'+':''}${myLeague.gf-myLeague.ga}</div>
-                        <div class="text-xs text-slate-400">${t('gd')}</div>
-                    </div>
-                    <div class="bg-slate-800/50 rounded-lg p-2">
-                        <div class="text-amber-400 font-bold text-lg game-title">${myLeague.pts}</div>
-                        <div class="text-xs text-slate-400">${t('pts')}</div>
-                    </div>
+                    <div class="bg-slate-800/50 rounded-lg p-2"><div class="text-cyan-300 font-bold text-lg game-title">#${myPos}</div><div class="text-xs text-slate-400">${t('rank')}</div></div>
+                    <div class="bg-slate-800/50 rounded-lg p-2"><div class="text-white font-bold text-lg">${myL.won}-${myL.drawn}-${myL.lost}</div><div class="text-xs text-slate-400">${t('record')}</div></div>
+                    <div class="bg-slate-800/50 rounded-lg p-2"><div class="${myL.gf-myL.ga>=0?'text-green-400':'text-red-400'} font-bold text-lg">${myL.gf-myL.ga>0?'+':''}${myL.gf-myL.ga}</div><div class="text-xs text-slate-400">${t('gd')}</div></div>
+                    <div class="bg-slate-800/50 rounded-lg p-2"><div class="text-amber-400 font-bold text-lg game-title">${myL.pts}</div><div class="text-xs text-slate-400">${t('pts')}</div></div>
                 </div>
             </div>
             
@@ -1412,73 +923,19 @@
                 </div>
             </div>
             
-            ${game.news.length > 0 ? `
-            <div class="card p-3 mb-3">
-                <h3 class="font-bold text-sm mb-2 flex items-center gap-1">📰 News</h3>
-                <div class="space-y-1 max-h-32 overflow-y-auto">
-                    ${game.news.slice(0, 5).map(n => `<div class="text-xs bg-slate-800/60 p-2 rounded-lg">${n.text}</div>`).join('')}
-                </div>
-            </div>
-            ` : ''}
+            ${game.news.length ? `<div class="card p-3 mb-3"><h3 class="font-bold text-sm mb-2">📰 News</h3><div class="space-y-1 max-h-32 overflow-y-auto">${game.news.slice(0,5).map(n=>`<div class="text-xs bg-slate-800/60 p-2 rounded-lg">${n.text}</div>`).join('')}</div></div>` : ''}
             
-            ${game.prospects.length > 0 ? `
-            <div class="card p-3 mb-3">
-                <h3 class="font-bold text-sm mb-2">🌟 ${t('academy')} (${game.prospects.length})</h3>
-                <div class="space-y-2">
-                    ${game.prospects.map(p => `
-                        <div class="player-card cursor-pointer hover:border-cyan-400" onclick="showPlayerDetail(p)">
-                            <div class="flex justify-between items-center">
-                                <div class="flex items-center gap-2">
-                                    <div class="player-avatar">
-                                        <img src="${p.avatar || 'data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22%3E%3Cdefs%3E%3ClinearGradient id=%22grad%22 x1=%220%25%22 y1=%220%25%22 x2=%22100%25%22 y2=%22100%25%22%3E%3Cstop offset=%220%25%22 style=%22stop-color:%23667eea;stop-opacity:1%22 /%3E%3Cstop offset=%22100%25%22 style=%22stop-color:%238b5cf6;stop-opacity:1%22 /%3E%3C/linearGradient%3E%3C/defs%3E%3Ccircle cx=%2250%22 cy=%2250%22 r=%2250%22 fill=%22url(%23grad)%22/%3E%3Ccircle cx=%2235%22 cy=%2235%22 r=%228%22 fill=%22%23fff%22/%3E%3Ccircle cx=%2265%22 cy=%2235%22 r=%228%22 fill=%22%23fff%22/%3E%3Cpath d=%22M 30 60 Q 50 75 70 60%22 stroke=%22%23fff%22 stroke-width=%223%22 fill=%22none%22/%3E%3C/svg%3E'}" alt="${p.name}" onerror="this.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22%3E%3Cdefs%3E%3ClinearGradient id=%22grad%22 x1=%220%25%22 y1=%220%25%22 x2=%22100%25%22 y2=%22100%25%22%3E%3Cstop offset=%220%25%22 style=%22stop-color:%23667eea;stop-opacity:1%22 /%3E%3Cstop offset=%22100%25%22 style=%22stop-color:%238b5cf6;stop-opacity:1%22 /%3E%3C/linearGradient%3E%3C/defs%3E%3Ccircle cx=%2250%22 cy=%2250%22 r=%2250%22 fill=%22url(%23grad)%22/%3E%3Ccircle cx=%2235%22 cy=%2235%22 r=%228%22 fill=%22%23fff%22/%3E%3Ccircle cx=%2265%22 cy=%2235%22 r=%228%22 fill=%22%23fff%22/%3E%3Cpath d=%22M 30 60 Q 50 75 70 60%22 stroke=%22%23fff%22 stroke-width=%223%22 fill=%22none%22/%3E%3C/svg%3E'">
-                                    </div>
-                                    <div>
-                                        <div class="font-bold">${p.name}</div>
-                                        <div class="text-xs text-slate-400">${p.age} yrs · ${t('potential')}: ${p.potential}</div>
-                                    </div>
-                                </div>
-                                <div class="text-right">
-                                    <div class="text-2xl font-bold game-title ${p.ovr>=70?'text-cyan-300':p.ovr>=60?'text-green-400':'text-slate-400'}">${p.ovr}</div>
-                                </div>
-                            </div>
-                            <div class="flex gap-1 mt-2">
-                                <button onclick="event.stopPropagation();signProspect('${p.id}')" class="btn-game green flex-1 text-xs">✅ ${t('sign')}</button>
-                                <button onclick="event.stopPropagation();rejectProspect('${p.id}')" class="btn-game red flex-1 text-xs">❌ ${t('reject')}</button>
-                            </div>
-                        </div>
-                    `).join('')}
-                </div>
-            </div>
-            ` : ''}
+            ${game.prospects.length ? `<div class="card p-3 mb-3"><h3 class="font-bold text-sm mb-2">🌟 ${t('academy')} (${game.prospects.length})</h3><div class="space-y-2">${game.prospects.map(p => playerCardHTML(p, true, false)).join('')}</div></div>` : ''}
             
             <div class="card p-3 mb-3">
                 <h3 class="font-bold text-sm mb-2">💰 ${t('market')}</h3>
-                <div class="space-y-2 max-h-48 overflow-y-auto">
-                    ${game.market.map(p => `
-                        <div class="flex justify-between items-center bg-slate-800/50 p-2 rounded-lg cursor-pointer hover:bg-slate-700/50" onclick="showPlayerDetail(p)">
-                            <div class="flex items-center gap-2">
-                                <div class="player-avatar" style="width:36px;height:36px;">
-                                    <img src="${p.avatar || 'data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22%3E%3Cdefs%3E%3ClinearGradient id=%22grad%22 x1=%220%25%22 y1=%220%25%22 x2=%22100%25%22 y2=%22100%25%22%3E%3Cstop offset=%220%25%22 style=%22stop-color:%23667eea;stop-opacity:1%22 /%3E%3Cstop offset=%22100%25%22 style=%22stop-color:%238b5cf6;stop-opacity:1%22 /%3E%3C/linearGradient%3E%3C/defs%3E%3Ccircle cx=%2250%22 cy=%2250%22 r=%2250%22 fill=%22url(%23grad)%22/%3E%3Ccircle cx=%2235%22 cy=%2235%22 r=%228%22 fill=%22%23fff%22/%3E%3Ccircle cx=%2265%22 cy=%2235%22 r=%228%22 fill=%22%23fff%22/%3E%3Cpath d=%22M 30 60 Q 50 75 70 60%22 stroke=%22%23fff%22 stroke-width=%223%22 fill=%22none%22/%3E%3C/svg%3E'}" alt="${p.name}" onerror="this.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22%3E%3Cdefs%3E%3ClinearGradient id=%22grad%22 x1=%220%25%22 y1=%220%25%22 x2=%22100%25%22 y2=%22100%25%22%3E%3Cstop offset=%220%25%22 style=%22stop-color:%23667eea;stop-opacity:1%22 /%3E%3Cstop offset=%22100%25%22 style=%22stop-color:%238b5cf6;stop-opacity:1%22 /%3E%3C/linearGradient%3E%3C/defs%3E%3Ccircle cx=%2250%22 cy=%2250%22 r=%2250%22 fill=%22url(%23grad)%22/%3E%3Ccircle cx=%2235%22 cy=%2235%22 r=%228%22 fill=%22%23fff%22/%3E%3Ccircle cx=%2265%22 cy=%2235%22 r=%228%22 fill=%22%23fff%22/%3E%3Cpath d=%22M 30 60 Q 50 75 70 60%22 stroke=%22%23fff%22 stroke-width=%223%22 fill=%22none%22/%3E%3C/svg%3E'">
-                                </div>
-                                <div>
-                                    <div class="font-medium text-sm">${p.name}</div>
-                                    <div class="text-xs text-slate-400">${p.age} yrs · ${p.ovr}⭐</div>
-                                </div>
-                            </div>
-                            <div class="text-right">
-                                <div class="text-amber-400 font-bold">${fmt(p.askPrice)}</div>
-                            </div>
-                        </div>
-                    `).join('')}
-                </div>
+                <div class="space-y-2 max-h-48 overflow-y-auto">${game.market.map(p => playerCardHTML(p, false, true)).join('')}</div>
             </div>
             
             <div class="card p-3">
                 <h3 class="font-bold text-sm mb-2">📊 ${t('standings')}</h3>
-                <div class="standings-row text-xs text-slate-400 font-semibold mb-1">
-                    <span>#</span><span>Team</span><span class="text-center">W</span><span class="text-right">${t('pts')}</span>
-                </div>
-                ${sorted.slice(0, 10).map((s, i) => {
+                <div class="standings-row text-xs text-slate-400 font-semibold mb-1"><span>#</span><span>Team</span><span class="text-center">W</span><span class="text-right">${t('pts')}</span></div>
+                ${sorted.slice(0,10).map((s,i) => {
                     const isMe = s.name === 'FC United';
                     return `<div class="standings-row ${isMe?'me':''} ${i<3?'text-green-400':''}">
                         <span class="font-bold">${i+1}</span>
@@ -1491,169 +948,116 @@
         `;
     }
 
-    function renderTeam() {
-        const sorted = [...game.team].sort((a, b) => b.ovr - a.ovr);
-        
+    function playerCardHTML(p, showSignButtons, showPrice) {
         return `
-            <div class="mb-3">
-                <div class="flex gap-1 mb-3 overflow-x-auto pb-1">
-                    <button onclick="filterPos='all';render()" class="btn-game text-xs whitespace-nowrap ${filterPos==='all'?'gold':'purple'}">${t('all')}</button>
-                    <button onclick="filterPos='GK';render()" class="btn-game text-xs whitespace-nowrap ${filterPos==='GK'?'gold':'purple'}">🧤 GK</button>
-                    <button onclick="filterPos='DEF';render()" class="btn-game text-xs whitespace-nowrap ${filterPos==='DEF'?'gold':'purple'}">🛡️ DEF</button>
-                    <button onclick="filterPos='MID';render()" class="btn-game text-xs whitespace-nowrap ${filterPos==='MID'?'gold':'purple'}">⚙️ MID</button>
-                    <button onclick="filterPos='ATT';render()" class="btn-game text-xs whitespace-nowrap ${filterPos==='ATT'?'gold':'purple'}">⚔️ ATT</button>
-                </div>
-            </div>
-            
-            <div class="space-y-2">
-                ${sorted.filter(p => {
-                    if (filterPos === 'all') return true;
-                    if (filterPos === 'GK') return p.position === 'GK';
-                    if (filterPos === 'DEF') return ['CB','LB','RB'].includes(p.position);
-                    if (filterPos === 'MID') return ['CDM','CM','CAM','LW','RW'].includes(p.position);
-                    if (filterPos === 'ATT') return ['ST','CF'].includes(p.position);
-                    return true;
-                }).map(p => `
-                    <div class="player-card cursor-pointer hover:border-cyan-400" onclick="showPlayerDetail(game.team.find(x => x.id === '${p.id}'))">
-                        <div class="flex justify-between items-center">
-                            <div class="flex items-center gap-3">
-                                <div class="player-avatar">
-                                    <img src="${p.avatar || 'data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22%3E%3Cdefs%3E%3ClinearGradient id=%22grad%22 x1=%220%25%22 y1=%220%25%22 x2=%22100%25%22 y2=%22100%25%22%3E%3Cstop offset=%220%25%22 style=%22stop-color:%23667eea;stop-opacity:1%22 /%3E%3Cstop offset=%22100%25%22 style=%22stop-color:%238b5cf6;stop-opacity:1%22 /%3E%3C/linearGradient%3E%3C/defs%3E%3Ccircle cx=%2250%22 cy=%2250%22 r=%2250%22 fill=%22url(%23grad)%22/%3E%3Ccircle cx=%2235%22 cy=%2235%22 r=%228%22 fill=%22%23fff%22/%3E%3Ccircle cx=%2265%22 cy=%2235%22 r=%228%22 fill=%22%23fff%22/%3E%3Cpath d=%22M 30 60 Q 50 75 70 60%22 stroke=%22%23fff%22 stroke-width=%223%22 fill=%22none%22/%3E%3C/svg%3E'}" alt="${p.name}" onerror="this.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22%3E%3Cdefs%3E%3ClinearGradient id=%22grad%22 x1=%220%25%22 y1=%220%25%22 x2=%22100%25%22 y2=%22100%25%22%3E%3Cstop offset=%220%25%22 style=%22stop-color:%23667eea;stop-opacity:1%22 /%3E%3Cstop offset=%22100%25%22 style=%22stop-color:%238b5cf6;stop-opacity:1%22 /%3E%3C/linearGradient%3E%3C/defs%3E%3Ccircle cx=%2250%22 cy=%2250%22 r=%2250%22 fill=%22url(%23grad)%22/%3E%3Ccircle cx=%2235%22 cy=%2235%22 r=%228%22 fill=%22%23fff%22/%3E%3Ccircle cx=%2265%22 cy=%2235%22 r=%228%22 fill=%22%23fff%22/%3E%3Cpath d=%22M 30 60 Q 50 75 70 60%22 stroke=%22%23fff%22 stroke-width=%223%22 fill=%22none%22/%3E%3C/svg%3E'">
-                                </div>
-                                <div>
-                                    <div class="font-bold">${p.name}</div>
-                                    <div class="text-xs text-slate-400">${p.age} yrs · ${p.region}</div>
-                                </div>
-                            </div>
-                            <div class="text-right">
-                                <div class="text-3xl font-bold game-title ${p.ovr>=75?'text-cyan-300':p.ovr>=65?'text-green-400':'text-slate-400'}">${p.ovr}</div>
-                            </div>
-                        </div>
-                        <div class="grid grid-cols-5 gap-1 mt-2 text-center">
-                            <div><div class="text-xs text-slate-400">${t('pace')}</div><div class="text-sm font-semibold">${p.pace}</div></div>
-                            <div><div class="text-xs text-slate-400">${t('shooting')}</div><div class="text-sm font-semibold">${p.shooting}</div></div>
-                            <div><div class="text-xs text-slate-400">${t('passing')}</div><div class="text-sm font-semibold">${p.passing}</div></div>
-                            <div><div class="text-xs text-slate-400">${t('defending')}</div><div class="text-sm font-semibold">${p.defending}</div></div>
-                            <div><div class="text-xs text-slate-400">${t('physical')}</div><div class="text-sm font-semibold">${p.physical}</div></div>
-                        </div>
-                        <div class="flex gap-2 mt-2">
-                            <div class="flex-1 bg-slate-800/50 rounded p-1 text-center"><div class="text-xs text-slate-400">⚡${t('fitness')}</div><div class="stat-bar"><div class="stat-fill ${p.fitness>=70?'bg-green-500':p.fitness>=40?'bg-yellow-500':'bg-red-500'}" style="width:${p.fitness}%"></div></div></div>
-                            <div class="flex-1 bg-slate-800/50 rounded p-1 text-center"><div class="text-xs text-slate-400">😊${t('morale')}</div><div class="stat-bar"><div class="stat-fill ${p.morale>=70?'bg-green-500':p.morale>=40?'bg-yellow-500':'bg-red-500'}" style="width:${p.morale}%"></div></div></div>
+            <div class="player-card" onclick="showPlayerDetail(${JSON.stringify(p).replace(/"/g, '&quot;')})">
+                <div class="flex justify-between items-center">
+                    <div class="flex items-center gap-2">
+                        <div class="player-avatar"><img src="${p.avatar}" alt="${p.name}" onerror="this.style.background='linear-gradient(135deg,#667eea,#764ba2)';this.innerHTML=''"></div>
+                        <div>
+                            <div class="font-bold">${p.name}</div>
+                            <div class="text-xs text-slate-400">${p.age} yrs · ${p.position}</div>
                         </div>
                     </div>
+                    <div class="text-right">
+                        <div class="text-2xl font-bold game-title ${p.ovr>=75?'text-cyan-300':p.ovr>=65?'text-green-400':'text-slate-400'}">${p.ovr}</div>
+                        ${showPrice ? `<div class="text-amber-400 text-xs">${fmt(p.askPrice)}</div>` : ''}
+                    </div>
+                </div>
+                ${showSignButtons ? `<div class="flex gap-1 mt-2"><button onclick="event.stopPropagation();signProspect('${p.id}')" class="btn-game green flex-1 text-xs">✅ ${t('sign')}</button><button onclick="event.stopPropagation();rejectProspect('${p.id}')" class="btn-game red flex-1 text-xs">❌ ${t('reject')}</button></div>` : ''}
+            </div>
+        `;
+    }
+
+    function renderTeam() {
+        const sorted = [...game.team].sort((a, b) => b.ovr - a.ovr);
+        return `
+            <div class="mb-3 flex gap-1 overflow-x-auto pb-1">
+                ${[['all','全部'],['GK','门将'],['DEF','后卫'],['MID','中场'],['ATT','前锋']].map(([key, label]) => `
+                    <button onclick="filterPos='${key}';render()" class="btn-game text-xs whitespace-nowrap ${filterPos===key?'gold':'purple'}">${label}</button>
                 `).join('')}
             </div>
+            <div class="space-y-2">${sorted.filter(p => filterPos==='all' || (filterPos==='GK'&&p.position==='GK') || (filterPos==='DEF'&&['CB','LB','RB'].includes(p.position)) || (filterPos==='MID'&&['CDM','CM','CAM','LW','RW'].includes(p.position)) || (filterPos==='ATT'&&['ST'].includes(p.position))).map(p => `
+                <div class="player-card" onclick="showPlayerDetail(${JSON.stringify(p).replace(/"/g, '&quot;')})">
+                    <div class="flex justify-between items-center">
+                        <div class="flex items-center gap-3">
+                            <div class="player-avatar"><img src="${p.avatar}" alt="${p.name}" onerror="this.style.background='linear-gradient(135deg,#667eea,#764ba2)';this.innerHTML=''"></div>
+                            <div>
+                                <div class="font-bold">${p.name}</div>
+                                <div class="text-xs text-slate-400">${p.age} yrs · ${p.region}</div>
+                            </div>
+                        </div>
+                        <div class="text-right">
+                            <div class="text-3xl font-bold game-title ${p.ovr>=75?'text-cyan-300':p.ovr>=65?'text-green-400':'text-slate-400'}">${p.ovr}</div>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-5 gap-1 mt-2 text-center">
+                        <div><div class="text-xs text-slate-400">${t('pace')}</div><div class="text-sm font-semibold">${p.pace}</div></div>
+                        <div><div class="text-xs text-slate-400">${t('shooting')}</div><div class="text-sm font-semibold">${p.shooting}</div></div>
+                        <div><div class="text-xs text-slate-400">${t('passing')}</div><div class="text-sm font-semibold">${p.passing}</div></div>
+                        <div><div class="text-xs text-slate-400">${t('defending')}</div><div class="text-sm font-semibold">${p.defending}</div></div>
+                        <div><div class="text-xs text-slate-400">${t('physical')}</div><div class="text-sm font-semibold">${p.physical}</div></div>
+                    </div>
+                    <div class="flex gap-2 mt-2">
+                        <div class="flex-1 bg-slate-800/50 rounded p-1 text-center"><div class="text-xs text-slate-400">⚡${t('fitness')}</div><div class="stat-bar"><div class="stat-fill ${p.fitness>=70?'bg-green-500':p.fitness>=40?'bg-yellow-500':'bg-red-500'}" style="width:${p.fitness}%"></div></div></div>
+                        <div class="flex-1 bg-slate-800/50 rounded p-1 text-center"><div class="text-xs text-slate-400">😊${t('morale')}</div><div class="stat-bar"><div class="stat-fill ${p.morale>=70?'bg-green-500':p.morale>=40?'bg-yellow-500':'bg-red-500'}" style="width:${p.morale}%"></div></div></div>
+                    </div>
+                </div>
+            `).join('')}</div>
         `;
     }
 
     function renderTactics() {
         const formations = ['4-4-2', '4-3-3', '4-2-3-1', '3-5-2'];
         const tactics = ['attack', 'balance', 'defend'];
-        
         return `
             <div class="card p-3 mb-3">
                 <h3 class="font-bold text-sm mb-3">⚙️ ${t('formation')}</h3>
-                <div class="grid grid-cols-2 gap-2">
-                    ${formations.map(f => `
-                        <button onclick="game.formation='${f}';save();render()" class="p-3 rounded-xl text-center ${game.formation===f?'bg-cyan-500/20 border-2 border-cyan-400':'bg-slate-800/50 border border-slate-600'}">
-                            <div class="text-xl font-bold game-title">${f}</div>
-                        </button>
-                    `).join('')}
-                </div>
+                <div class="grid grid-cols-2 gap-2">${formations.map(f => `<button onclick="game.formation='${f}';save();render()" class="p-3 rounded-xl text-center ${game.formation===f?'bg-cyan-500/20 border-2 border-cyan-400':'bg-slate-800/50 border border-slate-600'}"><div class="text-xl font-bold game-title">${f}</div></button>`).join('')}</div>
             </div>
-            
             <div class="card p-3 mb-3">
                 <h3 class="font-bold text-sm mb-3">🎯 ${t('style')}</h3>
-                <div class="grid grid-cols-3 gap-2">
-                    ${tactics.map(key => `
-                        <button onclick="game.tactic='${key}';save();render()" class="p-3 rounded-xl text-center ${game.tactic===key?'bg-cyan-500/20 border-2 border-cyan-400':'bg-slate-800/50 border border-slate-600'}">
-                            <div class="text-2xl mb-1">${key==='attack'?'⚔️':key==='balance'?'⚖️':'🛡️'}</div>
-                            <div class="font-bold">${t(key)}</div>
-                        </button>
-                    `).join('')}
-                </div>
+                <div class="grid grid-cols-3 gap-2">${tactics.map(key => `<button onclick="game.tactic='${key}';save();render()" class="p-3 rounded-xl text-center ${game.tactic===key?'bg-cyan-500/20 border-2 border-cyan-400':'bg-slate-800/50 border border-slate-600'}"><div class="text-2xl mb-1">${key==='attack'?'⚔️':key==='balance'?'⚖️':'🛡️'}</div><div class="font-bold">${t(key)}</div></button>`).join('')}</div>
             </div>
-            
             <div class="card p-3">
                 <h3 class="font-bold text-sm mb-3">📋 ${t('currentTeam')}</h3>
                 <div class="text-xs text-slate-400 mb-2">${t('formation')}: ${game.formation} · ${t(game.tactic)}</div>
-                <div class="space-y-1">
-                    ${game.team.slice(0, 11).map(p => `
-                        <div class="flex justify-between items-center bg-slate-800/50 p-2 rounded-lg text-sm">
-                            <span>${p.name}</span>
-                            <span class="text-cyan-400 font-bold">${p.position}</span>
-                            <span class="text-amber-400">${p.ovr}</span>
-                        </div>
-                    `).join('')}
-                </div>
+                <div class="space-y-1">${game.team.slice(0,11).map(p => `<div class="flex justify-between items-center bg-slate-800/50 p-2 rounded-lg text-sm"><span>${p.name}</span><span class="text-cyan-400 font-bold">${p.position}</span><span class="text-amber-400">${p.ovr}</span></div>`).join('')}</div>
             </div>
         `;
     }
 
     function renderFacility() {
-        const facilities = [
-            { key: 'training', name: 'Training Ground', icon: '🏋️' },
-            { key: 'academy', name: 'Youth Academy', icon: '🌟' },
-            { key: 'stadium', name: 'Stadium', icon: '🏟️' }
-        ];
-        const costs = [50000, 100000, 200000, 400000, 800000, 1600000, 3200000, 6400000, 12800000];
-        
-        return `
-            <div class="space-y-3">
-                ${facilities.map(f => {
-                    const level = game.facilities[f.key];
-                    const cost = costs[Math.min(level - 1, 8)];
-                    const canAfford = game.budget >= cost;
-                    return `
-                        <div class="card p-4">
-                            <div class="flex justify-between items-center mb-2">
-                                <div class="flex items-center gap-2">
-                                    <span class="text-2xl">${f.icon}</span>
-                                    <div>
-                                        <div class="font-bold">${f.name}</div>
-                                    </div>
-                                </div>
-                                <div class="text-right">
-                                    <div class="text-2xl font-bold game-title text-cyan-300">Lv.${level}</div>
-                                </div>
-                            </div>
-                            <button onclick="upgradeFacility('${f.key}')" class="btn-game w-full text-xs ${canAfford&&level<10?'gold':'purple'}" ${!canAfford||level>=10?'disabled':''}>
-                                ${level >= 10 ? 'MAX' : `⬆️ ${t('upgrade')} (${fmt(cost)})`}
-                            </button>
-                            <div class="flex gap-1 mt-2">
-                                ${Array.from({length: 10}).map((_, i) => `<div class="h-2 flex-1 rounded ${i < level ? 'bg-cyan-400' : 'bg-slate-700'}"></div>`).join('')}
-                            </div>
-                        </div>
-                    `;
-                }).join('')}
-            </div>
-        `;
+        const facilities = [{key:'training',name:LANG==='zh'?'训练场':'Training Ground',icon:'🏋️'},{key:'academy',name:LANG==='zh'?'青训营':'Youth Academy',icon:'🌟'},{key:'stadium',name:LANG==='zh'?'体育场':'Stadium',icon:'🏟️'}];
+        const costs = [50000,100000,200000,400000,800000,1600000,3200000,6400000,12800000];
+        return `<div class="space-y-3">${facilities.map(f => {
+            const level = game.facilities[f.key];
+            const cost = costs[Math.min(level-1,8)];
+            const canAfford = game.budget >= cost;
+            return `<div class="card p-4">
+                <div class="flex justify-between items-center mb-2">
+                    <div class="flex items-center gap-2"><span class="text-2xl">${f.icon}</span><div class="font-bold">${f.name}</div></div>
+                    <div class="text-2xl font-bold game-title text-cyan-300">Lv.${level}</div>
+                </div>
+                <button onclick="upgradeFacility('${f.key}')" class="btn-game w-full text-xs ${canAfford&&level<10?'gold':'purple'}" ${(!canAfford||level>=10)?'disabled':''}>${level>=10?'MAX':`⬆️ ${t('upgrade')} (${fmt(cost)})`}</button>
+                <div class="flex gap-1 mt-2">${Array.from({length:10}).map((_,i)=>`<div class="h-2 flex-1 rounded ${i<level?'bg-cyan-400':'bg-slate-700'}"></div>`).join('')}</div>
+            </div>`;
+        }).join('')}</div>`;
     }
 
     function renderMatchTab() {
-        if (matchState) {
-            return renderMatchView();
-        }
-        
-        const opp = game.league[rand(1, game.league.length - 1)];
-        
+        if (matchState) return renderMatchView();
+        const opp = game.league[rand(1,game.league.length-1)];
         return `
             <div class="card p-4 mb-3 text-center">
-                <h3 class="font-bold text-lg mb-4">⚽ ${t('nextMatch')}</h3>
+                <h3 class="font-bold text-lg mb-4">⚽ ${LANG==='zh'?'下一场比赛':'Next Match'}</h3>
                 <div class="flex items-center justify-center gap-4">
-                    <div class="text-center">
-                        <div class="text-2xl mb-1">🔵</div>
-                        <div class="font-bold">${getLeagueName(0)}</div>
-                    </div>
+                    <div class="text-center"><div class="text-2xl mb-1">🔵</div><div class="font-bold">${getLeagueName(0)}</div></div>
                     <div class="text-3xl font-bold game-title text-slate-500">${t('vs')}</div>
-                    <div class="text-center">
-                        <div class="text-2xl mb-1">🔴</div>
-                        <div class="font-bold">${getLeagueName(opp.index)}</div>
-                    </div>
+                    <div class="text-center"><div class="text-2xl mb-1">🔴</div><div class="font-bold">${getLeagueName(opp.index)}</div></div>
                 </div>
             </div>
-            
-            <button onclick="startMatch()" class="btn-game gold w-full text-lg py-4">⚽ ${t('playMatch')}</button>
+            <button onclick="startMatch()" class="btn-game gold w-full text-lg py-4">⚽ ${t('play')}</button>
         `;
     }
 
@@ -1661,206 +1065,84 @@
         return `
             <div class="card p-3 mb-3">
                 <div class="flex justify-between items-center">
-                    <div class="text-center">
-                        <div class="text-xs text-slate-400">${getLeagueName(0)}</div>
-                        <div class="text-4xl font-bold game-title text-cyan-300">${matchState.myScore}</div>
-                    </div>
-                    <div class="text-center">
-                        <div class="text-xs text-red-400 font-bold animate-pulse">${t('live')}</div>
-                        <div class="text-2xl font-bold game-title">${matchState.minute}'</div>
-                        <div class="text-xs text-slate-400">${Math.floor(matchState.second / 60 * 100)}%</div>
-                    </div>
-                    <div class="text-center">
-                        <div class="text-xs text-slate-400">${matchState.oppName}</div>
-                        <div class="text-4xl font-bold game-title text-red-400">${matchState.oppScore}</div>
-                    </div>
+                    <div class="text-center"><div class="text-xs text-slate-400">${getLeagueName(0)}</div><div class="text-4xl font-bold game-title text-cyan-300">${matchState.myScore}</div></div>
+                    <div class="text-center"><div class="text-xs text-red-400 font-bold animate-pulse">${t('live')}</div><div class="text-2xl font-bold game-title">${matchState.minute}'</div></div>
+                    <div class="text-center"><div class="text-xs text-slate-400">${matchState.oppName}</div><div class="text-4xl font-bold game-title text-red-400">${matchState.oppScore}</div></div>
                 </div>
             </div>
-            
-            <div class="card p-2 mb-3" style="background:#1a5d1a; border-radius:12px;">
+            <div class="card p-2 mb-3" style="background:#1a5d1a;border-radius:12px;">
                 <canvas id="matchCanvas" width="350" height="200" style="width:100%;height:auto;border-radius:8px;"></canvas>
             </div>
-            
             <div class="card p-3" style="max-height:200px;overflow-y:auto;">
                 <h4 class="font-bold text-sm mb-2">📋 Events</h4>
-                <div id="matchEvents" class="space-y-1">
-                    ${matchState.events.map(e => `
-                        <div class="event-item ${e.type === 'goal' ? 'event-goal' : e.type === 'card' ? 'event-card' : e.type === 'shot' ? 'event-shot' : e.type === 'foul' ? 'event-foul' : e.type === 'sub' ? 'event-sub' : 'event-pass'} p-2 rounded text-xs">
-                            <span class="text-slate-400 mr-2">${e.time}</span>
-                            ${e.text}
-                        </div>
-                    `).join('')}
-                </div>
+                <div id="matchEvents" class="space-y-1">${matchState.events.map(e => `<div class="event-${e.type==='goal'?'goal':e.type==='card'?'card':e.type==='shot'?'shot':e.type==='foul'?'foul':e.type==='sub'?'card':'pass'} p-2 rounded text-xs border-l-2" style="border-color:${e.type==='goal'?'#22c55e':e.type==='card'?'#fbbf24':e.type==='shot'?'#f59e0b':e.type==='foul'?'#ef4444':'#3b82f6'};background:${e.type==='goal'?'rgba(34,197,94,0.1)':e.type==='card'?'rgba(251,191,36,0.1)':e.type==='shot'?'rgba(245,158,11,0.1)':e.type==='foul'?'rgba(239,68,68,0.1)':'rgba(59,130,246,0.1)'}"><span class="text-slate-400 mr-2">${e.time}</span>${e.text}</div>`).join('')}</div>
             </div>
-            
-            ${matchState.finished ? `
-                <div class="mt-3 text-center">
-                    <div class="text-2xl font-bold mb-2 ${matchState.myScore > matchState.oppScore ? 'text-green-400' : matchState.myScore === matchState.oppScore ? 'text-yellow-400' : 'text-red-400'}">
-                        ${matchState.myScore > matchState.oppScore ? '🎉 WIN!' : matchState.myScore === matchState.oppScore ? '🤝 DRAW!' : '😢 LOSS...'}
-                    </div>
-                    <button onclick="currentTab='home';matchState=null;render()" class="btn-game gold">${t('back')}</button>
-                </div>
-            ` : ''}
+            ${matchState.finished ? `<div class="mt-3 text-center"><div class="text-2xl font-bold mb-2 ${matchState.myScore>matchState.oppScore?'text-green-400':matchState.myScore===matchState.oppScore?'text-yellow-400':'text-red-400'}">${matchState.myScore>matchState.oppScore?'🎉 WIN!':matchState.myScore===matchState.oppScore?'🤝 DRAW!':'😢 LOSS...'}</div><button onclick="currentTab='home';matchState=null;render()" class="btn-game gold">${t('back')}</button></div>` : ''}
         `;
     }
 
     function renderMatchUI() {
-        const eventsEl = document.getElementById('matchEvents');
-        if (eventsEl && matchState) {
-            eventsEl.innerHTML = matchState.events.map(e => `
-                <div class="event-item ${e.type === 'goal' ? 'event-goal' : e.type === 'card' ? 'event-card' : e.type === 'shot' ? 'event-shot' : e.type === 'foul' ? 'event-foul' : e.type === 'sub' ? 'event-sub' : 'event-pass'} p-2 rounded text-xs">
-                    <span class="text-slate-400 mr-2">${e.time}</span>
-                    ${e.text}
-                </div>
-            `).join('');
+        const el = document.getElementById('matchEvents');
+        if (el && matchState) {
+            el.innerHTML = matchState.events.map(e => `<div class="p-2 rounded text-xs border-l-2" style="border-color:${e.type==='goal'?'#22c55e':e.type==='card'?'#fbbf24':e.type==='shot'?'#f59e0b':e.type==='foul'?'#ef4444':'#3b82f6'};background:${e.type==='goal'?'rgba(34,197,94,0.1)':e.type==='card'?'rgba(251,191,36,0.1)':e.type==='shot'?'rgba(245,158,11,0.1)':e.type==='foul'?'rgba(239,68,68,0.1)':'rgba(59,130,246,0.1)'}"><span class="text-slate-400 mr-2">${e.time}</span>${e.text}</div>`).join('');
         }
     }
 
-    function renderMatch() {
-        if (!matchCanvas || !matchCtx) return;
+    function renderMatchCanvas() {
+        if (!canvas || !ctx) return;
+        const w = canvas.width / window.devicePixelRatio;
+        const h = canvas.height / window.devicePixelRatio;
         
-        const ctx = matchCtx;
-        const w = matchCanvas.width / window.devicePixelRatio;
-        const h = matchCanvas.height / window.devicePixelRatio;
-        
-        // 清空画布
         ctx.fillStyle = '#2d8a2d';
         ctx.fillRect(0, 0, w, h);
         
-        // 绘制球场线条
         ctx.strokeStyle = 'rgba(255,255,255,0.4)';
         ctx.lineWidth = 2;
+        ctx.strokeRect(10, 10, w-20, h-20);
+        ctx.beginPath(); ctx.moveTo(w/2, 10); ctx.lineTo(w/2, h-10); ctx.stroke();
+        ctx.beginPath(); ctx.arc(w/2, h/2, 35, 0, Math.PI*2); ctx.stroke();
+        ctx.strokeRect(10, h/4, 40, h/2); ctx.strokeRect(w-50, h/4, 40, h/2);
         
-        // 边界
-        ctx.strokeRect(10, 10, w - 20, h - 20);
-        
-        // 中线
-        ctx.beginPath();
-        ctx.moveTo(w / 2, 10);
-        ctx.lineTo(w / 2, h - 10);
-        ctx.stroke();
-        
-        // 中圈
-        ctx.beginPath();
-        ctx.arc(w / 2, h / 2, 35, 0, Math.PI * 2);
-        ctx.stroke();
-        
-        // 中点
-        ctx.fillStyle = 'rgba(255,255,255,0.6)';
-        ctx.beginPath();
-        ctx.arc(w / 2, h / 2, 3, 0, Math.PI * 2);
-        ctx.fill();
-        
-        // 禁区
-        ctx.strokeRect(10, h / 4, 40, h / 2);
-        ctx.strokeRect(w - 50, h / 4, 40, h / 2);
-        
-        // 小禁区
-        ctx.strokeRect(10, h / 3, 20, h / 3);
-        ctx.strokeRect(w - 30, h / 3, 20, h / 3);
-        
-        // 绘制我方球员（蓝色）
-        matchState.myTeam.forEach((p, i) => {
-            const x = p.x * w;
-            const y = p.y * h;
-            
-            // 球员圆圈
-            ctx.beginPath();
-            ctx.arc(x, y, 14, 0, Math.PI * 2);
-            ctx.fillStyle = '#00d4ff';
-            ctx.fill();
-            ctx.strokeStyle = '#ffffff';
-            ctx.lineWidth = 2.5;
-            ctx.stroke();
-            
-            // 球员号码/名字
-            ctx.fillStyle = '#000';
-            ctx.font = 'bold 9px Arial';
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-            const shortName = p.name.split(' ')[0].substring(0, 3);
-            ctx.fillText(shortName, x, y);
+        matchState.myTeam.forEach(p => {
+            const x = p.x * w, y = p.y * h;
+            ctx.beginPath(); ctx.arc(x, y, 14, 0, Math.PI*2);
+            ctx.fillStyle = '#00d4ff'; ctx.fill();
+            ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.stroke();
+            ctx.fillStyle = '#000'; ctx.font = 'bold 8px Arial'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+            ctx.fillText(p.name.split(' ')[0].substring(0,3), x, y);
         });
         
-        // 绘制对方球员（红色）
-        matchState.oppTeam.forEach((p, i) => {
-            const x = p.x * w;
-            const y = p.y * h;
-            
-            ctx.beginPath();
-            ctx.arc(x, y, 14, 0, Math.PI * 2);
-            ctx.fillStyle = '#ff6b6b';
-            ctx.fill();
-            ctx.strokeStyle = '#ffffff';
-            ctx.lineWidth = 2.5;
-            ctx.stroke();
-            
-            ctx.fillStyle = '#fff';
-            ctx.font = 'bold 9px Arial';
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-            const shortName = p.name.split(' ')[0].substring(0, 3);
-            ctx.fillText(shortName, x, y);
+        matchState.oppTeam.forEach(p => {
+            const x = p.x * w, y = p.y * h;
+            ctx.beginPath(); ctx.arc(x, y, 14, 0, Math.PI*2);
+            ctx.fillStyle = '#ff6b6b'; ctx.fill();
+            ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.stroke();
+            ctx.fillStyle = '#fff'; ctx.font = 'bold 8px Arial'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+            ctx.fillText(p.name.split(' ')[0].substring(0,3), x, y);
         });
         
-        // 绘制球（带阴影）
-        const bx = matchState.ball.x * w;
-        const by = matchState.ball.y * h;
+        const bx = matchState.ball.x * w, by = matchState.ball.y * h;
+        ctx.beginPath(); ctx.arc(bx, by+6, 6, 0, Math.PI*2); ctx.fillStyle = 'rgba(0,0,0,0.2)'; ctx.fill();
+        ctx.beginPath(); ctx.arc(bx, by, 7, 0, Math.PI*2); ctx.fillStyle = '#fff'; ctx.fill(); ctx.strokeStyle = '#000'; ctx.lineWidth = 1.5; ctx.stroke();
         
-        // 球的阴影
-        ctx.fillStyle = 'rgba(0,0,0,0.2)';
-        ctx.beginPath();
-        ctx.ellipse(bx, by + 8, 8, 3, 0, 0, Math.PI * 2);
-        ctx.fill();
-        
-        // 球
-        ctx.beginPath();
-        ctx.arc(bx, by, 7, 0, Math.PI * 2);
-        ctx.fillStyle = '#ffffff';
-        ctx.fill();
-        ctx.strokeStyle = '#000';
-        ctx.lineWidth = 1.5;
-        ctx.stroke();
-        
-        // 球的纹理
-        ctx.strokeStyle = 'rgba(0,0,0,0.3)';
-        ctx.lineWidth = 0.5;
-        ctx.beginPath();
-        ctx.arc(bx - 2, by - 2, 3, 0, Math.PI * 2);
-        ctx.stroke();
-        
-        // 比分显示
-        ctx.fillStyle = 'rgba(0,0,0,0.7)';
-        ctx.fillRect(w/2 - 60, 5, 120, 28);
-        ctx.fillStyle = '#ffffff';
-        ctx.font = 'bold 18px Orbitron';
-        ctx.textAlign = 'center';
+        ctx.fillStyle = 'rgba(0,0,0,0.7)'; ctx.fillRect(w/2-60, 5, 120, 28);
+        ctx.fillStyle = '#fff'; ctx.font = 'bold 18px Orbitron'; ctx.textAlign = 'center';
         ctx.fillText(`${matchState.myScore} - ${matchState.oppScore}`, w/2, 24);
         
-        // 时间显示
-        ctx.fillStyle = 'rgba(0,0,0,0.7)';
-        ctx.fillRect(w - 50, 5, 45, 28);
-        ctx.fillStyle = matchState.minute >= 45 && matchState.minute < 46 ? '#ffff00' : '#ff4444';
-        ctx.font = 'bold 16px Orbitron';
-        ctx.textAlign = 'center';
-        ctx.fillText(`${matchState.minute}'`, w - 27, 24);
+        ctx.fillStyle = 'rgba(0,0,0,0.7)'; ctx.fillRect(w-50, 5, 45, 28);
+        ctx.fillStyle = matchState.minute>=45&&matchState.minute<46?'#ffff00':'#ff4444'; ctx.font = 'bold 16px Orbitron';
+        ctx.fillText(`${matchState.minute}'`, w-27, 24);
     }
 
     // ==================== Actions ====================
     function upgradeFacility(key) {
-        const costs = [50000, 100000, 200000, 400000, 800000, 1600000, 3200000, 6400000, 12800000];
-        const cost = costs[Math.min(game.facilities[key] - 1, 8)];
-        if (game.budget >= cost && game.facilities[key] < 10) {
-            game.budget -= cost;
-            game.facilities[key]++;
+        const costs = [50000,100000,200000,400000,800000,1600000,3200000,6400000,12800000];
+        const cost = costs[Math.min(game.facilities[key]-1,8)];
+        if (game.budget>=cost && game.facilities[key]<10) {
+            game.budget -= cost; game.facilities[key]++;
             addNews(`🔧 ${key} upgraded to Lv.${game.facilities[key]}!`);
-            showToast = t('upgraded');
-            save();
-            render();
-        } else {
-            showToast = t('noMoney');
-            render();
-        }
+            showToast = t('upgraded'); save(); render();
+        } else { showToast = t('noMoney'); render(); }
     }
 
     function signProspect(id) {
@@ -1870,13 +1152,8 @@
             game.team.push(p);
             game.prospects = game.prospects.filter(x => x.id !== id);
             addNews(`✅ Signed ${p.name}!`);
-            showToast = t('signed');
-            save();
-            render();
-        } else {
-            showToast = t('noMoney');
-            render();
-        }
+            showToast = t('signed'); save(); render();
+        } else { showToast = t('noMoney'); render(); }
     }
 
     function rejectProspect(id) {
@@ -1884,46 +1161,11 @@
         render();
     }
 
-    function buyPlayer(id) {
-        const p = game.market.find(x => x.id === id);
-        if (p && game.budget >= p.askPrice) {
-            game.budget -= p.askPrice;
-            game.team.push(p);
-            game.market = game.market.filter(x => x.id !== id);
-            addNews(`💰 Signed ${p.name}!`);
-            showToast = t('signed');
-            save();
-            render();
-        } else {
-            showToast = t('noMoney');
-            render();
-        }
-    }
-
     // ==================== Boot ====================
-    async function boot() {
-        initGame();
-        
-        // Generate avatars for all players
-        for (let p of game.team) {
-            p.avatar = await generatePlayerAvatar(p.name, p.region);
-        }
-        
-        refreshMarket();
-        for (let p of game.market) {
-            p.avatar = await generatePlayerAvatar(p.name, p.region);
-        }
-        
-        scoutAcademy();
-        for (let p of game.prospects) {
-            p.avatar = await generatePlayerAvatar(p.name, p.region);
-        }
-        
-        save();
-        render();
-    }
-
-    boot();
+    initGame();
+    refreshMarket();
+    scoutAcademy();
+    render();
     </script>
 </body>
 </html>
