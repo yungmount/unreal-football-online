@@ -300,20 +300,18 @@
     };
 
     async function generatePlayerAvatar(name, region) {
-        // Use Dicebear API for realistic avatars
-        const ethnicity = ETHNICITIES[region] || 'mixed';
+        // 使用多个头像 API 作为备选
         const seed = name.replace(/\s+/g, '').toLowerCase();
+        const ethnicity = ETHNICITIES[region] || 'mixed';
         
-        // Dicebear Avataaars style with ethnicity hints
-        const styles = {
-            white: 'avataaars',
-            black: 'avataaars',
-            asian: 'avataaars',
-            mixed: 'avataaars'
-        };
+        // 优先使用 Dicebear Avataaars（最稳定）
+        const urls = [
+            `https://api.dicebear.com/7.x/avataaars/svg?seed=${seed}&scale=85&backgroundColor=random`,
+            `https://api.dicebear.com/7.x/lorelei/svg?seed=${seed}&scale=85&backgroundColor=random`,
+            `https://api.dicebear.com/7.x/personas/svg?seed=${seed}&scale=85&backgroundColor=random`
+        ];
         
-        const url = `https://api.dicebear.com/7.x/${styles[ethnicity]}/svg?seed=${seed}&scale=80&backgroundColor=random`;
-        return url;
+        return urls[0]; // 返回第一个 URL，浏览器会自动加载
     }
 
     // ==================== I18n ====================
@@ -728,7 +726,7 @@
     function updateMatch() {
         if (!matchState || !matchState.started || matchState.finished) return;
         
-        matchState.second += 1.5;
+        matchState.second += 0.5;
         if (matchState.second >= 60) {
             matchState.second = 0;
             matchState.minute++;
@@ -745,13 +743,127 @@
             }
         }
         
-        moveBall();
-        movePlayers();
+        // 已在 updateMatch 中调用
         
-        // Generate events less frequently
-        if (matchState.minute % 5 === 0 && matchState.second < 2 && !matchState.halftime) {
-            generateMatchEvent();
+        updateBallPhysics();
+        updatePlayerMovement();
+        
+        if (Math.floor(matchState.second) % 3 === 0 && matchState.second < 1 && !matchState.halftime) {
+            if (Math.random() < 0.3) generateMatchEvent();
         }
+    }
+
+
+    function updateBallPhysics() {
+        const ball = matchState.ball;
+        
+        if (ball.owner) {
+            const dx = ball.owner.x - ball.x;
+            const dy = ball.owner.y - ball.y;
+            const dist = Math.hypot(dx, dy);
+            
+            if (dist > 0.01) {
+                const speed = 0.08;
+                ball.x += (dx / dist) * speed;
+                ball.y += (dy / dist) * speed;
+            } else {
+                ball.x = ball.owner.x;
+                ball.y = ball.owner.y;
+            }
+            ball.vx = 0;
+            ball.vy = 0;
+        } else {
+            ball.x += ball.vx;
+            ball.y += ball.vy;
+            ball.vx *= 0.94;
+            ball.vy *= 0.94;
+            
+            if (ball.x < 0.02) { ball.x = 0.02; ball.vx = Math.abs(ball.vx) * 0.6; }
+            if (ball.x > 0.98) { ball.x = 0.98; ball.vx = -Math.abs(ball.vx) * 0.6; }
+            if (ball.y < 0.02) { ball.y = 0.02; ball.vy = Math.abs(ball.vy) * 0.6; }
+            if (ball.y > 0.98) { ball.y = 0.98; ball.vy = -Math.abs(ball.vy) * 0.6; }
+            
+            const ballSpeed = Math.hypot(ball.vx, ball.vy);
+            if (ballSpeed < 0.01) {
+                const defenders = matchState.possession === 'my' ? matchState.oppTeam : matchState.myTeam;
+                const closest = defenders.reduce((best, p) => {
+                    const dist = Math.hypot(p.x - ball.x, p.y - ball.y);
+                    return dist < best.dist ? { p, dist } : best;
+                }, { p: null, dist: Infinity });
+                
+                if (closest.dist < 0.12) {
+                    ball.owner = closest.p;
+                    matchState.possession = matchState.possession === 'my' ? 'opp' : 'my';
+                    matchState.passChain = 0;
+                }
+            }
+        }
+    }
+
+    function updatePlayerMovement() {
+        const ball = matchState.ball;
+        
+        matchState.myTeam.forEach((p, i) => {
+            updatePlayerAI(p, matchState.myTeam, matchState.oppTeam, ball, 'my');
+        });
+        
+        matchState.oppTeam.forEach((p, i) => {
+            updatePlayerAI(p, matchState.oppTeam, matchState.myTeam, ball, 'opp');
+        });
+    }
+
+    function updatePlayerAI(player, team, opponents, ball, side) {
+        let targetX = player.homeX;
+        let targetY = player.homeY;
+        
+        if (matchState.possession === (side === 'my' ? 'my' : 'opp')) {
+            if (ball.owner && team.includes(ball.owner)) {
+                const dx = ball.owner.x - player.x;
+                const dy = ball.owner.y - player.y;
+                const dist = Math.hypot(dx, dy);
+                
+                if (dist > 0.12 && dist < 0.35) {
+                    targetX = player.homeX + (side === 'my' ? 0.08 : -0.08);
+                    targetY = player.homeY + (Math.random() - 0.5) * 0.08;
+                } else if (dist > 0.35) {
+                    targetX = player.homeX + (side === 'my' ? 0.12 : -0.12);
+                    targetY = player.homeY + (Math.random() - 0.5) * 0.06;
+                }
+            } else {
+                targetX = player.homeX;
+                targetY = player.homeY;
+            }
+        } else {
+            const closestOpponent = opponents.reduce((best, opp) => {
+                const dist = Math.hypot(opp.x - player.x, opp.y - player.y);
+                return dist < best.dist ? { opp, dist } : best;
+            }, { opp: null, dist: Infinity });
+            
+            if (closestOpponent.dist < 0.25) {
+                targetX = closestOpponent.opp.x + (side === 'my' ? -0.04 : 0.04);
+                targetY = closestOpponent.opp.y;
+            } else {
+                targetX = player.homeX;
+                targetY = player.homeY;
+            }
+        }
+        
+        const moveSpeed = player.speed || 0.025;
+        const dx = targetX - player.x;
+        const dy = targetY - player.y;
+        const dist = Math.hypot(dx, dy);
+        
+        if (dist > 0.005) {
+            player.x += (dx / dist) * moveSpeed;
+            player.y += (dy / dist) * moveSpeed;
+        }
+        
+        if (side === 'my') {
+            player.x = Math.max(0.05, Math.min(0.5, player.x));
+        } else {
+            player.x = Math.max(0.5, Math.min(0.95, player.x));
+        }
+        player.y = Math.max(0.02, Math.min(0.98, player.y));
     }
 
     function moveBall() {
@@ -1314,7 +1426,7 @@
                 <h3 class="font-bold text-sm mb-2">🌟 ${t('academy')} (${game.prospects.length})</h3>
                 <div class="space-y-2">
                     ${game.prospects.map(p => `
-                        <div class="player-card">
+                        <div class="player-card cursor-pointer hover:border-cyan-400" onclick="showPlayerDetail(p)">
                             <div class="flex justify-between items-center">
                                 <div class="flex items-center gap-2">
                                     <div class="player-avatar">
@@ -1330,8 +1442,8 @@
                                 </div>
                             </div>
                             <div class="flex gap-1 mt-2">
-                                <button onclick="signProspect('${p.id}')" class="btn-game green flex-1 text-xs">✅ ${t('sign')}</button>
-                                <button onclick="rejectProspect('${p.id}')" class="btn-game red flex-1 text-xs">❌ ${t('reject')}</button>
+                                <button onclick="event.stopPropagation();signProspect('${p.id}')" class="btn-game green flex-1 text-xs">✅ ${t('sign')}</button>
+                                <button onclick="event.stopPropagation();rejectProspect('${p.id}')" class="btn-game red flex-1 text-xs">❌ ${t('reject')}</button>
                             </div>
                         </div>
                     `).join('')}
@@ -1343,7 +1455,7 @@
                 <h3 class="font-bold text-sm mb-2">💰 ${t('market')}</h3>
                 <div class="space-y-2 max-h-48 overflow-y-auto">
                     ${game.market.map(p => `
-                        <div class="flex justify-between items-center bg-slate-800/50 p-2 rounded-lg cursor-pointer hover:bg-slate-700/50" onclick="buyPlayer('${p.id}')">
+                        <div class="flex justify-between items-center bg-slate-800/50 p-2 rounded-lg cursor-pointer hover:bg-slate-700/50" onclick="showPlayerDetail(p)">
                             <div class="flex items-center gap-2">
                                 <div class="player-avatar" style="width:36px;height:36px;">
                                     <img src="${p.avatar || 'data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22%3E%3Ccircle cx=%2250%22 cy=%2250%22 r=%2250%22 fill=%22%23667eea%22/%3E%3C/svg%3E'}" alt="${p.name}" onerror="this.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22%3E%3Ccircle cx=%2250%22 cy=%2250%22 r=%2250%22 fill=%22%23667eea%22/%3E%3C/svg%3E'">
