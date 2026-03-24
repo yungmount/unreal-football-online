@@ -1,842 +1,833 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>UFO - 梦幻足球</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <style>
-        * { font-family: 'Inter', sans-serif; -webkit-tap-highlight-color: transparent; user-select: none; }
-        body { margin: 0; min-height: 100vh; background: linear-gradient(135deg, #0a0a1a 0%, #1a1a3a 100%); color: #fff; overflow-x: hidden; }
-        .game-title { font-family: 'Orbitron', sans-serif; }
-        .card { background: linear-gradient(145deg, rgba(30,41,59,0.9), rgba(15,23,42,0.95)); border: 1px solid rgba(0,212,255,0.2); border-radius: 16px; }
-        .btn-game { background: linear-gradient(135deg, #00d4ff, #0099cc); border: none; border-radius: 12px; padding: 12px 20px; font-weight: 700; color: #000; cursor: pointer; transition: all 0.2s; }
-        .btn-game:active { transform: scale(0.95); }
-        .btn-game.gold { background: linear-gradient(135deg, #ffd700, #b8860b); }
-        .btn-game.green { background: linear-gradient(135deg, #22c55e, #16a34a); }
-        .btn-game.red { background: linear-gradient(135deg, #ef4444, #dc2626); }
-        .btn-game.purple { background: linear-gradient(135deg, #9333ea, #7c3aed); color: #fff; }
-        .lang-btn { padding: 6px 12px; border-radius: 20px; font-size: 12px; font-weight: 600; border: 1px solid rgba(255,255,255,0.3); background: rgba(255,255,255,0.1); color: #fff; cursor: pointer; }
-        .lang-btn.active { background: #00d4ff; color: #000; border-color: #00d4ff; }
-        .nav-btn { display: flex; flex-direction: column; align-items: center; padding: 8px 12px; color: rgba(255,255,255,0.5); cursor: pointer; }
-        .nav-btn.active { color: #00d4ff; }
-        .nav-btn .icon { font-size: 18px; }
-        .nav-btn .text { font-size: 9px; margin-top: 2px; }
-        .stat-bar { height: 6px; border-radius: 3px; background: rgba(0,0,0,0.5); overflow: hidden; }
-        .stat-fill { height: 100%; border-radius: 3px; transition: width 0.3s; }
-        .player-card { background: linear-gradient(145deg, #1e293b, #0f172a); border: 1px solid rgba(255,215,0,0.3); border-radius: 12px; padding: 12px; cursor: pointer; transition: all 0.2s; }
-        .player-card:hover { border-color: #00d4ff; transform: translateY(-2px); }
-        .standings-row { display: grid; grid-template-columns: 30px 1fr 40px 50px; padding: 8px 12px; border-radius: 8px; margin-bottom: 4px; align-items: center; font-size: 13px; }
-        .standings-row.me { background: rgba(0,212,255,0.2); border: 1px solid rgba(0,212,255,0.5); }
-        @keyframes spin3d { from { transform: rotateY(0deg); } to { transform: rotateY(360deg); } }
-        .player-3d { perspective: 600px; width: 140px; height: 220px; margin: 0 auto; }
-        .player-3d-inner { width: 100%; height: 100%; transform-style: preserve-3d; animation: spin3d 6s linear infinite; }
-        canvas { display: block; width: 100%; height: auto; }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>UFO - Unreal Football Online</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+*{font-family:'Inter',sans-serif;-webkit-tap-highlight-color:transparent;user-select:none;box-sizing:border-box}
+body{margin:0;background:linear-gradient(135deg,#0a0a1a,#1a1a3a);color:#fff;min-height:100vh;overflow-x:hidden}
+.gt{font-family:'Orbitron',sans-serif}
+.card{background:linear-gradient(145deg,rgba(30,41,59,.9),rgba(15,23,42,.95));border:1px solid rgba(0,212,255,.2);border-radius:16px}
+.btn{border:none;border-radius:12px;padding:10px 16px;font-weight:700;cursor:pointer;transition:all .2s;letter-spacing:.5px;font-size:13px}
+.btn-c{background:linear-gradient(135deg,#00d4ff,#0099cc);color:#000;box-shadow:0 4px 15px rgba(0,212,255,.3)}
+.btn-g{background:linear-gradient(135deg,#ffd700,#b8860b);color:#000;box-shadow:0 4px 15px rgba(255,215,0,.4)}
+.btn-gr{background:linear-gradient(135deg,#22c55e,#16a34a);color:#fff}
+.btn-r{background:linear-gradient(135deg,#ef4444,#dc2626);color:#fff}
+.btn-p{background:linear-gradient(135deg,#9333ea,#7c3aed);color:#fff}
+.btn:active{transform:scale(.95)}
+.pcard{background:linear-gradient(145deg,#1e293b,#0f172a);border:1px solid rgba(255,215,0,.3);border-radius:12px;padding:12px;cursor:pointer;transition:all .2s;position:relative}
+.pcard::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,#ffd700,#00d4ff,#ffd700);border-radius:12px 12px 0 0}
+.pcard:active{transform:scale(.98)}
+.sbar{height:6px;border-radius:3px;background:rgba(0,0,0,.5);overflow:hidden}
+.sfill{height:100%;border-radius:3px}
+.nav-btn{display:flex;flex-direction:column;align-items:center;padding:8px 12px;color:rgba(255,255,255,.5);cursor:pointer;transition:all .2s;background:none;border:none}
+.nav-btn.on{color:#00d4ff}
+.toast{position:fixed;top:80px;left:50%;transform:translateX(-50%);background:linear-gradient(135deg,rgba(34,197,94,.95),rgba(22,163,74,.95));padding:12px 24px;border-radius:30px;font-weight:600;z-index:100;white-space:nowrap}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
+.pulse{animation:pulse 1s infinite}
+@keyframes spin3d{from{transform:rotateY(0deg)}to{transform:rotateY(360deg)}}
+.spin3d{animation:spin3d 6s linear infinite;transform-style:preserve-3d}
+canvas{display:block}
+</style>
 </head>
 <body>
-    <div id="app"></div>
-    
-    <script>
-    // ==================== Config ====================
-    let LANG = 'zh';
-    const GAME_NAME = 'UFO';
-    
-    const I18N = {
-        en: {
-            appName: "UFO", home: "Home", team: "Squad", tactics: "Tactics", facility: "Facility", match: "Match",
-            budget: "Budget", round: "Round {0}", season: "Season {0}", rank: "Rank", record: "Record", gd: "GD",
-            win: "W", draw: "D", lose: "L", pts: "PTS", play: "Play", train: "Train", refresh: "Refresh",
-            academy: "Academy", market: "Market", standings: "Standings", sign: "Sign", reject: "Release",
-            goals: "G", assists: "A", matches: "M", fitness: "FIT", morale: "MOR", pace: "PAC", shooting: "SHO",
-            passing: "PAS", defending: "DEF", physical: "PHY", formation: "Formation", style: "Style", upgrade: "Upgrade",
-            attack: "Attack", balance: "Balance", defend: "Defend", level: "Level", potential: "Potential",
-            age: "Age", overall: "OVR", height: "Height", weight: "Weight", value: "Value", wage: "Wage", position: "Position",
-            signed: "Signed!", noMoney: "Not enough funds!", trained: "Trained!", upgraded: "Upgraded!", back: "Back",
-            all: "All", goalkeeper: "GK", defenders: "DEF", midfielders: "MID", attackers: "ATT", live: "LIVE",
-            details: "Details", vs: "VS", currentTeam: "Squad"
-        },
-        zh: {
-            appName: "UFO", home: "首页", team: "阵容", tactics: "战术", facility: "设施", match: "比赛",
-            budget: "资金", round: "第{0}轮", season: "赛季{0}", rank: "排名", record: "战绩", gd: "净胜",
-            win: "胜", draw: "平", lose: "负", pts: "分", play: "开始", train: "训练", refresh: "刷新",
-            academy: "青训", market: "转会", standings: "积分榜", sign: "签约", reject: "放弃",
-            goals: "球", assists: "助", matches: "场", fitness: "体", morale: "气", pace: "速", shooting: "射",
-            passing: "传", defending: "防", physical: "体", formation: "阵型", style: "战术", upgrade: "升级",
-            attack: "进攻", balance: "平衡", defend: "防守", level: "等级", potential: "潜力",
-            age: "年龄", overall: "总评", height: "身高", weight: "体重", value: "身价", wage: "周薪", position: "位置",
-            signed: "签约成功!", noMoney: "资金不足!", trained: "训练完成!", upgraded: "升级成功!", back: "返回",
-            all: "全部", goalkeeper: "门将", defenders: "后卫", midfielders: "中场", attackers: "前锋", live: "直播",
-            details: "详情", vs: "VS", currentTeam: "当前阵容"
-        }
+<div id="app"></div>
+<script>
+// ============================================================
+// UFO - Unreal Football Online
+// ============================================================
+
+// ---- Config ----
+const SAVE_KEY = 'ufo_v12';
+let LANG = 'zh';
+
+// ---- I18n ----
+const T = {
+  zh:{appName:'梦幻足球',home:'首页',match:'比赛',team:'阵容',tactics:'战术',facility:'设施',
+      budget:'资金',rank:'排名',record:'战绩',gd:'净胜',pts:'分',play:'开始比赛',train:'训练',
+      refresh:'刷新',academy:'青训',market:'转会市场',standings:'积分榜',sign:'签约',reject:'放弃',
+      goals:'进球',assists:'助攻',matches:'场次',fitness:'体能',morale:'士气',pace:'速度',
+      shooting:'射门',passing:'传球',defending:'防守',physical:'体格',formation:'阵型',
+      style:'战术风格',upgrade:'升级',attack:'进攻',balance:'平衡',defend:'防守',
+      age:'年龄',ovr:'总评',height:'身高',weight:'体重',value:'身价',wage:'周薪',position:'位置',
+      potential:'潜力',signed:'签约成功!',noMoney:'资金不足!',trained:'训练完成!',upgraded:'升级成功!',
+      back:'返回',live:'直播',vs:'VS',abilities:'能力值',bmi:'体型指数',
+      halfTime:'半场',fullTime:'全场',extraTime:'加时赛',penalties:'点球大战',
+      win:'胜利!',draw:'平局!',lose:'失利...',news:'新闻',currentSquad:'当前阵容'},
+  en:{appName:'Dream Football',home:'Home',match:'Match',team:'Squad',tactics:'Tactics',facility:'Facility',
+      budget:'Budget',rank:'Rank',record:'Record',gd:'GD',pts:'PTS',play:'Play Match',train:'Train',
+      refresh:'Refresh',academy:'Academy',market:'Transfer Market',standings:'Standings',sign:'Sign',reject:'Reject',
+      goals:'G',assists:'A',matches:'M',fitness:'FIT',morale:'MOR',pace:'PAC',
+      shooting:'SHO',passing:'PAS',defending:'DEF',physical:'PHY',formation:'Formation',
+      style:'Tactic Style',upgrade:'Upgrade',attack:'Attack',balance:'Balance',defend:'Defend',
+      age:'Age',ovr:'OVR',height:'Height',weight:'Weight',value:'Value',wage:'Wage',position:'Position',
+      potential:'POT',signed:'Signed!',noMoney:'Not enough funds!',trained:'Trained!',upgraded:'Upgraded!',
+      back:'Back',live:'LIVE',vs:'VS',abilities:'Abilities',bmi:'BMI',
+      halfTime:'Half Time',fullTime:'Full Time',extraTime:'Extra Time',penalties:'Penalties',
+      win:'WIN!',draw:'DRAW!',lose:'LOSS...',news:'News',currentSquad:'Current Squad'}
+};
+function t(k){return T[LANG][k]||k}
+function fmt(n){if(n>=1e6)return'€'+(n/1e6).toFixed(1)+'M';if(n>=1e3)return'€'+(n/1e3).toFixed(0)+'K';return'€'+n}
+const rand=(a,b)=>Math.floor(Math.random()*(b-a+1))+a;
+const uid=()=>'p'+Date.now().toString(36)+Math.random().toString(36).substr(2,4);
+
+// ---- Player Names ----
+const NAMES={
+  England:['Harry Kane','Jude Bellingham','Bukayo Saka','Declan Rice','Phil Foden','Mason Mount','Trent Alexander-Arnold','John Stones','Kyle Walker','Jordan Pickford','James Maddison','Jarrod Bowen','Ollie Watkins','Cole Palmer','Noni Madueke'],
+  Spain:['Pedri','Gavi','Ferran Torres','Unai Simon','Aymeric Laporte','Jordi Alba','Dani Olmo','Mikel Oyarzabal','Nico Williams','Lamine Yamal','Alejandro Balde','Pau Torres','Bryan Gil','David Raya','Aleix Garcia'],
+  Germany:['Jamal Musiala','Florian Wirtz','Kai Havertz','Joshua Kimmich','Manuel Neuer','Antonio Rudiger','Ilkay Gundogan','Thomas Muller','Leroy Sane','Jonathan Tah','Leon Goretzka','Serge Gnabry','Maximilian Beier','Kevin Schade','Jeremie Frimpong'],
+  France:['Kylian Mbappe','Aurelien Tchouameni','Eduardo Camavinga','Theo Hernandez','Adrien Rabiot','Ousmane Dembele','Kingsley Coman','Raphael Varane','William Saliba','Ibrahima Konate','Jules Kounde','Mike Maignan','Bradley Barcola','Warren Zaire-Emery','Nicolas Jackson'],
+  Brazil:['Vinicius Jr','Rodrygo','Casemiro','Marquinhos','Alisson','Thiago Silva','Lucas Paqueta','Richarlison','Gabriel Jesus','Antony','Eder Militao','Bruno Guimaraes','Raphinha','Gabriel Martinelli','Joao Pedro'],
+  Argentina:['Lionel Messi','Lautaro Martinez','Julian Alvarez','Angel Di Maria','Lisandro Martinez','Enzo Fernandez','Alexis Mac Allister','Cristian Romero','Emiliano Martinez','Nicolas Otamendi','Nahuel Molina','Marcos Acuna','Rodrigo De Paul','Leandro Paredes','Juan Foyth'],
+  Italy:['Gianluigi Donnarumma','Alessandro Bastoni','Nicolo Barella','Federico Chiesa','Ciro Immobile','Sandro Tonali','Davide Calabria','Gianluca Mancini','Bryan Cristante','Lorenzo Pellegrini','Gianluca Scamacca','Matteo Politano','Lorenzo Lucca','Gianluca Caprari','Francesco Caputo'],
+  Nigeria:['Victor Osimhen','Wilfred Ndidi','Samuel Chukwueze','Ola Aina','Taiwo Awoniyi','Ademola Lookman','William Troost-Ekong','Semi Ajayi','Leon Balogun','Calvin Bassey','Moses Simon','Victor Boniface','Kelechi Iheanacho','Zaidu Sanusi','Chidera Ejuke'],
+  Japan:['Takefusa Kubo','Daichi Kamada','Wataru Endo','Takehiro Tomiyasu','Kaoru Mitoma','Junya Ito','Daizen Maeda','Ayase Ueda','Ritsu Doan','Ko Itakura','Yuki Kobayashi','Koki Saito','Takumi Minamino','Shinji Kagawa','Yuto Nagatomo'],
+  Korea:['Son Heung-min','Lee Kang-in','Kim Min-jae','Hwang Hee-chan','Cho Gue-sung','Lee Jae-sung','Hwang In-beom','Seung-ho Paik','Byun Jun-hee','Lee Yong','Kim Young-gwon','Woo-young Jung','Seol Ki-hyeon','Park Ji-soo','Kim Jin-hyeon'],
+  China:['Wu Lei','Zhang Yuning','Wang Dalei','Yan Junling','Wei Shihao','Liu Yang','Jiang Guangtai','Dai Lin','Li Kai','Zhang Jiazhen','Zhang Ruofan','Liu Binbin','Tan Tianxiao','Huang Zhengyu','Yu Hanchao'],
+  USA:['Christian Pulisic','Weston McKennie','Antonee Robinson','Tyler Adams','Yunus Musah','Gio Reyna','Folarin Balogun','Tim Weah','Brenden Aaronson','Ricardo Pepi','Mark McKenzie','Miles Robinson','Aaron Long','Josh Sargent','Joe Scally']
+};
+
+// ---- Avatar: Pravatar (real photos) ----
+// Pravatar has 70 real human face photos, free, no API key
+function getAvatar(player) {
+  // Map player to a consistent photo index based on name hash
+  const hash = player.name.split('').reduce((a,c)=>a+c.charCodeAt(0),0);
+  const imgId = (hash % 70) + 1;
+  return `https://i.pravatar.cc/150?img=${imgId}`;
+}
+
+// ---- 3D Player Body SVG ----
+function getPlayerBody(player) {
+  const h = player.height || 180;
+  const w = player.weight || 75;
+  // Body proportions based on height/weight
+  const bodyW = 28 + (w - 70) * 0.3;
+  const bodyH = 35 + (h - 175) * 0.2;
+  const legLen = 55 + (h - 175) * 0.4;
+  const skinColors = {
+    England:'#FFDFC4',Spain:'#F0C8A0',Germany:'#FFE0BD',France:'#FFDFC4',
+    Brazil:'#C4956A',Argentina:'#F0C8A0',Italy:'#FFDFC4',Nigeria:'#704214',
+    Japan:'#FFE4C4',Korea:'#FFE4C4',China:'#FFE4C4',USA:'#E8B796'
+  };
+  const skin = skinColors[player.region] || '#FFDFC4';
+  const jerseyColors = ['#00d4ff','#ff4444','#22c55e','#ffd700','#9333ea','#f97316','#ec4899','#06b6d4'];
+  const jc = jerseyColors[(player.name.charCodeAt(0)+player.name.charCodeAt(1))%jerseyColors.length];
+  const num = ((player.name.charCodeAt(0)*3+player.name.charCodeAt(2))%99)+1;
+  const cx = 60;
+  const headY = 20;
+  const neckY = headY + 22;
+  const shoulderY = neckY + 8;
+  const waistY = shoulderY + bodyH;
+  const kneeY = waistY + legLen * 0.55;
+  const footY = waistY + legLen;
+  const lx = cx - bodyW/2;
+  const rx = cx + bodyW/2;
+
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 ${footY+15}" width="120" height="${footY+15}">
+    <defs>
+      <linearGradient id="jg" x1="0%" y1="0%" x2="0%" y2="100%">
+        <stop offset="0%" style="stop-color:${jc}"/>
+        <stop offset="100%" style="stop-color:${jc}99"/>
+      </linearGradient>
+      <linearGradient id="sg" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" style="stop-color:${skin}"/>
+        <stop offset="100%" style="stop-color:${skin}cc"/>
+      </linearGradient>
+    </defs>
+    <!-- Shadow -->
+    <ellipse cx="${cx}" cy="${footY+10}" rx="25" ry="6" fill="rgba(0,0,0,0.3)"/>
+    <!-- Left leg -->
+    <path d="M${cx-bodyW*0.35} ${waistY} L${cx-bodyW*0.3} ${kneeY} L${cx-bodyW*0.28} ${footY}" stroke="${skin}" stroke-width="${bodyW*0.28}" stroke-linecap="round" fill="none"/>
+    <!-- Right leg -->
+    <path d="M${cx+bodyW*0.35} ${waistY} L${cx+bodyW*0.3} ${kneeY} L${cx+bodyW*0.28} ${footY}" stroke="${skin}" stroke-width="${bodyW*0.28}" stroke-linecap="round" fill="none"/>
+    <!-- Socks -->
+    <path d="M${cx-bodyW*0.3} ${kneeY+5} L${cx-bodyW*0.28} ${footY}" stroke="${jc}" stroke-width="${bodyW*0.26}" stroke-linecap="round" fill="none" opacity="0.8"/>
+    <path d="M${cx+bodyW*0.3} ${kneeY+5} L${cx+bodyW*0.28} ${footY}" stroke="${jc}" stroke-width="${bodyW*0.26}" stroke-linecap="round" fill="none" opacity="0.8"/>
+    <!-- Shoes -->
+    <ellipse cx="${cx-bodyW*0.28}" cy="${footY+3}" rx="${bodyW*0.22}" ry="5" fill="#1a1a1a"/>
+    <ellipse cx="${cx+bodyW*0.28}" cy="${footY+3}" rx="${bodyW*0.22}" ry="5" fill="#1a1a1a"/>
+    <!-- Shorts -->
+    <path d="M${lx+2} ${waistY-2} L${lx} ${waistY+18} L${cx-2} ${waistY+20} L${cx+2} ${waistY+20} L${rx} ${waistY+18} L${rx-2} ${waistY-2} Z" fill="#1a1a1a"/>
+    <!-- Jersey body -->
+    <path d="M${lx} ${shoulderY} L${lx-8} ${shoulderY+5} L${lx-10} ${waistY} L${rx+10} ${waistY} L${rx+8} ${shoulderY+5} L${rx} ${shoulderY} Z" fill="url(#jg)"/>
+    <!-- Jersey number -->
+    <text x="${cx}" y="${shoulderY+bodyH*0.55}" font-family="Arial Black" font-size="${bodyW*0.45}" font-weight="900" fill="white" text-anchor="middle" opacity="0.9">${num}</text>
+    <!-- Left arm -->
+    <path d="M${lx} ${shoulderY+3} L${lx-14} ${shoulderY+bodyH*0.7}" stroke="url(#jg)" stroke-width="${bodyW*0.28}" stroke-linecap="round" fill="none"/>
+    <!-- Right arm -->
+    <path d="M${rx} ${shoulderY+3} L${rx+14} ${shoulderY+bodyH*0.7}" stroke="url(#jg)" stroke-width="${bodyW*0.28}" stroke-linecap="round" fill="none"/>
+    <!-- Hands -->
+    <circle cx="${lx-14}" cy="${shoulderY+bodyH*0.7+5}" r="${bodyW*0.14}" fill="${skin}"/>
+    <circle cx="${rx+14}" cy="${shoulderY+bodyH*0.7+5}" r="${bodyW*0.14}" fill="${skin}"/>
+    <!-- Neck -->
+    <rect x="${cx-5}" y="${neckY}" width="10" height="10" fill="${skin}" rx="2"/>
+    <!-- Head placeholder (avatar shown separately) -->
+    <circle cx="${cx}" cy="${headY}" r="18" fill="${skin}" opacity="0.3" stroke="${skin}" stroke-width="1"/>
+    <text x="${cx}" y="${headY+5}" font-size="10" text-anchor="middle" fill="${skin}" opacity="0.6">👤</text>
+  </svg>`;
+}
+
+// ---- Player Creation ----
+function createPlayer(region, position, quality=60) {
+  const age = rand(17,35);
+  const names = NAMES[region] || NAMES.England;
+  const name = names[rand(0,names.length-1)];
+  const pb = {GK:{pac:-20,sho:-25,def:20},CB:{pac:-5,sho:-15,def:25,phy:20},LB:{pac:15,def:10,pas:10},RB:{pac:15,def:10,pas:10},CDM:{def:15,pas:15},CM:{sho:10,def:5,pas:18},CAM:{pac:10,sho:18,def:-5,pas:15},LW:{pac:22,sho:18,def:-10},RW:{pac:22,sho:18,def:-10},ST:{pac:12,sho:25,def:-15,phy:15}};
+  const b = pb[position]||{};
+  const ovr = Math.max(30,Math.min(99,quality+rand(-8,8)));
+  const pot = Math.min(99,quality+rand(5,22));
+  const hBase = {GK:192,CB:188,LB:181,RB:181,CDM:184,CM:181,CAM:178,LW:176,RW:176,ST:185}[position]||180;
+  const height = Math.round(hBase + rand(-4,4) - (age<20?(20-age)*0.08:0));
+  const weight = Math.round(height*0.65+rand(-5,5));
+  const val = Math.floor(ovr*8000*(age<22?1.6:age<26?1.2:age<30?0.8:0.35)*rand(80,120)/100);
+  return {
+    id:uid(), name, region, position, age, ovr, potential:pot,
+    pace:Math.max(30,Math.min(99,rand(50,85)+(b.pac||0))),
+    shooting:Math.max(30,Math.min(99,rand(40,80)+(b.sho||0))),
+    passing:Math.max(30,Math.min(99,rand(45,85)+(b.pas||0))),
+    defending:Math.max(30,Math.min(99,rand(40,80)+(b.def||0))),
+    physical:Math.max(30,Math.min(99,rand(50,85)+(b.phy||0))),
+    fitness:rand(75,100), morale:rand(60,100),
+    value:val, wage:Math.floor(ovr*80*rand(80,120)/100),
+    goals:0, assists:0, matches:0, height, weight
+  };
+}
+
+// ---- Game State ----
+let G = null;
+let tab = 'home';
+let filterPos = 'all';
+let toast = null;
+let MS = null; // match state
+let selPlayer = null;
+let cvs = null, ctx = null;
+let rafId = null;
+let lastT = 0;
+
+function initGame() {
+  const saved = localStorage.getItem(SAVE_KEY);
+  if (saved) { try { G = JSON.parse(saved); return; } catch(e){} }
+  G = {
+    budget:5000000, team:[], league:[], season:1, week:1, day:0,
+    formation:'4-4-2', tactic:'balance',
+    facilities:{training:1,academy:1,stadium:1},
+    market:[], prospects:[], news:[]
+  };
+  const pos = ['GK','CB','CB','LB','RB','CDM','CM','CM','LW','RW','ST','ST','CB','CM','CDM','LB','RB','GK','CAM','ST','CM','CB'];
+  const reg = ['England','Spain','Brazil','Germany','France','Italy','Argentina','Portugal','Nigeria','Japan','Korea','China','USA','England','Spain','Brazil','Germany','France','Italy','Argentina','Portugal','England'];
+  for(let i=0;i<22;i++) G.team.push(createPlayer(reg[i],pos[i],rand(58,72)));
+  const tns = {en:['FC United','Athletic Club','Dragon FC','Lion SC','Red Stars','Blue Moon','Green FC','Phoenix FC','Silver Eagles','Golden Snakes','Violets','Panthers'],zh:['FC联','竞技俱乐部','龙之队','雄狮SC','红星队','蓝月亮','绿茵FC','凤凰FC','银鹰SC','金蛇队','紫百合','黑豹FC']};
+  G.league = tns.en.map((n,i)=>({name:n,index:i,strength:rand(40,88),played:0,won:0,drawn:0,lost:0,gf:0,ga:0,pts:0}));
+  G.leagueNames = tns;
+}
+function save(){localStorage.setItem(SAVE_KEY,JSON.stringify(G))}
+function getLN(i){return LANG==='zh'?G.leagueNames.zh[i]:G.leagueNames.en[i]}
+function addNews(txt){G.news.unshift({txt,t:Date.now()});if(G.news.length>20)G.news.pop()}
+
+function refreshMarket(){
+  const q=55+G.facilities.academy*3;
+  const regs=['England','Spain','Brazil','Germany','France','Italy','Argentina'];
+  G.market=[];
+  for(let i=0;i<6;i++){
+    const p=createPlayer(regs[rand(0,regs.length-1)],['GK','CB','LB','RB','CDM','CM','CAM','LW','RW','ST'][rand(0,9)],rand(q-10,q+15));
+    p.askPrice=Math.floor(p.value*rand(75,125)/100);
+    G.market.push(p);
+  }
+  save();
+}
+function scoutAcademy(){
+  const cnt=2+Math.floor(G.facilities.academy/2);
+  const q=42+G.facilities.academy*4;
+  G.prospects=[];
+  for(let i=0;i<Math.min(cnt,4);i++) G.prospects.push(createPlayer('China',['GK','CB','CM','ST'][rand(0,3)],rand(q-12,q+12)));
+  addNews('🌟 青训发现'+G.prospects.length+'名人才!');
+}
+function trainTeam(){
+  const bonus=1+G.facilities.training*0.18;
+  G.team.forEach(p=>{
+    if(p.age<29&&p.ovr<p.potential){const g=Math.floor(rand(0,2)*bonus);if(g>0){p.ovr=Math.min(p.potential,p.ovr+g);if(rand(1,100)<=25){const s=['pace','shooting','passing','defending','physical'];p[s[rand(0,4)]]=Math.min(99,p[s[rand(0,4)]]+1)}}}
+    p.fitness=Math.min(100,p.fitness+rand(8,18));
+  });
+  addNews(t('trained'));
+  save();
+}
+
+// ---- Formation Positions ----
+const FP = {
+  '4-4-2':[[.08,.5],[.22,.15],[.22,.4],[.22,.6],[.22,.85],[.38,.2],[.38,.45],[.38,.75],[.52,.15],[.52,.5],[.52,.85]],
+  '4-3-3':[[.08,.5],[.22,.15],[.22,.4],[.22,.6],[.22,.85],[.38,.3],[.38,.5],[.38,.7],[.55,.2],[.55,.5],[.55,.8]],
+  '4-2-3-1':[[.08,.5],[.22,.15],[.22,.4],[.22,.6],[.22,.85],[.35,.35],[.35,.65],[.48,.2],[.48,.5],[.48,.8],[.58,.5]],
+  '3-5-2':[[.08,.5],[.22,.25],[.22,.5],[.22,.75],[.38,.1],[.38,.35],[.38,.5],[.38,.65],[.38,.9],[.52,.35],[.52,.65]]
+};
+
+// ---- Match Engine ----
+function startMatch() {
+  if(rafId){cancelAnimationFrame(rafId);rafId=null}
+  MS = null;
+  tab = 'match';
+  render();
+
+  setTimeout(()=>{
+    const fp = FP[G.formation]||FP['4-4-2'];
+    const myTeam = G.team.slice(0,11).map((p,i)=>{
+      const pos = fp[i]||{x:.3,y:.5};
+      return {...p, mx:pos[0], my:pos[1], x:pos[0], y:pos[1], hx:pos[0], hy:pos[1], spd:(p.pace/100)*.45+.15};
+    });
+    const oppIdx = rand(1,G.league.length-1);
+    const oppStr = G.league[oppIdx].strength;
+    const oppFp = fp.map(p=>[1-p[0],p[1]]);
+    const oppPos = ['GK','CB','CB','LB','RB','CDM','CM','CM','LW','RW','ST'];
+    const oppTeam = oppPos.map((pos,i)=>{
+      const p = createPlayer(['England','Spain','Brazil','Germany','France'][rand(0,4)],pos,oppStr);
+      const op = oppFp[i]||[.7,.5];
+      return {...p, mx:op[0], my:op[1], x:op[0], y:op[1], hx:op[0], hy:op[1], spd:(p.pace/100)*.45+.15};
+    });
+    MS = {
+      myTeam, oppTeam,
+      oppName: getLN(oppIdx),
+      myScore:0, oppScore:0,
+      min:0, sec:0,
+      ball:{x:.5,y:.5,z:0,vx:0,vy:0,owner:null,tx:.5,ty:.5,flying:false,sx:.5,sy:.5},
+      poss:'my',
+      events:[],
+      started:true, finished:false, htDone:false,
+      shots:{my:0,opp:0},
+      lastEvt:0
     };
-    
-    function t(key, ...args) { 
-        let text = I18N[LANG][key] || key; 
-        args.forEach((v, i) => text = text.replace(`{${i}}`, v)); 
-        return text; 
-    }
-    
-    const PLAYER_NAMES = {
-        England: ['Harry Kane','Jude Bellingham','Bukayo Saka','Declan Rice','Phil Foden','Mason Mount','Trent Alexander-Arnold','John Stones','Kyle Walker','Jordan Pickford'],
-        Spain: ['Pedri','Gavi','Ferran Torres','Sergio Busquets','Unai Simon','Cesar Azpilicueta','Aymeric Laporte','Jordi Alba','Dani Olmo','Mikel Oyarzabal'],
-        Germany: ['Jamal Musiala','Florian Wirtz','Kai Havertz','Joshua Kimmich','Manuel Neuer','Antonio Rudiger','Ilkay Gundogan','Thomas Muller','Leroy Sane','Jonathan Tah'],
-        France: ['Kylian Mbappe','Aurelien Tchouameni','Eduardo Camavinga','Theo Hernandez','Adrien Rabiot','N Golo Kante','Ousmane Dembele','Kingsley Coman','Ferland Mendy','Raphael Varane'],
-        Brazil: ['Vinicius Jr','Rodrygo','Casemiro','Marquinhos','Alisson','Thiago Silva','Lucas Paqueta','Fabinho','Richarlison','Gabriel Jesus'],
-        Argentina: ['Lionel Messi','Lautaro Martinez','Julian Alvarez','Angel Di Maria','Gonzalo Montiel','Lisandro Martinez','Enzo Fernandez','Alexis Mac Allister','Cristian Romero','Emiliano Martinez'],
-        Italy: ['Gianluigi Donnarumma','Alessandro Bastoni','Nicolo Barella','Leonardo Bonucci','Federico Chiesa','Ciro Immobile','Rafael Leao','Sandro Tonali','Davide Calabria','Alessio Romagnoli'],
-        Nigeria: ['Victor Osimhen','Wilfred Ndidi','Kelechi Iheanacho','Samuel Chukwueze','Ola Aina','Zaidu Sanusi','Chidera Ejuke','Taiwo Awoniyi','Nathaniel Tiole','Ademola Lookman'],
-        Japan: ['Takefusa Kubo','Daichi Kamada','Wataru Endo','Takehiro Tomiyasu','Kaoru Mitoma','Junya Ito','Hiroki Sakai','Daizen Maeda','Ayase Ueda','Ritsu Doan'],
-        Korea: ['Son Heung-min','Lee Kang-in','Kim Min-jae','Hwang Hee-chan','Cho Gue-sung','Kim Young-gwon','Seol Ki-hyeon','Lee Jae-sung','Hwang In-beom','Park Ji-soo'],
-        China: ['Wu Lei','Zhang Yuning','Wang Dalei','Yan Junling','Kou Zhun','Gao Lin','Zheng Zhi','Feng Xiaoting','Wei Shihao','Liu Yang'],
-        USA: ['Christian Pulisic','Weston McKennie','Sergiño Dest','Antonee Robinson','Tyler Adams','Yunus Musah','Gio Reyna','Joe Scally','Tim Weah','Brenden Aaronson']
-    };
-    
-    // ==================== Avatar - Dicebear Realistic Faces ====================
-    function getPlayerAvatar(player) {
-        // 使用 Dicebear API 生成更真实的头像
-        // avataaars 风格 - 卡通但更真实的人脸
-        const seed = player.id || player.name;
-        // 使用 fun-emoji 风格，更加真实
-        return `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(seed)}&backgroundColor=0ea5e9,7c3aed,f59e0b,10b981,ef4444`;
-    }
-    
-    // ==================== 3D Player Model ====================
-    function generate3DPlayer(player) {
-        // 根据位置调整体型
-        const positionBodyTypes = {
-            'GK': { shoulder: 1.15, chest: 1.2, leg: 0.9, heightBonus: 8 },  // 门将：宽肩、壮实
-            'CB': { shoulder: 1.1, chest: 1.15, leg: 1.0, heightBonus: 3 },   // 中卫：强壮
-            'LB': { shoulder: 0.95, chest: 1.0, leg: 1.05, heightBonus: 0 },  // 左边卫：匀称
-            'RB': { shoulder: 0.95, chest: 1.0, leg: 1.05, heightBonus: 0 },  // 右边卫：匀称
-            'CDM': { shoulder: 1.05, chest: 1.1, leg: 1.0, heightBonus: 1 },  // 防守中场：偏壮
-            'CM': { shoulder: 1.0, chest: 1.0, leg: 1.0, heightBonus: 0 },    // 中场：标准
-            'CAM': { shoulder: 0.95, chest: 0.95, leg: 1.0, heightBonus: -2 },// 前腰：精瘦
-            'LW': { shoulder: 0.9, chest: 0.9, leg: 1.1, heightBonus: -2 },   // 左边锋：精瘦快速
-            'RW': { shoulder: 0.9, chest: 0.9, leg: 1.1, heightBonus: -2 },   // 右边锋：精瘦快速
-            'ST': { shoulder: 1.0, chest: 1.05, leg: 1.05, heightBonus: 2 }   // 前锋：力量型
-        };
-        
-        const bodyType = positionBodyTypes[player.position] || { shoulder: 1.0, chest: 1.0, leg: 1.0, heightBonus: 0 };
-        
-        const heightNorm = (player.height - 170) / 30;
-        const weightNorm = (player.weight - 70) / 25;
-        const baseHeight = 160 + heightNorm * 20 + bodyType.heightBonus;
-        const shoulderWidth = 24 * bodyType.shoulder * (1 + weightNorm * 0.1);
-        const chestWidth = 40 * bodyType.chest * (1 + weightNorm * 0.15);
-        const legLength = 50 * bodyType.leg * (1 + heightNorm * 0.1);
-        
-        const jerseyNum = Math.floor(Math.random() * 99) + 1;
-        const jerseyColors = ['#00d4ff', '#ff4444', '#44ff44', '#ffff44', '#ff44ff'];
-        const jerseyColor = jerseyColors[Math.floor(Math.random() * jerseyColors.length)];
-        
-        // 根据位置选择肤色（更真实）
-        const skinTones = ['#FFD7A8', '#F5C89A', '#E8A87C', '#D4A574', '#C68642'];
-        const skinTone = skinTones[Math.floor(Math.random() * skinTones.length)];
-        const skinToneDark = shadeColor(skinTone, -15);
-        
-        const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 ${baseHeight}" width="140" height="${baseHeight * 1.4}">
-            <defs>
-                <linearGradient id="body${player.id}" x1="0%" y1="0%" x2="0%" y2="100%">
-                    <stop offset="0%" style="stop-color:${skinTone}"/>
-                    <stop offset="100%" style="stop-color:${skinToneDark}"/>
-                </linearGradient>
-                <linearGradient id="jersey${player.id}" x1="0%" y1="0%" x2="0%" y2="100%">
-                    <stop offset="0%" style="stop-color:${jerseyColor}"/>
-                    <stop offset="100%" style="stop-color:${shadeColor(jerseyColor, -20)}"/>
-                </linearGradient>
-            </defs>
-            
-            <!-- 头 -->
-            <ellipse cx="50" cy="20" rx="${12 + weightNorm * 2}" ry="14" fill="url(#body${player.id})"/>
-            
-            <!-- 头发 -->
-            <ellipse cx="50" cy="11" rx="${14 + weightNorm * 2}" ry="9" fill="#2C1810"/>
-            <ellipse cx="50" cy="8" rx="10" ry="5" fill="#1a0f08"/>
-            
-            <!-- 眉毛 -->
-            <path d="M 42 15 Q 45 13 48 15" stroke="#1a0f08" stroke-width="1.5" fill="none"/>
-            <path d="M 52 15 Q 55 13 58 15" stroke="#1a0f08" stroke-width="1.5" fill="none"/>
-            
-            <!-- 眼睛 -->
-            <ellipse cx="45" cy="19" rx="2.5" ry="2" fill="#fff"/>
-            <ellipse cx="55" cy="19" rx="2.5" ry="2" fill="#fff"/>
-            <circle cx="45" cy="19" r="1.5" fill="#3a2a1a"/>
-            <circle cx="55" cy="19" r="1.5" fill="#3a2a1a"/>
-            <circle cx="45.5" cy="18.5" r="0.6" fill="#fff"/>
-            <circle cx="55.5" cy="18.5" r="0.6" fill="#fff"/>
-            
-            <!-- 鼻子 -->
-            <path d="M 50 20 L 48 25 L 52 25 Z" fill="${skinToneDark}"/>
-            
-            <!-- 嘴 -->
-            <path d="M 46 28 Q 50 30 54 28" stroke="#a05050" stroke-width="1.5" fill="none" stroke-linecap="round"/>
-            
-            <!-- 脖子 -->
-            <rect x="45" y="33" width="10" height="8" fill="url(#body${player.id})"/>
-            
-            <!-- 球衣主体 - 根据体型调整 -->
-            <path d="M ${50 - shoulderWidth/2} 41 
-                     L ${50 - shoulderWidth/2 - 5} 45 
-                     L ${50 - chestWidth/2 - 3} ${88 + heightNorm * 10} 
-                     L ${50 - chestWidth/2 + 5} ${92 + heightNorm * 10} 
-                     L ${50 + chestWidth/2 - 5} ${92 + heightNorm * 10} 
-                     L ${50 + chestWidth/2 + 3} ${88 + heightNorm * 10} 
-                     L ${50 + shoulderWidth/2 + 5} 45 
-                     L ${50 + shoulderWidth/2} 41 Z" 
-                  fill="url(#jersey${player.id})" stroke="#fff" stroke-width="1"/>
-            
-            <!-- 球衣号码 -->
-            <text x="50" y="${68 + heightNorm * 5}" font-family="Arial Black" font-size="14" font-weight="bold" fill="white" text-anchor="middle">${jerseyNum}</text>
-            
-            <!-- 球衣细节线条 -->
-            <line x1="50" y1="50" x2="50" y2="${70 + heightNorm * 5}" stroke="rgba(255,255,255,0.3)" stroke-width="1"/>
-            
-            <!-- 手臂 - 根据体型调整粗细 -->
-            <ellipse cx="${50 - shoulderWidth/2 - 5}" cy="55" rx="${6 * bodyType.shoulder}" ry="${22 * (1 + heightNorm * 0.1)}" fill="url(#body${player.id})"/>
-            <ellipse cx="${50 + shoulderWidth/2 + 5}" cy="55" rx="${6 * bodyType.shoulder}" ry="${22 * (1 + heightNorm * 0.1)}" fill="url(#body${player.id})"/>
-            
-            <!-- 短裤 -->
-            <path d="M ${50 - chestWidth/2 + 5} ${92 + heightNorm * 10} 
-                     L ${50 - 12} ${100 + heightNorm * 10 + legLength * 0.3} 
-                     L ${50 - 8} ${100 + heightNorm * 10 + legLength * 0.3} 
-                     L ${50 - 3} ${92 + heightNorm * 10} 
-                     L ${50 + 3} ${92 + heightNorm * 10} 
-                     L ${50 + 8} ${100 + heightNorm * 10 + legLength * 0.3} 
-                     L ${50 + 12} ${100 + heightNorm * 10 + legLength * 0.3} 
-                     L ${50 + chestWidth/2 - 5} ${92 + heightNorm * 10} Z" 
-                  fill="#1a1a2e"/>
-            
-            <!-- 腿 - 根据体型调整 -->
-            <rect x="${50 - 10}" y="${100 + heightNorm * 10 + legLength * 0.3}" width="8" height="${legLength * 0.6}" rx="3" fill="url(#body${player.id})"/>
-            <rect x="${50 + 2}" y="${100 + heightNorm * 10 + legLength * 0.3}" width="8" height="${legLength * 0.6}" rx="3" fill="url(#body${player.id})"/>
-            
-            <!-- 球袜 -->
-            <rect x="${50 - 11}" y="${100 + heightNorm * 10 + legLength * 0.8}" width="10" height="14" rx="2" fill="${jerseyColor}" opacity="0.85"/>
-            <rect x="${50 + 1}" y="${100 + heightNorm * 10 + legLength * 0.8}" width="10" height="14" rx="2" fill="${jerseyColor}" opacity="0.85"/>
-            
-            <!-- 球鞋 -->
-            <ellipse cx="${50 - 6}" cy="${118 + heightNorm * 10 + legLength * 0.75}" rx="8" ry="5" fill="#1a1a1a"/>
-            <ellipse cx="${50 + 6}" cy="${118 + heightNorm * 10 + legLength * 0.75}" rx="8" ry="5" fill="#1a1a1a"/>
-            <!-- 鞋钉 -->
-            <rect x="${50 - 10}" y="${120 + heightNorm * 10 + legLength * 0.75}" width="2" height="3" fill="#333"/>
-            <rect x="${50 - 6}" y="${121 + heightNorm * 10 + legLength * 0.75}" width="2" height="3" fill="#333"/>
-            <rect x="${50 + 4}" y="${121 + heightNorm * 10 + legLength * 0.75}" width="2" height="3" fill="#333"/>
-            <rect x="${50 + 8}" y="${120 + heightNorm * 10 + legLength * 0.75}" width="2" height="3" fill="#333"/>
-        </svg>`;
-        
-        return 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
-    }
-    
-    // 颜色调节辅助函数
-    function shadeColor(color, percent) {
-        const num = parseInt(color.replace('#', ''), 16);
-        const amt = Math.round(2.55 * percent);
-        const R = Math.max(0, Math.min(255, (num >> 16) + amt));
-        const G = Math.max(0, Math.min(255, (num >> 8 & 0x00FF) + amt));
-        const B = Math.max(0, Math.min(255, (num & 0x0000FF) + amt));
-        return '#' + (0x1000000 + R * 0x10000 + G * 0x100 + B).toString(16).slice(1);
-    }
-    
-    // ==================== Game State ====================
-    let game = null;
-    let currentTab = 'home';
-    let selectedPlayer = null;
-    let matchState = null;
-    let canvas = null;
-    let ctx = null;
-    let animationId = null;
-    
-    const rand = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
-    const uid = () => 'p' + Date.now() + Math.random().toString(36).substr(2, 6);
-    const fmt = (n) => n >= 1000000 ? '€' + (n / 1000000).toFixed(1) + 'M' : n >= 1000 ? '€' + (n / 1000).toFixed(0) + 'K' : '€' + n;
-    
-    // ==================== Player Creation ====================
-    function createPlayer(region, position, quality = 60) {
-        const age = rand(17, 35);
-        const names = PLAYER_NAMES[region] || PLAYER_NAMES['England'];
-        const name = names[rand(0, names.length - 1)];
-        
-        const heightBase = { GK: rand(188, 196), CB: rand(184, 193), LB: rand(177, 185), RB: rand(177, 185), CDM: rand(180, 188), CM: rand(177, 185), CAM: rand(175, 182), LW: rand(172, 180), RW: rand(172, 180), ST: rand(179, 191) };
-        const height = Math.round((heightBase[position] || 180) - (age < 20 ? (20 - age) * 0.08 : 0));
-        const weight = Math.round(height * 0.65 + rand(-5, 5));
-        
-        const posBonus = {
-            GK: { pace: -20, shooting: -25, defending: 20, passing: 5 },
-            CB: { pace: -5, shooting: -15, defending: 25, physical: 20 },
-            LB: { pace: 15, shooting: 0, defending: 10, passing: 10 },
-            RB: { pace: 15, shooting: 0, defending: 10, passing: 10 },
-            CDM: { pace: 0, shooting: -5, defending: 15, passing: 15 },
-            CM: { pace: 5, shooting: 10, defending: 5, passing: 18 },
-            CAM: { pace: 10, shooting: 18, defending: -5, passing: 15 },
-            LW: { pace: 22, shooting: 18, defending: -10, passing: 10 },
-            RW: { pace: 22, shooting: 18, defending: -10, passing: 10 },
-            ST: { pace: 12, shooting: 25, defending: -15, physical: 15 }
-        };
-        
-        const b = posBonus[position] || {};
-        const potential = Math.min(99, quality + rand(5, 22));
-        const ovr = Math.max(30, Math.min(99, quality + rand(-8, 8)));
-        const value = Math.floor(ovr * 8000 * (age < 22 ? 1.6 : age < 26 ? 1.2 : age < 30 ? 0.8 : 0.35));
-        
-        return {
-            id: uid(), name, region, position, age, ovr, potential,
-            pace: Math.max(30, Math.min(99, rand(50, 85) + (b.pace || 0))),
-            shooting: Math.max(30, Math.min(99, rand(40, 80) + (b.shooting || 0))),
-            passing: Math.max(30, Math.min(99, rand(45, 85) + (b.passing || 0))),
-            defending: Math.max(30, Math.min(99, rand(40, 80) + (b.defending || 0))),
-            physical: Math.max(30, Math.min(99, rand(50, 85) + (b.physical || 0))),
-            fitness: rand(75, 100), morale: rand(60, 100),
-            value: Math.floor(value * rand(80, 120) / 100),
-            wage: Math.floor(ovr * 80 * rand(80, 120) / 100),
-            goals: 0, assists: 0, matches: 0,
-            height, weight
-        };
-    }
-    
-    // ==================== Game Init ====================
-    function initGame() {
-        const saved = localStorage.getItem('football_v12_save');
-        if (saved) {
-            try {
-                game = JSON.parse(saved);
-                return;
-            } catch(e) {}
-        }
-        
-        game = { budget: 5000000, team: [], league: [], facilities: { training: 1, academy: 1, stadium: 1 },
-            season: 1, week: 1, day: 0, formation: '4-4-2', tactic: 'balance', market: [], prospects: [], news: [] };
-        
-        const positions = ['GK','CB','CB','CB','LB','RB','CDM','CM','CM','CAM','LW','RW','ST','ST','CM','CDM','CB','LB','RB','GK','CM','ST'];
-        const regions = ['England','Spain','Brazil','Germany','France','Italy','Argentina','Nigeria','Japan','Korea','China','USA','England','Spain','Brazil','Germany','France','Italy','Argentina','Nigeria','Japan','Korea'];
-        
-        for (let i = 0; i < 22; i++) {
-            game.team.push(createPlayer(regions[i], positions[i], rand(58, 72)));
-        }
-        
-        const teamNames = ['FC联','竞技','龙之队','雄狮','红星','蓝月','绿茵','凤凰','银鹰','金蛇','紫百合','黑豹'];
-        game.league = teamNames.map((name, i) => ({ name, index: i, strength: rand(40, 88), played: 0, won: 0, drawn: 0, lost: 0, gf: 0, ga: 0, pts: 0 }));
-    }
-    
-    function save() { localStorage.setItem('football_v12_save', JSON.stringify(game)); }
-    
-    // ==================== Match System ====================
-    const FORMATION_POSITIONS = {
-        '4-4-2': [{x:0.08,y:0.5},{x:0.22,y:0.15},{x:0.22,y:0.4},{x:0.22,y:0.6},{x:0.22,y:0.85},{x:0.38,y:0.2},{x:0.38,y:0.5},{x:0.38,y:0.8},{x:0.52,y:0.3},{x:0.52,y:0.7}],
-        '4-3-3': [{x:0.08,y:0.5},{x:0.22,y:0.15},{x:0.22,y:0.4},{x:0.22,y:0.6},{x:0.22,y:0.85},{x:0.38,y:0.3},{x:0.38,y:0.5},{x:0.38,y:0.7},{x:0.55,y:0.2},{x:0.55,y:0.5},{x:0.55,y:0.8}],
-        '4-2-3-1': [{x:0.08,y:0.5},{x:0.22,y:0.15},{x:0.22,y:0.4},{x:0.22,y:0.6},{x:0.22,y:0.85},{x:0.35,y:0.35},{x:0.35,y:0.65},{x:0.48,y:0.2},{x:0.48,y:0.5},{x:0.48,y:0.8},{x:0.58,y:0.5}],
-        '3-5-2': [{x:0.08,y:0.5},{x:0.22,y:0.25},{x:0.22,y:0.5},{x:0.22,y:0.75},{x:0.38,y:0.1},{x:0.38,y:0.35},{x:0.38,y:0.5},{x:0.38,y:0.65},{x:0.38,y:0.9},{x:0.52,y:0.35},{x:0.52,y:0.65}]
-    };
-    
-    function startMatch() {
-        currentTab = 'match';
-        matchState = null;
-        render();
-        
-        setTimeout(() => {
-            const formationPos = FORMATION_POSITIONS[game.formation] || FORMATION_POSITIONS['4-4-2'];
-            
-            const myTeam = [];
-            for (let i = 0; i < 11; i++) {
-                const p = game.team[i] || createPlayer('England', 'CM', 65);
-                const pos = formationPos[i] || {x:0.3, y:0.5};
-                myTeam.push({...p, x: pos.x, y: pos.y, vx: 0, vy: 0, homeX: pos.x, homeY: pos.y});
-            }
-            
-            const oppIdx = rand(1, game.league.length - 1);
-            const oppTeam = [];
-            const oppPos = formationPos.map(p => ({x: 1-p.x, y: p.y}));
-            const oppPositions = ['GK','CB','CB','CB','LB','RB','CDM','CM','CM','LW','ST'];
-            
-            for (let i = 0; i < 11; i++) {
-                const p = createPlayer('Brazil', oppPositions[i], game.league[oppIdx].strength);
-                const o = oppPos[i] || {x:0.7, y:0.5};
-                oppTeam.push({...p, x: o.x, y: o.y, vx: 0, vy: 0, homeX: o.x, homeY: o.y});
-            }
-            
-            matchState = {
-                myTeam, oppTeam,
-                oppName: game.league[oppIdx].name,
-                myScore: 0, oppScore: 0,
-                minute: 0, second: 0,
-                events: [],
-                ball: {x:0.5, y:0.5, vx:0, vy:0},
-                possession: 'my',
-                started: true, finished: false
-            };
-            
-            // 关键：重新渲染界面以显示比赛
-            render();
-            
-            startMatchLoop();
-        }, 100);
-    }
-    
-    function startMatchLoop() {
-        canvas = document.getElementById('matchCanvas');
-        if (!canvas) {
-            console.error('Canvas not found, retrying...');
-            setTimeout(startMatchLoop, 100);
-            return;
-        }
-        
-        ctx = canvas.getContext('2d');
-        const rect = canvas.getBoundingClientRect();
-        canvas.width = rect.width * window.devicePixelRatio;
-        canvas.height = rect.height * window.devicePixelRatio;
-        ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
-        
-        console.log('Match started:', matchState.myTeam.length, 'vs', matchState.oppTeam.length);
-        
-        let lastTime = performance.now();
-        let lastEventTime = 0;
-        
-        function loop(time) {
-            if (!matchState || !matchState.started || matchState.finished) return;
-            
-            const dt = Math.min((time - lastTime) / 1000, 0.05);
-            lastTime = time;
-            
-            // 更新比赛时间
-            matchState.second += dt * 60; // 加速时间流逝 (1秒 = 1分钟比赛时间)
-            if (matchState.second >= 60) {
-                matchState.second = 0;
-                matchState.minute++;
-                
-                // 每分钟检查进球事件
-                simulateMatchEvents();
-                
-                if (matchState.minute >= 90) {
-                    matchState.finished = true;
-                    endMatch();
-                    render();
-                    return;
-                }
-            }
-            
-            // 移动球员和球
-            updatePlayerPositions(dt);
-            
-            // 渲染
-            renderMatchCanvas();
-            animationId = requestAnimationFrame(loop);
-        }
-        
-        animationId = requestAnimationFrame(loop);
-    }
-    
-    function simulateMatchEvents() {
-        if (!matchState) return;
-        
-        // 计算球队实力
-        const myStrength = matchState.myTeam.reduce((sum, p) => sum + p.ovr, 0) / 11;
-        const oppStrength = matchState.oppTeam.reduce((sum, p) => sum + p.ovr, 0) / 11;
-        
-        // 进球概率基于实力差
-        const myGoalChance = 0.02 + (myStrength - oppStrength) * 0.001;
-        const oppGoalChance = 0.02 + (oppStrength - myStrength) * 0.001;
-        
-        if (Math.random() < myGoalChance) {
-            matchState.myScore++;
-            const scorer = matchState.myTeam[rand(8, 10)] || matchState.myTeam[rand(0, 10)];
-            matchState.events.push({ minute: matchState.minute, type: 'goal', team: 'my', player: scorer.name });
-        }
-        
-        if (Math.random() < oppGoalChance) {
-            matchState.oppScore++;
-            const scorer = matchState.oppTeam[rand(8, 10)] || matchState.oppTeam[rand(0, 10)];
-            matchState.events.push({ minute: matchState.minute, type: 'goal', team: 'opp', player: scorer.name });
-        }
-    }
-    
-    function updatePlayerPositions(dt) {
-        if (!matchState) return;
-        
-        // 更新球位置
-        matchState.ball.x += matchState.ball.vx * dt;
-        matchState.ball.y += matchState.ball.vy * dt;
-        
-        // 球场边界
-        if (matchState.ball.x < 0 || matchState.ball.x > 1) matchState.ball.vx *= -0.8;
-        if (matchState.ball.y < 0 || matchState.ball.y > 1) matchState.ball.vy *= -0.8;
-        matchState.ball.x = Math.max(0, Math.min(1, matchState.ball.x));
-        matchState.ball.y = Math.max(0, Math.min(1, matchState.ball.y));
-        
-        // 随机球移动
-        if (Math.random() < 0.05) {
-            matchState.ball.vx = (Math.random() - 0.5) * 0.5;
-            matchState.ball.vy = (Math.random() - 0.5) * 0.5;
-        }
-        
-        // 球员追球
-        const allPlayers = [...matchState.myTeam, ...matchState.oppTeam];
-        allPlayers.forEach(p => {
-            const dx = matchState.ball.x - p.x;
-            const dy = matchState.ball.y - p.y;
-            const dist = Math.sqrt(dx*dx + dy*dy);
-            
-            // 如果球近，追球
-            if (dist < 0.3 && Math.random() < 0.1) {
-                p.vx += dx * 0.02;
-                p.vy += dy * 0.02;
-            } else {
-                // 回归原位
-                p.vx += (p.homeX - p.x) * 0.01;
-                p.vy += (p.homeY - p.y) * 0.01;
-            }
-            
-            // 更新位置
-            p.x += p.vx * dt;
-            p.y += p.vy * dt;
-            p.vx *= 0.95;
-            p.vy *= 0.95;
-            
-            // 边界
-            p.x = Math.max(0.02, Math.min(0.98, p.x));
-            p.y = Math.max(0.02, Math.min(0.98, p.y));
-        });
-    }
-    
-    function endMatch() {
-        // 更新联赛积分
-        const myLeague = game.league[0];
-        myLeague.played++;
-        myLeague.gf += matchState.myScore;
-        myLeague.ga += matchState.oppScore;
-        
-        if (matchState.myScore > matchState.oppScore) {
-            myLeague.won++;
-            myLeague.pts += 3;
-        } else if (matchState.myScore < matchState.oppScore) {
-            myLeague.lost++;
-        } else {
-            myLeague.drawn++;
-            myLeague.pts += 1;
-        }
-        
-        game.week++;
-        save();
-    }
-    
-    function renderMatchCanvas() {
-        if (!canvas || !ctx || !matchState) return;
-        
-        const w = canvas.width / window.devicePixelRatio;
-        const h = canvas.height / window.devicePixelRatio;
-        
-        // 草地
-        ctx.fillStyle = '#2d8a2d';
-        ctx.fillRect(0, 0, w, h);
-        
-        // 球场线
-        ctx.strokeStyle = 'rgba(255,255,255,0.5)';
-        ctx.lineWidth = 2;
-        ctx.strokeRect(15, 15, w-30, h-30);
-        ctx.beginPath(); ctx.moveTo(w/2, 15); ctx.lineTo(w/2, h-15); ctx.stroke();
-        
-        // 球员
-        matchState.myTeam.forEach(p => {
-            ctx.beginPath();
-            ctx.arc(p.x * w, p.y * h, 10, 0, Math.PI*2);
-            ctx.fillStyle = '#00d4ff';
-            ctx.fill();
-            ctx.strokeStyle = '#fff';
-            ctx.lineWidth = 2;
-            ctx.stroke();
-        });
-        
-        matchState.oppTeam.forEach(p => {
-            ctx.beginPath();
-            ctx.arc(p.x * w, p.y * h, 10, 0, Math.PI*2);
-            ctx.fillStyle = '#ff6b6b';
-            ctx.fill();
-            ctx.strokeStyle = '#fff';
-            ctx.lineWidth = 2;
-            ctx.stroke();
-        });
-        
-        // 球
-        ctx.beginPath();
-        ctx.arc(matchState.ball.x * w, matchState.ball.y * h, 6, 0, Math.PI*2);
-        ctx.fillStyle = '#fff';
-        ctx.fill();
-        
-        // 比分
-        ctx.fillStyle = 'rgba(0,0,0,0.8)';
-        ctx.fillRect(w/2-50, 5, 100, 30);
-        ctx.fillStyle = '#fff';
-        ctx.font = 'bold 18px Arial';
-        ctx.textAlign = 'center';
-        ctx.fillText(`${matchState.myScore} - ${matchState.oppScore}`, w/2, 28);
-        
-        // 时间
-        ctx.fillStyle = 'rgba(0,0,0,0.8)';
-        ctx.fillRect(w-45, 5, 40, 22);
-        ctx.fillStyle = '#ff4444';
-        ctx.font = 'bold 14px Arial';
-        ctx.fillText(`${matchState.minute}'`, w-25, 24);
-    }
-    
-    function renderMatch() {
-        if (!canvas || !ctx || !matchState) return;
-        
-        const w = canvas.width / window.devicePixelRatio;
-        const h = canvas.height / window.devicePixelRatio;
-        
-        ctx.fillStyle = '#2d8a2d';
-        ctx.fillRect(0, 0, w, h);
-        
-        ctx.strokeStyle = 'rgba(255,255,255,0.5)';
-        ctx.lineWidth = 2;
-        ctx.strokeRect(15, 15, w-30, h-30);
-        ctx.beginPath(); ctx.moveTo(w/2, 15); ctx.lineTo(w/2, h-15); ctx.stroke();
-        ctx.beginPath(); ctx.arc(w/2, h/2, 30, 0, Math.PI*2); ctx.stroke();
-        
-        // 球员
-        matchState.myTeam.forEach(p => {
-            const x = p.x * w, y = p.y * h;
-            ctx.beginPath(); ctx.arc(x, y, 10, 0, Math.PI*2);
-            ctx.fillStyle = '#00d4ff'; ctx.fill();
-            ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.5; ctx.stroke();
-        });
-        
-        matchState.oppTeam.forEach(p => {
-            const x = p.x * w, y = p.y * h;
-            ctx.beginPath(); ctx.arc(x, y, 10, 0, Math.PI*2);
-            ctx.fillStyle = '#ff6b6b'; ctx.fill();
-            ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.5; ctx.stroke();
-        });
-        
-        // 球
-        const bx = matchState.ball.x * w, by = matchState.ball.y * h;
-        ctx.beginPath(); ctx.arc(bx, by, 5, 0, Math.PI*2);
-        ctx.fillStyle = '#fff'; ctx.fill();
-        ctx.strokeStyle = '#000'; ctx.lineWidth = 1; ctx.stroke();
-        
-        // 比分
-        ctx.fillStyle = 'rgba(0,0,0,0.8)';
-        ctx.fillRect(w/2-50, 5, 100, 25);
-        ctx.fillStyle = '#fff';
-        ctx.font = 'bold 16px Orbitron';
-        ctx.textAlign = 'center';
-        ctx.fillText(`${matchState.myScore} - ${matchState.oppScore}`, w/2, 22);
-        
-        ctx.fillStyle = 'rgba(0,0,0,0.8)';
-        ctx.fillRect(w-40, 5, 35, 20);
-        ctx.fillStyle = '#ff4444';
-        ctx.font = 'bold 12px Orbitron';
-        ctx.fillText(`${matchState.minute}'`, w-22, 18);
-    }
-    
-    // ==================== UI ====================
-    function render() {
-        const myL = game.league[0];
-        const sorted = [...game.league].sort((a, b) => b.pts - a.pts);
-        const myPos = sorted.findIndex(l => l.name === 'FC联') + 1;
-        
-        let main = '';
-        if (currentTab === 'playerDetail') main = renderPlayerDetail();
-        else if (currentTab === 'home') main = renderHome(myL, sorted, myPos);
-        else if (currentTab === 'team') main = renderTeam();
-        else if (currentTab === 'match') main = renderMatchTab();
-        
-        document.getElementById('app').innerHTML = `
-            <header class="sticky top-0 z-20 bg-gradient-to-b from-slate-900 to-slate-900/95 border-b border-cyan-500/30 p-3">
-                <div class="flex justify-between items-center max-w-md mx-auto">
-                    <div>
-                        <h1 class="game-title text-cyan-300 font-bold text-lg">${GAME_NAME}</h1>
-                        <p class="text-amber-400 text-sm font-semibold">${fmt(game.budget)}</p>
-                    </div>
-                    <div class="text-right">
-                        <div class="flex gap-1 justify-end mb-1">
-                            <button onclick="setLang('en')" class="lang-btn ${LANG==='en'?'active':''}">EN</button>
-                            <button onclick="setLang('zh')" class="lang-btn ${LANG==='zh'?'active':''}">中文</button>
-                        </div>
-                        <p class="text-xs text-slate-400">${t('round', game.week)}</p>
-                    </div>
-                </div>
-            </header>
-            <main class="max-w-md mx-auto p-3 pb-24">${main}</main>
-            <nav class="fixed bottom-0 left-0 right-0 bg-gradient-to-t from-slate-900 to-slate-900/95 border-t border-cyan-500/30 p-2 z-30">
-                <div class="max-w-md mx-auto flex justify-around">
-                    ${currentTab !== 'playerDetail' ? ['home','match','team'].map(tab => `
-                        <button onclick="switchTab('${tab}')" class="nav-btn ${currentTab===tab?'active':''}">
-                            <span class="icon">${tab==='home'?'🏠':tab==='match'?'⚽':'👥'}</span>
-                            <span class="text">${t(tab)}</span>
-                        </button>
-                    `).join('') : ''}
-                </div>
-            </nav>
-        `;
-    }
-    
-    function switchTab(tab) { currentTab = tab; selectedPlayer = null; render(); }
-    function setLang(lang) { LANG = lang; render(); }
-    
-    function renderHome(myL, sorted, myPos) {
-        return `
-            <div class="card p-3 mb-3">
-                <div class="grid grid-cols-4 gap-2 text-center">
-                    <div class="bg-slate-800/50 rounded-lg p-2"><div class="text-cyan-300 font-bold text-lg game-title">#${myPos}</div><div class="text-xs text-slate-400">${t('rank')}</div></div>
-                    <div class="bg-slate-800/50 rounded-lg p-2"><div class="text-white font-bold text-lg">${myL.won}-${myL.drawn}-${myL.lost}</div><div class="text-xs text-slate-400">${t('record')}</div></div>
-                    <div class="bg-slate-800/50 rounded-lg p-2"><div class="text-green-400 font-bold text-lg">${myL.gf-myL.ga}</div><div class="text-xs text-slate-400">${t('gd')}</div></div>
-                    <div class="bg-slate-800/50 rounded-lg p-2"><div class="text-amber-400 font-bold text-lg game-title">${myL.pts}</div><div class="text-xs text-slate-400">${t('pts')}</div></div>
-                </div>
-            </div>
-            
-            <div class="card p-3 mb-3">
-                <button onclick="startMatch()" class="btn-game gold w-full text-sm mb-2">⚽ ${t('play')}</button>
-                <button onclick="trainTeam();render()" class="btn-game w-full text-sm">🏋️ ${t('train')}</button>
-            </div>
-            
-            <div class="card p-3">
-                <h3 class="font-bold text-sm mb-2">📊 ${t('standings')}</h3>
-                ${sorted.slice(0,8).map((s,i) => `<div class="standings-row ${s.name==='FC联'?'me':''}"><span class="font-bold">${i+1}</span><span>${s.name}</span><span class="text-center">${s.won}</span><span class="text-right font-bold">${s.pts}</span></div>`).join('')}
-            </div>
-        `;
-    }
-    
-    function renderTeam() {
-        return `<div class="space-y-2">${game.team.slice(0,11).map(p => `
-            <div class="player-card" onclick="showPlayerDetail(${JSON.stringify(p).replace(/"/g, '&quot;')})">
-                <div class="flex justify-between items-center">
-                    <div class="flex items-center gap-2">
-                        <img src="${getPlayerAvatar(p)}" alt="${p.name}" style="width:40px;height:40px;border-radius:50%;background:#667eea;" onerror="this.style.opacity='0'">
-                        <div>
-                            <div class="font-bold text-sm">${p.name}</div>
-                            <div class="text-xs text-slate-400">${p.age}岁 · ${p.position}</div>
-                        </div>
-                    </div>
-                    <div class="text-2xl font-bold game-title text-cyan-300">${p.ovr}</div>
-                </div>
-            </div>
-        `).join('')}</div>`;
-    }
-    
-    function renderPlayerDetail() {
-        const p = selectedPlayer;
-        if (!p) return '';
-        
-        const model3d = generate3DPlayer(p);
-        
-        return `
-            <div class="card p-4 mb-3">
-                <div class="flex items-start gap-4 mb-4">
-                    <img src="${getPlayerAvatar(p)}" alt="${p.name}" style="width:60px;height:60px;border-radius:50%;background:#667eea;" onerror="this.style.opacity='0'">
-                    <div>
-                        <h2 class="text-2xl font-bold game-title text-cyan-300">${p.name}</h2>
-                        <p class="text-sm text-slate-400">${p.position} · ${p.region}</p>
-                        <p class="text-lg font-bold text-amber-400">${p.ovr} OVR</p>
-                    </div>
-                </div>
-                
-                <div class="bg-slate-800/50 rounded-xl p-4 mb-4">
-                    <h3 class="font-bold text-sm mb-3">👤 3D 全身图</h3>
-                    <div class="player-3d">
-                        <div class="player-3d-inner">
-                            <img src="${model3d}" alt="${p.name}" style="width:100%;height:100%;border-radius:12px;">
-                        </div>
-                    </div>
-                    <div class="grid grid-cols-3 gap-2 mt-3 text-center text-xs">
-                        <div class="bg-slate-700/50 p-2 rounded"><div class="text-slate-400">${t('height')}</div><div class="font-bold">${p.height}cm</div></div>
-                        <div class="bg-slate-700/50 p-2 rounded"><div class="text-slate-400">${t('weight')}</div><div class="font-bold">${p.weight}kg</div></div>
-                        <div class="bg-slate-700/50 p-2 rounded"><div class="text-slate-400">BMI</div><div class="font-bold">${(p.weight / Math.pow(p.height/100, 2)).toFixed(1)}</div></div>
-                    </div>
-                </div>
-                
-                <div class="bg-slate-800/50 p-4 rounded-xl mb-4">
-                    <h3 class="font-bold text-sm mb-3">📊 能力</h3>
-                    <div class="space-y-2">
-                        ${[{l:'速度',v:p.pace,c:'#00d4ff'},{l:'射门',v:p.shooting,c:'#ef4444'},{l:'传球',v:p.passing,c:'#fbbf24'},{l:'防守',v:p.defending,c:'#22c55e'},{l:'体格',v:p.physical,c:'#8b5cf6'}].map(s => `
-                            <div class="flex items-center gap-2">
-                                <span class="text-xs text-slate-400 w-12">${s.l}</span>
-                                <div class="flex-1 stat-bar"><div class="stat-fill" style="width:${s.v}%;background:${s.c}"></div></div>
-                                <span class="text-sm font-bold w-8 text-right">${s.v}</span>
-                            </div>
-                        `).join('')}
-                    </div>
-                </div>
-                
-                <button onclick="currentTab='team';selectedPlayer=null;render()" class="btn-game purple w-full">${t('back')}</button>
-            </div>
-        `;
-    }
-    
-    function renderMatchTab() {
-        if (matchState && matchState.started) {
-            const recentEvents = matchState.events.slice(-5).reverse();
-            return `
-                <div class="card p-3 mb-3">
-                    <div class="flex justify-between items-center">
-                        <div class="text-center"><div class="text-xs text-slate-400">FC联</div><div class="text-4xl font-bold game-title text-cyan-300">${matchState.myScore}</div></div>
-                        <div class="text-center"><div class="text-xs text-red-400 font-bold ${matchState.finished?'':'animate-pulse'}">${matchState.finished?'终场':t('live')}</div><div class="text-2xl font-bold game-title">${matchState.minute}'</div></div>
-                        <div class="text-center"><div class="text-xs text-slate-400">${matchState.oppName}</div><div class="text-4xl font-bold game-title text-red-400">${matchState.oppScore}</div></div>
-                    </div>
-                </div>
-                <div class="card p-2 mb-3" style="background:#1a5d1a;border-radius:12px;">
-                    <canvas id="matchCanvas" width="350" height="200" style="width:100%;height:auto;border-radius:8px;"></canvas>
-                </div>
-                ${recentEvents.length > 0 ? `
-                    <div class="card p-3 mb-3">
-                        <h4 class="font-bold text-sm mb-2">⚽ 比赛事件</h4>
-                        <div class="space-y-1 text-sm">
-                            ${recentEvents.map(e => `
-                                <div class="flex items-center gap-2 ${e.team==='my'?'text-cyan-300':'text-red-400'}">
-                                    <span class="font-bold">${e.minute}'</span>
-                                    <span>⚽</span>
-                                    <span>${e.player}</span>
-                                    <span class="text-xs text-slate-500">${e.team==='my'?'FC联':matchState.oppName}</span>
-                                </div>
-                            `).join('')}
-                        </div>
-                    </div>
-                ` : ''}
-                ${matchState.finished ? `
-                    <div class="card p-4 mb-3 text-center">
-                        <h3 class="font-bold text-xl mb-2 ${matchState.myScore > matchState.oppScore ? 'text-green-400' : matchState.myScore < matchState.oppScore ? 'text-red-400' : 'text-amber-400'}">
-                            ${matchState.myScore > matchState.oppScore ? '🏆 胜利!' : matchState.myScore < matchState.oppScore ? '😢 失利' : '🤝 平局'}
-                        </h3>
-                        <p class="text-sm text-slate-400">比赛结束，${matchState.myScore} - ${matchState.oppScore}</p>
-                    </div>
-                    <div class="text-center"><button onclick="currentTab='home';matchState=null;render()" class="btn-game gold">${t('back')}</button></div>
-                ` : ''}
-            `;
-        }
-        
-        return `
-            <div class="card p-4 mb-3 text-center">
-                <h3 class="font-bold text-lg mb-4">⚽ 下一场比赛</h3>
-                <div class="flex items-center justify-center gap-4">
-                    <div><div class="text-2xl mb-1">🔵</div><div class="font-bold">FC联</div></div>
-                    <div class="text-3xl font-bold game-title text-slate-500">${t('vs')}</div>
-                    <div><div class="text-2xl mb-1">🔴</div><div class="font-bold">${game.league[rand(1,game.league.length-1)].name}</div></div>
-                </div>
-            </div>
-            <button onclick="startMatch()" class="btn-game gold w-full text-lg py-4">⚽ ${t('play')}</button>
-        `;
-    }
-    
-    function showPlayerDetail(player) {
-        selectedPlayer = player;
-        currentTab = 'playerDetail';
-        render();
-    }
-    
-    function trainTeam() {
-        game.team.forEach(p => {
-            if (p.age < 29 && p.ovr < p.potential) {
-                p.ovr = Math.min(p.potential, p.ovr + rand(0, 2));
-            }
-            p.fitness = Math.min(100, p.fitness + rand(8, 18));
-        });
-        save();
-    }
-    
-    // ==================== Boot ====================
-    initGame();
     render();
-    </script>
+    lastT = performance.now();
+    rafId = requestAnimationFrame(matchLoop);
+  }, 150);
+}
+
+function matchLoop(ts) {
+  if(!MS||!MS.started||MS.finished){rafId=null;return}
+  const dt = Math.min((ts-lastT)/1000, .05);
+  lastT = ts;
+  updateMatch(dt, ts);
+  drawMatch();
+  rafId = requestAnimationFrame(matchLoop);
+}
+
+function updateMatch(dt, ts) {
+  // Time: 1 real second = 1 game minute
+  MS.sec += dt;
+  if(MS.sec >= 1) {
+    MS.sec = 0;
+    MS.min++;
+    if(MS.min===45&&!MS.htDone){MS.htDone=true;addEvt('⏱️ 半场!','info')}
+    if(MS.min>=90&&!MS.finished){endMatch();return}
+  }
+
+  // Ball physics
+  const ball = MS.ball;
+  if(ball.flying){
+    const dx=ball.tx-ball.x, dy=ball.ty-ball.y, d=Math.hypot(dx,dy);
+    if(d>.015){
+      ball.x+=dx/d*.55*dt; ball.y+=dy/d*.55*dt;
+      const prog=1-d/Math.max(.001,Math.hypot(ball.tx-ball.sx,ball.ty-ball.sy));
+      ball.z=Math.sin(prog*Math.PI)*.12;
+    } else {
+      ball.x=ball.tx; ball.y=ball.ty; ball.z=0; ball.flying=false;
+      // Check interception
+      const all=[...MS.myTeam,...MS.oppTeam];
+      const near=all.filter(p=>Math.hypot(p.x-ball.x,p.y-ball.y)<.12);
+      if(near.length>0){
+        ball.owner=near[rand(0,near.length-1)];
+        MS.poss=MS.myTeam.includes(ball.owner)?'my':'opp';
+      }
+    }
+  } else if(ball.owner){
+    ball.x+=(ball.owner.x-ball.x)*6*dt;
+    ball.y+=(ball.owner.y-ball.y)*6*dt;
+  } else {
+    ball.x+=ball.vx*dt; ball.y+=ball.vy*dt;
+    ball.vx*=.93; ball.vy*=.93;
+    if(ball.x<.02){ball.x=.02;ball.vx*=-.5}
+    if(ball.x>.98){ball.x=.98;ball.vx*=-.5}
+    if(ball.y<.02){ball.y=.02;ball.vy*=-.5}
+    if(ball.y>.98){ball.y=.98;ball.vy*=-.5}
+  }
+
+  // Player AI
+  const myAtk = MS.poss==='my';
+  [...MS.myTeam,...MS.oppTeam].forEach((p,i)=>{
+    const isMy = i<11;
+    const atk = isMy===myAtk;
+    let tx=p.hx, ty=p.hy;
+    if(atk){
+      if(ball.owner&&(isMy?MS.myTeam:MS.oppTeam).includes(ball.owner)){
+        if(ball.owner.id===p.id){tx=p.hx+(isMy?.1:-.1);ty=p.hy}
+        else{tx=p.hx+(isMy?.08:-.08)+(Math.random()-.5)*.1;ty=p.hy+(Math.random()-.5)*.15}
+      } else {
+        tx=ball.x*(isMy?.6:.4)+p.hx*(isMy?.4:.6);
+        ty=ball.y*.5+p.hy*.5;
+      }
+    } else {
+      const d=Math.hypot(ball.x-p.x,ball.y-p.y);
+      if(d<.25){tx=ball.x+(isMy?-.04:.04);ty=ball.y}
+      else{tx=p.hx+(isMy?-.03:.03);ty=p.hy}
+    }
+    const dx=tx-p.x, dy=ty-p.y, d=Math.hypot(dx,dy);
+    if(d>.008){const spd=Math.min(d*4,p.spd);p.x+=dx/d*spd*dt;p.y+=dy/d*spd*dt}
+    if(isMy){p.x=Math.max(.04,Math.min(.62,p.x))}else{p.x=Math.max(.38,Math.min(.96,p.x))}
+    p.y=Math.max(.02,Math.min(.98,p.y));
+  });
+
+  // Events
+  if(ts-MS.lastEvt>2500&&Math.random()<.18){genEvt();MS.lastEvt=ts}
+}
+
+function genEvt(){
+  if(!MS)return;
+  const myAtk=MS.poss==='my';
+  const atk=myAtk?MS.myTeam:MS.oppTeam;
+  const def=myAtk?MS.oppTeam:MS.myTeam;
+  const r=rand(1,100);
+  const ball=MS.ball;
+
+  if(r<=22){
+    // Shot
+    const shooters=atk.filter(p=>['ST','LW','RW','CAM'].includes(p.position));
+    const shooter=shooters[rand(0,shooters.length-1)]||atk[rand(0,4)];
+    const gk=def[0];
+    MS.shots[myAtk?'my':'opp']++;
+    const sq=(shooter.shooting+shooter.pace)/2;
+    const sv=gk.defending+30;
+    ball.sx=ball.x; ball.sy=ball.y;
+    ball.tx=myAtk?.88:.12; ball.ty=.25+Math.random()*.5;
+    ball.flying=true; ball.owner=shooter;
+    setTimeout(()=>{
+      if(!MS)return;
+      if(sq>sv+14){
+        if(myAtk){MS.myScore++;shooter.goals++}else MS.oppScore++;
+        addEvt(`⚽ ${shooter.name.split(' ').pop()} 进球! ${MS.myScore}-${MS.oppScore}`,'goal');
+      } else if(sq>sv-8){addEvt(`🧤 扑出!`,'shot')}
+      else{addEvt(`❌ 射偏!`,'shot')}
+    },700);
+  } else if(r<=45){
+    // Pass
+    const passer=ball.owner||atk[0];
+    const recv=atk.filter(p=>p.id!==passer?.id);
+    const r2=recv[rand(0,Math.min(recv.length-1,5))];
+    if(r2){
+      ball.sx=ball.x; ball.sy=ball.y;
+      ball.tx=r2.x+(Math.random()-.5)*.04; ball.ty=r2.y+(Math.random()-.5)*.04;
+      ball.flying=true; ball.owner=r2;
+      addEvt(`👟 ${passer?.name.split(' ').pop()||'?'} → ${r2.name.split(' ').pop()}`,'pass');
+    }
+  } else if(r<=58){
+    // Intercept
+    const inter=def[rand(0,5)];
+    if(inter){ball.owner=inter;MS.poss=myAtk?'opp':'my';addEvt(`🔄 抢断!`,'pass')}
+  } else if(r<=65){
+    // Foul
+    const fouler=atk[rand(0,4)];
+    if(fouler){ball.owner=null;ball.vx=(Math.random()-.5)*.3;ball.vy=(Math.random()-.5)*.3;addEvt(`⚠️ ${fouler.name.split(' ').pop()} 犯规!`,'foul')}
+  }
+}
+
+function addEvt(txt,type){
+  if(!MS)return;
+  MS.events.unshift({txt,type,min:`${MS.min}'`});
+  if(MS.events.length>15)MS.events.pop();
+  const el=document.getElementById('evts');
+  if(el)el.innerHTML=evtHTML();
+}
+
+function evtHTML(){
+  if(!MS)return'';
+  const colors={goal:'#22c55e',shot:'#f59e0b',foul:'#ef4444',pass:'#3b82f6',info:'#94a3b8'};
+  return MS.events.map(e=>`<div style="padding:6px 8px;border-radius:6px;font-size:11px;border-left:3px solid ${colors[e.type]||'#94a3b8'};background:${colors[e.type]||'#94a3b8'}18;margin-bottom:4px"><span style="color:#94a3b8;margin-right:6px">${e.min}</span>${e.txt}</div>`).join('');
+}
+
+function endMatch(){
+  if(!MS||MS.finished)return;
+  MS.finished=true;
+  if(rafId){cancelAnimationFrame(rafId);rafId=null}
+  addEvt(`🏁 全场结束 ${MS.myScore}-${MS.oppScore}`,'info');
+  const myL=G.league.find(l=>l.name==='FC United');
+  const oppL=G.league.find(l=>l.name===MS.oppName);
+  myL.played++;oppL.played++;
+  myL.gf+=MS.myScore;myL.ga+=MS.oppScore;
+  oppL.gf+=MS.oppScore;oppL.ga+=MS.myScore;
+  if(MS.myScore>MS.oppScore){myL.won++;myL.pts+=3;oppL.lost++}
+  else if(MS.myScore===MS.oppScore){myL.drawn++;myL.pts++;oppL.drawn++;oppL.pts++}
+  else{myL.lost++;oppL.won++;oppL.pts+=3}
+  G.budget+=120000*G.facilities.stadium;
+  G.team.slice(0,11).forEach(p=>{p.matches++;p.fitness=Math.max(45,p.fitness-rand(10,20));p.morale=Math.min(100,p.morale+(MS.myScore>MS.oppScore?6:-4));if(Math.random()<.12)p.assists++});
+  G.week++;
+  const res=MS.myScore>MS.oppScore?t('win'):MS.myScore===MS.oppScore?t('draw'):t('lose');
+  addNews(`${res} FC联 ${MS.myScore}-${MS.oppScore} vs ${MS.oppName}`);
+  if(G.week>38){G.season++;G.week=1;G.league.sort((a,b)=>b.pts-a.pts);const pos=G.league.findIndex(l=>l.name==='FC United')+1;addNews(`🏆 第${G.season-1}赛季结束! 排名#${pos}`);G.league.forEach(l=>{if(l.name!=='FC United')l.strength=Math.max(35,Math.min(95,l.strength+rand(-6,6)));l.played=l.won=l.drawn=l.lost=l.gf=l.ga=l.pts=0});G.budget+=2500000}
+  save();
+  render();
+}
+
+function drawMatch(){
+  cvs=document.getElementById('mc');
+  if(!cvs||!MS)return;
+  if(!ctx||ctx.canvas!==cvs){
+    ctx=cvs.getContext('2d');
+    const r=cvs.getBoundingClientRect();
+    cvs.width=r.width*devicePixelRatio;
+    cvs.height=r.height*devicePixelRatio;
+    ctx.scale(devicePixelRatio,devicePixelRatio);
+  }
+  const W=cvs.width/devicePixelRatio, H=cvs.height/devicePixelRatio;
+
+  // Field
+  ctx.fillStyle='#2d8a2d';ctx.fillRect(0,0,W,H);
+  for(let i=0;i<H;i+=20){ctx.fillStyle=i%40===0?'rgba(0,0,0,.04)':'rgba(255,255,255,.02)';ctx.fillRect(0,i,W,10)}
+
+  // Lines
+  ctx.strokeStyle='rgba(255,255,255,.5)';ctx.lineWidth=1.5;
+  ctx.strokeRect(12,10,W-24,H-20);
+  ctx.beginPath();ctx.moveTo(W/2,10);ctx.lineTo(W/2,H-10);ctx.stroke();
+  ctx.beginPath();ctx.arc(W/2,H/2,28,0,Math.PI*2);ctx.stroke();
+  ctx.strokeRect(12,H/4,32,H/2);ctx.strokeRect(W-44,H/4,32,H/2);
+  ctx.beginPath();ctx.arc(W/2,H/2,3,0,Math.PI*2);ctx.fillStyle='rgba(255,255,255,.5)';ctx.fill();
+
+  // Players
+  const drawP=(p,color)=>{
+    const x=p.x*W, y=p.y*H;
+    ctx.beginPath();ctx.ellipse(x,y+11,9,3,0,0,Math.PI*2);ctx.fillStyle='rgba(0,0,0,.25)';ctx.fill();
+    ctx.beginPath();ctx.arc(x,y,11,0,Math.PI*2);
+    ctx.fillStyle=color;ctx.fill();
+    ctx.strokeStyle='rgba(255,255,255,.9)';ctx.lineWidth=1.5;ctx.stroke();
+    ctx.fillStyle='#fff';ctx.font='bold 6.5px Arial';ctx.textAlign='center';ctx.textBaseline='middle';
+    ctx.fillText(p.name.split(' ').pop().substring(0,4),x,y);
+  };
+  MS.myTeam.forEach(p=>drawP(p,'#0ea5e9'));
+  MS.oppTeam.forEach(p=>drawP(p,'#ef4444'));
+
+  // Ball
+  const ball=MS.ball;
+  const bx=ball.x*W, by=ball.y*H-ball.z*H*.15;
+  ctx.beginPath();ctx.ellipse(bx,ball.y*H+5,5,2,0,0,Math.PI*2);ctx.fillStyle='rgba(0,0,0,.3)';ctx.fill();
+  ctx.beginPath();ctx.arc(bx,by,6,0,Math.PI*2);ctx.fillStyle='#fff';ctx.fill();
+  ctx.strokeStyle='#333';ctx.lineWidth=1;ctx.stroke();
+
+  // Score overlay
+  ctx.fillStyle='rgba(0,0,0,.75)';
+  roundRect(ctx,W/2-45,4,90,26,6);ctx.fill();
+  ctx.fillStyle='#fff';ctx.font='bold 16px Orbitron,Arial';ctx.textAlign='center';
+  ctx.fillText(`${MS.myScore} - ${MS.oppScore}`,W/2,21);
+  ctx.fillStyle='rgba(0,0,0,.75)';
+  roundRect(ctx,W-42,4,38,20,4);ctx.fill();
+  ctx.fillStyle=MS.min>=45?'#fbbf24':'#f87171';ctx.font='bold 12px Orbitron,Arial';
+  ctx.fillText(`${MS.min}'`,W-23,18);
+}
+
+function roundRect(ctx,x,y,w,h,r){ctx.beginPath();ctx.moveTo(x+r,y);ctx.lineTo(x+w-r,y);ctx.quadraticCurveTo(x+w,y,x+w,y+r);ctx.lineTo(x+w,y+h-r);ctx.quadraticCurveTo(x+w,y+h,x+w-r,y+h);ctx.lineTo(x+r,y+h);ctx.quadraticCurveTo(x,y+h,x,y+h-r);ctx.lineTo(x,y+r);ctx.quadraticCurveTo(x,y,x+r,y);ctx.closePath()}
+
+// ---- Render ----
+function render(){
+  const myL=G.league.find(l=>l.name==='FC United')||{won:0,drawn:0,lost:0,gf:0,ga:0,pts:0};
+  const sorted=[...G.league].sort((a,b)=>b.pts-a.pts);
+  const myPos=sorted.findIndex(l=>l.name==='FC United')+1;
+  let main='';
+  if(tab==='playerDetail')main=renderDetail();
+  else if(tab==='home')main=renderHome(myL,sorted,myPos);
+  else if(tab==='team')main=renderTeam();
+  else if(tab==='tactics')main=renderTactics();
+  else if(tab==='facility')main=renderFacility();
+  else if(tab==='match')main=renderMatch();
+
+  document.getElementById('app').innerHTML=`
+    <header style="position:sticky;top:0;z-index:20;background:linear-gradient(to bottom,#0f172a,rgba(15,23,42,.95));border-bottom:1px solid rgba(0,212,255,.3);padding:12px 16px">
+      <div style="max-width:480px;margin:0 auto;display:flex;justify-content:space-between;align-items:center">
+        <div>
+          <div class="gt" style="color:#00d4ff;font-weight:900;font-size:18px;letter-spacing:2px">UFO ⚽</div>
+          <div style="color:#fbbf24;font-size:13px;font-weight:600">${fmt(G.budget)}</div>
+        </div>
+        <div style="text-align:right">
+          <div style="display:flex;gap:4px;justify-content:flex-end;margin-bottom:4px">
+            <button onclick="LANG='zh';render()" style="padding:4px 10px;border-radius:20px;font-size:11px;font-weight:600;border:1px solid rgba(255,255,255,.3);background:${LANG==='zh'?'#00d4ff':'rgba(255,255,255,.1)'};color:${LANG==='zh'?'#000':'#fff'};cursor:pointer">中文</button>
+            <button onclick="LANG='en';render()" style="padding:4px 10px;border-radius:20px;font-size:11px;font-weight:600;border:1px solid rgba(255,255,255,.3);background:${LANG==='en'?'#00d4ff':'rgba(255,255,255,.1)'};color:${LANG==='en'?'#000':'#fff'};cursor:pointer">EN</button>
+          </div>
+          <div style="font-size:11px;color:#94a3b8">第${G.week}轮 · 赛季${G.season}</div>
+        </div>
+      </div>
+    </header>
+    <main style="max-width:480px;margin:0 auto;padding:12px 12px 100px">${main}</main>
+    <nav style="position:fixed;bottom:0;left:0;right:0;background:linear-gradient(to top,#0f172a,rgba(15,23,42,.95));border-top:1px solid rgba(0,212,255,.3);padding:8px;z-index:30">
+      <div style="max-width:480px;margin:0 auto;display:flex;justify-content:space-around">
+        ${tab!=='playerDetail'?['home','match','team','tactics','facility'].map(tb=>`
+          <button onclick="tab='${tb}';selPlayer=null;render()" class="nav-btn ${tab===tb?'on':''}">
+            <span style="font-size:18px">${tb==='home'?'🏠':tb==='match'?'⚽':tb==='team'?'👥':tb==='tactics'?'⚙️':'🏟️'}</span>
+            <span style="font-size:9px;margin-top:2px">${t(tb)}</span>
+          </button>`).join(''):''}
+      </div>
+    </nav>
+    ${toast?`<div class="toast">${toast}</div>`:''}
+  `;
+  if(toast)setTimeout(()=>{toast=null;render()},2000);
+}
+
+function showToast(msg){toast=msg;render()}
+
+function renderHome(myL,sorted,myPos){
+  return `
+    <div class="card" style="padding:12px;margin-bottom:12px">
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;text-align:center">
+        <div style="background:rgba(30,41,59,.6);border-radius:10px;padding:8px"><div class="gt" style="color:#00d4ff;font-weight:700;font-size:20px">#${myPos}</div><div style="font-size:10px;color:#94a3b8">${t('rank')}</div></div>
+        <div style="background:rgba(30,41,59,.6);border-radius:10px;padding:8px"><div style="font-weight:700;font-size:16px">${myL.won}-${myL.drawn}-${myL.lost}</div><div style="font-size:10px;color:#94a3b8">${t('record')}</div></div>
+        <div style="background:rgba(30,41,59,.6);border-radius:10px;padding:8px"><div style="font-weight:700;font-size:20px;color:${myL.gf-myL.ga>=0?'#22c55e':'#ef4444'}">${myL.gf-myL.ga>0?'+':''}${myL.gf-myL.ga}</div><div style="font-size:10px;color:#94a3b8">${t('gd')}</div></div>
+        <div style="background:rgba(30,41,59,.6);border-radius:10px;padding:8px"><div class="gt" style="color:#fbbf24;font-weight:700;font-size:20px">${myL.pts}</div><div style="font-size:10px;color:#94a3b8">${t('pts')}</div></div>
+      </div>
+    </div>
+    <div class="card" style="padding:12px;margin-bottom:12px">
+      <button onclick="startMatch()" class="btn btn-g" style="width:100%;margin-bottom:8px;font-size:15px;padding:14px">⚽ ${t('play')}</button>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <button onclick="trainTeam();render()" class="btn btn-c">🏋️ ${t('train')}</button>
+        <button onclick="refreshMarket();scoutAcademy();render()" class="btn btn-p">🔄 ${t('refresh')}</button>
+      </div>
+    </div>
+    ${G.news.length?`<div class="card" style="padding:12px;margin-bottom:12px"><div style="font-weight:700;font-size:13px;margin-bottom:8px">📰 ${t('news')}</div>${G.news.slice(0,5).map(n=>`<div style="font-size:11px;background:rgba(30,41,59,.6);padding:8px;border-radius:8px;margin-bottom:4px">${n.txt}</div>`).join('')}</div>`:''}
+    ${G.prospects.length?`<div class="card" style="padding:12px;margin-bottom:12px"><div style="font-weight:700;font-size:13px;margin-bottom:8px">🌟 ${t('academy')} (${G.prospects.length})</div>${G.prospects.map(p=>pCardHTML(p,true,false)).join('')}</div>`:''}
+    <div class="card" style="padding:12px;margin-bottom:12px">
+      <div style="font-weight:700;font-size:13px;margin-bottom:8px">💰 ${t('market')}</div>
+      ${G.market.map(p=>pCardHTML(p,false,true)).join('')}
+    </div>
+    <div class="card" style="padding:12px">
+      <div style="font-weight:700;font-size:13px;margin-bottom:8px">📊 ${t('standings')}</div>
+      ${sorted.slice(0,10).map((s,i)=>{
+        const isMe=s.name==='FC United';
+        return `<div style="display:grid;grid-template-columns:28px 1fr 36px 44px;padding:7px 10px;border-radius:8px;margin-bottom:3px;font-size:12px;align-items:center;${isMe?'background:linear-gradient(90deg,rgba(0,212,255,.25),transparent);border:1px solid rgba(0,212,255,.4)':''}">
+          <span style="font-weight:700;color:${i<3?'#22c55e':'#94a3b8'}">${i+1}</span>
+          <span style="font-weight:${isMe?700:400};color:${isMe?'#00d4ff':'#e2e8f0'}">${getLN(s.index)}</span>
+          <span style="text-align:center">${s.won}</span>
+          <span style="text-align:right;font-weight:700;color:#fbbf24">${s.pts}</span>
+        </div>`;
+      }).join('')}
+    </div>
+  `;
+}
+
+function pCardHTML(p,showSign,showPrice){
+  const av=getAvatar(p);
+  return `<div class="pcard" onclick="selPlayer=${JSON.stringify(p).replace(/"/g,'&quot;')};tab='playerDetail';render()" style="margin-bottom:8px">
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <div style="display:flex;align-items:center;gap:10px">
+        <img src="${av}" style="width:44px;height:44px;border-radius:50%;object-fit:cover;border:2px solid rgba(0,212,255,.4)" onerror="this.src='https://ui-avatars.com/api/?name=${encodeURIComponent(p.name)}&background=1e293b&color=00d4ff&size=44'">
+        <div>
+          <div style="font-weight:700;font-size:13px">${p.name}</div>
+          <div style="font-size:11px;color:#94a3b8">${p.age}岁 · ${p.position} · ${p.region}</div>
+        </div>
+      </div>
+      <div style="text-align:right">
+        <div class="gt" style="font-size:24px;font-weight:700;color:${p.ovr>=75?'#00d4ff':p.ovr>=65?'#22c55e':'#94a3b8'}">${p.ovr}</div>
+        ${showPrice?`<div style="font-size:11px;color:#fbbf24">${fmt(p.askPrice)}</div>`:''}
+      </div>
+    </div>
+    ${showSign?`<div style="display:flex;gap:6px;margin-top:8px">
+      <button onclick="event.stopPropagation();signP('${p.id}')" class="btn btn-gr" style="flex:1;font-size:11px;padding:7px">✅ ${t('sign')}</button>
+      <button onclick="event.stopPropagation();rejectP('${p.id}')" class="btn btn-r" style="flex:1;font-size:11px;padding:7px">❌ ${t('reject')}</button>
+    </div>`:''}
+  </div>`;
+}
+
+function renderDetail(){
+  const p = typeof selPlayer==='string'?JSON.parse(selPlayer):selPlayer;
+  if(!p)return'';
+  const av=getAvatar(p);
+  const body=getPlayerBody(p);
+  const stats=[{l:t('pace'),v:p.pace,c:'#00d4ff'},{l:t('shooting'),v:p.shooting,c:'#ef4444'},{l:t('passing'),v:p.passing,c:'#fbbf24'},{l:t('defending'),v:p.defending,c:'#22c55e'},{l:t('physical'),v:p.physical,c:'#8b5cf6'}];
+  const bmi=(p.weight/Math.pow(p.height/100,2)).toFixed(1);
+  return `
+    <div class="card" style="padding:16px;margin-bottom:12px">
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px">
+        <img src="${av}" style="width:72px;height:72px;border-radius:50%;object-fit:cover;border:3px solid #00d4ff;box-shadow:0 0 20px rgba(0,212,255,.4)" onerror="this.src='https://ui-avatars.com/api/?name=${encodeURIComponent(p.name)}&background=1e293b&color=00d4ff&size=72'">
+        <div>
+          <div class="gt" style="font-size:20px;font-weight:700;color:#00d4ff">${p.name}</div>
+          <div style="font-size:12px;color:#94a3b8">${p.position} · ${p.region}</div>
+          <div style="font-size:16px;font-weight:700;color:#fbbf24;margin-top:4px">${p.ovr} OVR ${p.potential>p.ovr?`<span style="color:#22c55e;font-size:12px">(↑${p.potential-p.ovr})</span>`:''}</div>
+        </div>
+      </div>
+
+      <!-- 3D 全身图 -->
+      <div style="background:rgba(15,23,42,.8);border-radius:12px;padding:16px;margin-bottom:12px;text-align:center">
+        <div style="font-size:12px;font-weight:700;color:#94a3b8;margin-bottom:12px">🏃 全身 3D 模型</div>
+        <div style="perspective:600px;display:inline-block">
+          <div class="spin3d" style="display:inline-block">
+            ${body}
+          </div>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:12px">
+          <div style="background:rgba(30,41,59,.6);border-radius:8px;padding:8px;text-align:center">
+            <div style="font-size:10px;color:#94a3b8">${t('height')}</div>
+            <div style="font-size:18px;font-weight:700">${p.height}cm</div>
+          </div>
+          <div style="background:rgba(30,41,59,.6);border-radius:8px;padding:8px;text-align:center">
+            <div style="font-size:10px;color:#94a3b8">${t('weight')}</div>
+            <div style="font-size:18px;font-weight:700">${p.weight}kg</div>
+          </div>
+          <div style="background:rgba(30,41,59,.6);border-radius:8px;padding:8px;text-align:center">
+            <div style="font-size:10px;color:#94a3b8">${t('bmi')}</div>
+            <div style="font-size:18px;font-weight:700;color:${bmi<18.5?'#60a5fa':bmi<25?'#22c55e':bmi<30?'#fbbf24':'#ef4444'}">${bmi}</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 能力值 -->
+      <div style="background:rgba(15,23,42,.8);border-radius:12px;padding:12px;margin-bottom:12px">
+        <div style="font-size:12px;font-weight:700;color:#94a3b8;margin-bottom:10px">📊 ${t('abilities')}</div>
+        ${stats.map(s=>`<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+          <span style="font-size:11px;color:#94a3b8;width:36px">${s.l}</span>
+          <div class="sbar" style="flex:1"><div class="sfill" style="width:${s.v}%;background:${s.c}"></div></div>
+          <span style="font-size:13px;font-weight:700;width:28px;text-align:right">${s.v}</span>
+        </div>`).join('')}
+      </div>
+
+      <!-- 统计 -->
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:12px">
+        <div style="background:rgba(34,197,94,.15);border-radius:8px;padding:8px;text-align:center"><div style="font-size:22px;font-weight:700;color:#22c55e">${p.goals}</div><div style="font-size:10px;color:#94a3b8">${t('goals')}</div></div>
+        <div style="background:rgba(0,212,255,.15);border-radius:8px;padding:8px;text-align:center"><div style="font-size:22px;font-weight:700;color:#00d4ff">${p.assists}</div><div style="font-size:10px;color:#94a3b8">${t('assists')}</div></div>
+        <div style="background:rgba(251,191,36,.15);border-radius:8px;padding:8px;text-align:center"><div style="font-size:22px;font-weight:700;color:#fbbf24">${p.matches}</div><div style="font-size:10px;color:#94a3b8">${t('matches')}</div></div>
+        <div style="background:rgba(139,92,246,.15);border-radius:8px;padding:8px;text-align:center"><div style="font-size:22px;font-weight:700;color:#8b5cf6">${p.age}</div><div style="font-size:10px;color:#94a3b8">${t('age')}</div></div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px">
+        <div style="background:rgba(30,41,59,.6);border-radius:8px;padding:10px"><div style="font-size:10px;color:#94a3b8">${t('value')}</div><div style="font-size:14px;font-weight:700;color:#22c55e">${fmt(p.value)}</div></div>
+        <div style="background:rgba(30,41,59,.6);border-radius:8px;padding:10px"><div style="font-size:10px;color:#94a3b8">${t('wage')}</div><div style="font-size:14px;font-weight:700;color:#fbbf24">${fmt(p.wage)}/w</div></div>
+      </div>
+
+      <button onclick="tab='home';selPlayer=null;render()" class="btn btn-p" style="width:100%">← ${t('back')}</button>
+    </div>
+  `;
+}
+
+function renderTeam(){
+  const sorted=[...G.team].sort((a,b)=>b.ovr-a.ovr);
+  const filters=[['all','全部'],['GK','门将'],['DEF','后卫'],['MID','中场'],['ATT','前锋']];
+  const filtered=sorted.filter(p=>filterPos==='all'||(filterPos==='GK'&&p.position==='GK')||(filterPos==='DEF'&&['CB','LB','RB'].includes(p.position))||(filterPos==='MID'&&['CDM','CM','CAM','LW','RW'].includes(p.position))||(filterPos==='ATT'&&p.position==='ST'));
+  return `
+    <div style="display:flex;gap:6px;overflow-x:auto;padding-bottom:8px;margin-bottom:12px">
+      ${filters.map(([k,l])=>`<button onclick="filterPos='${k}';render()" class="btn ${filterPos===k?'btn-g':'btn-p'}" style="white-space:nowrap;font-size:11px;padding:7px 12px">${l}</button>`).join('')}
+    </div>
+    ${filtered.map(p=>{
+      const av=getAvatar(p);
+      return `<div class="pcard" onclick="selPlayer=${JSON.stringify(p).replace(/"/g,'&quot;')};tab='playerDetail';render()" style="margin-bottom:8px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+          <div style="display:flex;align-items:center;gap:10px">
+            <img src="${av}" style="width:52px;height:52px;border-radius:50%;object-fit:cover;border:2px solid rgba(0,212,255,.4)" onerror="this.src='https://ui-avatars.com/api/?name=${encodeURIComponent(p.name)}&background=1e293b&color=00d4ff&size=52'">
+            <div>
+              <div style="font-weight:700">${p.name}</div>
+              <div style="font-size:11px;color:#94a3b8">${p.age}岁 · ${p.region}</div>
+            </div>
+          </div>
+          <div class="gt" style="font-size:28px;font-weight:700;color:${p.ovr>=75?'#00d4ff':p.ovr>=65?'#22c55e':'#94a3b8'}">${p.ovr}</div>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:4px;text-align:center;margin-bottom:8px">
+          ${[['速',p.pace,'#00d4ff'],['射',p.shooting,'#ef4444'],['传',p.passing,'#fbbf24'],['防',p.defending,'#22c55e'],['体',p.physical,'#8b5cf6']].map(([l,v,c])=>`<div style="background:rgba(30,41,59,.6);border-radius:6px;padding:4px"><div style="font-size:9px;color:#94a3b8">${l}</div><div style="font-size:13px;font-weight:700;color:${c}">${v}</div></div>`).join('')}
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
+          <div style="background:rgba(30,41,59,.4);border-radius:6px;padding:4px"><div style="font-size:9px;color:#94a3b8">⚡体能</div><div class="sbar" style="margin-top:3px"><div class="sfill" style="width:${p.fitness}%;background:${p.fitness>=70?'#22c55e':p.fitness>=40?'#fbbf24':'#ef4444'}"></div></div></div>
+          <div style="background:rgba(30,41,59,.4);border-radius:6px;padding:4px"><div style="font-size:9px;color:#94a3b8">😊士气</div><div class="sbar" style="margin-top:3px"><div class="sfill" style="width:${p.morale}%;background:${p.morale>=70?'#22c55e':p.morale>=40?'#fbbf24':'#ef4444'}"></div></div></div>
+        </div>
+      </div>`;
+    }).join('')}
+  `;
+}
+
+function renderTactics(){
+  const fms=['4-4-2','4-3-3','4-2-3-1','3-5-2'];
+  const tcs=['attack','balance','defend'];
+  return `
+    <div class="card" style="padding:12px;margin-bottom:12px">
+      <div style="font-weight:700;font-size:13px;margin-bottom:10px">⚙️ ${t('formation')}</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        ${fms.map(f=>`<button onclick="G.formation='${f}';save();render()" style="padding:12px;border-radius:10px;text-align:center;border:2px solid ${G.formation===f?'#00d4ff':'rgba(100,116,139,.4)'};background:${G.formation===f?'rgba(0,212,255,.15)':'rgba(30,41,59,.6)'};cursor:pointer;color:#fff"><div class="gt" style="font-size:18px;font-weight:700">${f}</div></button>`).join('')}
+      </div>
+    </div>
+    <div class="card" style="padding:12px;margin-bottom:12px">
+      <div style="font-weight:700;font-size:13px;margin-bottom:10px">🎯 ${t('style')}</div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">
+        ${tcs.map(k=>`<button onclick="G.tactic='${k}';save();render()" style="padding:12px;border-radius:10px;text-align:center;border:2px solid ${G.tactic===k?'#00d4ff':'rgba(100,116,139,.4)'};background:${G.tactic===k?'rgba(0,212,255,.15)':'rgba(30,41,59,.6)'};cursor:pointer;color:#fff"><div style="font-size:22px;margin-bottom:4px">${k==='attack'?'⚔️':k==='balance'?'⚖️':'🛡️'}</div><div style="font-size:12px;font-weight:600">${t(k)}</div></button>`).join('')}
+      </div>
+    </div>
+    <div class="card" style="padding:12px">
+      <div style="font-weight:700;font-size:13px;margin-bottom:8px">📋 ${t('currentSquad')}</div>
+      ${G.team.slice(0,11).map(p=>`<div style="display:flex;justify-content:space-between;align-items:center;background:rgba(30,41,59,.5);padding:8px 10px;border-radius:8px;margin-bottom:4px;font-size:12px"><span>${p.name}</span><span style="color:#00d4ff;font-weight:700">${p.position}</span><span style="color:#fbbf24">${p.ovr}</span></div>`).join('')}
+    </div>
+  `;
+}
+
+function renderFacility(){
+  const facs=[{k:'training',n:'训练场',ic:'🏋️'},{k:'academy',n:'青训营',ic:'🌟'},{k:'stadium',n:'体育场',ic:'🏟️'}];
+  const costs=[50000,100000,200000,400000,800000,1600000,3200000,6400000,12800000];
+  return facs.map(f=>{
+    const lv=G.facilities[f.k];
+    const cost=costs[Math.min(lv-1,8)];
+    const can=G.budget>=cost&&lv<10;
+    return `<div class="card" style="padding:16px;margin-bottom:12px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+        <div style="display:flex;align-items:center;gap:8px"><span style="font-size:28px">${f.ic}</span><div style="font-weight:700;font-size:15px">${f.n}</div></div>
+        <div class="gt" style="font-size:24px;font-weight:700;color:#00d4ff">Lv.${lv}</div>
+      </div>
+      <div style="display:flex;gap:3px;margin-bottom:10px">${Array.from({length:10}).map((_,i)=>`<div style="height:6px;flex:1;border-radius:3px;background:${i<lv?'#00d4ff':'rgba(100,116,139,.4)'}"></div>`).join('')}</div>
+      <button onclick="upgFac('${f.k}')" class="btn ${can?'btn-g':'btn-p'}" style="width:100%;font-size:12px" ${!can?'disabled':''}>${lv>=10?'MAX ✅':`⬆️ ${t('upgrade')} (${fmt(cost)})`}</button>
+    </div>`;
+  }).join('');
+}
+
+function renderMatch(){
+  if(!MS){
+    const opp=G.league[rand(1,G.league.length-1)];
+    return `
+      <div class="card" style="padding:24px;margin-bottom:12px;text-align:center">
+        <div style="font-size:16px;font-weight:700;margin-bottom:20px">⚽ 下一场比赛</div>
+        <div style="display:flex;align-items:center;justify-content:center;gap:20px">
+          <div style="text-align:center"><div style="font-size:28px;margin-bottom:6px">🔵</div><div style="font-weight:700">FC联</div></div>
+          <div class="gt" style="font-size:28px;font-weight:700;color:#475569">${t('vs')}</div>
+          <div style="text-align:center"><div style="font-size:28px;margin-bottom:6px">🔴</div><div style="font-weight:700">${getLN(opp.index)}</div></div>
+        </div>
+      </div>
+      <button onclick="startMatch()" class="btn btn-g" style="width:100%;font-size:18px;padding:18px">⚽ ${t('play')}</button>
+    `;
+  }
+  return `
+    <div class="card" style="padding:12px;margin-bottom:10px">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <div style="text-align:center"><div style="font-size:11px;color:#94a3b8">FC联</div><div class="gt" style="font-size:40px;font-weight:700;color:#00d4ff">${MS.myScore}</div></div>
+        <div style="text-align:center"><div class="pulse" style="font-size:11px;color:#ef4444;font-weight:700">${t('live')}</div><div class="gt" style="font-size:22px;font-weight:700">${MS.min}'</div></div>
+        <div style="text-align:center"><div style="font-size:11px;color:#94a3b8">${MS.oppName}</div><div class="gt" style="font-size:40px;font-weight:700;color:#ef4444">${MS.oppScore}</div></div>
+      </div>
+    </div>
+    <div style="background:#1a5d1a;border-radius:12px;padding:6px;margin-bottom:10px;overflow:hidden">
+      <canvas id="mc" style="width:100%;height:auto;display:block;border-radius:8px;aspect-ratio:16/9"></canvas>
+    </div>
+    <div class="card" style="padding:12px;max-height:180px;overflow-y:auto">
+      <div style="font-size:12px;font-weight:700;margin-bottom:8px">📋 事件</div>
+      <div id="evts">${evtHTML()}</div>
+    </div>
+    ${MS.finished?`<div style="text-align:center;margin-top:16px"><div style="font-size:24px;font-weight:700;margin-bottom:12px;color:${MS.myScore>MS.oppScore?'#22c55e':MS.myScore===MS.oppScore?'#fbbf24':'#ef4444'}">${MS.myScore>MS.oppScore?'🎉 '+t('win'):MS.myScore===MS.oppScore?'🤝 '+t('draw'):'😢 '+t('lose')}</div><button onclick="tab='home';MS=null;render()" class="btn btn-g">${t('back')}</button></div>`:''}
+  `;
+}
+
+// ---- Actions ----
+function upgFac(k){
+  const costs=[50000,100000,200000,400000,800000,1600000,3200000,6400000,12800000];
+  const cost=costs[Math.min(G.facilities[k]-1,8)];
+  if(G.budget>=cost&&G.facilities[k]<10){G.budget-=cost;G.facilities[k]++;addNews(`🔧 ${k}升级到Lv.${G.facilities[k]}!`);showToast(t('upgraded'));save()}
+  else showToast(t('noMoney'));
+}
+function signP(id){
+  const p=G.prospects.find(x=>x.id===id);
+  if(p&&G.budget>=p.value*.3){G.budget-=Math.floor(p.value*.3);G.team.push(p);G.prospects=G.prospects.filter(x=>x.id!==id);addNews(`✅ 签约${p.name}!`);showToast(t('signed'));save()}
+  else showToast(t('noMoney'));
+}
+function rejectP(id){G.prospects=G.prospects.filter(x=>x.id!==id);render()}
+
+// ---- Boot ----
+initGame();
+refreshMarket();
+scoutAcademy();
+render();
+</script>
 </body>
 </html>
