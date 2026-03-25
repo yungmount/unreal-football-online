@@ -90,13 +90,11 @@ const NAMES={
   USA:['Christian Pulisic','Weston McKennie','Antonee Robinson','Tyler Adams','Yunus Musah','Gio Reyna','Folarin Balogun','Tim Weah','Brenden Aaronson','Ricardo Pepi','Mark McKenzie','Miles Robinson','Aaron Long','Josh Sargent','Joe Scally']
 };
 
-// ---- Avatar: Pravatar (real photos) ----
-// Pravatar has 70 real human face photos, free, no API key
+// ---- Avatar: RandomUser.me (100 real male photos, free, no API key) ----
 function getAvatar(player) {
-  // Map player to a consistent photo index based on name hash
   const hash = player.name.split('').reduce((a,c)=>a+c.charCodeAt(0),0);
-  const imgId = (hash % 70) + 1;
-  return `https://i.pravatar.cc/150?img=${imgId}`;
+  const imgId = hash % 100; // 0-99
+  return `https://randomuser.me/api/portraits/men/${imgId}.jpg`;
 }
 
 // ---- 3D Player Body SVG ----
