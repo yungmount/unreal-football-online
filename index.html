@@ -1091,7 +1091,7 @@ function renderDetail(){
 
       <button onclick="tab='home';selPlayer=null;render()" class="btn btn-p" style="width:100%">← ${t('back')}</button>
     </div>
-    ${'<scr'+'ipt>setTimeout(function(){var c=document.getElementById("'+voxelId+'");if(c&&window.THREE)initVoxelPlayer(${JSON.stringify(p)},"'+voxelId+'");},100);<'+'/script>'}
+    <script>if(window.THREE)(function(){var c=document.getElementById("${voxelId}");if(c&&c.dataset.ready!='1'){c.dataset.ready='1';initVoxelPlayer(${JSON.stringify(p).replace(/'/g,"\\'")},"${voxelId}");}})();</script>
   `;
 }
 
