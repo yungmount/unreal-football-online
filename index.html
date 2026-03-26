@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>UFO - Unreal Football Online</title>
 <script src="https://cdn.tailwindcss.com"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://unpkg.com/three@0.128.0/three.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
 *{font-family:'Inter',sans-serif;-webkit-tap-highlight-color:transparent;user-select:none;box-sizing:border-box}
@@ -310,172 +310,95 @@ function generatePixelAvatar(player) {
 }
 
 // ---- 3D Voxel Player (Three.js Minecraft style) ----
+let voxelScenes = {};
 function getVoxelPlayer(player, containerId) {
   const h = player.height || 180;
   const w = player.weight || 75;
   const nat = player.nationality || player.nation || 'England';
-  
-  // Colors
   const skinColors = {
     England:'#F2D8B8',Spain:'#D8A878',Germany:'#F0D8B8',France:'#D8A870',
     Brazil:'#B87040',Argentina:'#D4A078',Italy:'#D8B088',Nigeria:'#5C2C0C',
     Japan:'#E8D0A8',Korea:'#E4CC9A',China:'#E0C8A0',USA:'#D0A078'
   };
   const skin = skinColors[nat] || '#F2D8B8';
+  const jc = ['#CC1111','#1133BB','#118811','#CC8800','#881188','#008899','#CC4400','#224488'][(player.name.charCodeAt(0)+player.name.charCodeAt(1))%8];
   
-  const jerseyColors = ['#CC1111','#1133BB','#118811','#CC8800','#881188','#008899','#CC4400','#224488'];
-  const jc = jerseyColors[(player.name.charCodeAt(0)+player.name.charCodeAt(1))%jerseyColors.length];
-  const shorts = '#1a1a2e';
-  const socks = jc;
-  const shoes = '#0a0a0a';
+  return `<div id="${containerId}" style="width:200px;height:280px;margin:0 auto;"></div>`;
+}
+
+function initVoxelPlayer(player, containerId) {
+  if(!window.THREE) return;
+  const container = document.getElementById(containerId);
+  if(!container) return;
   
-  // Scale factors
-  const scale = 0.015;
-  const headSize = 8 * scale;
-  const bodyW = (6 + (w-70)*0.05) * scale;
-  const bodyH = (10 + (h-175)*0.03) * scale;
-  const legLen = (12 + (h-175)*0.04) * scale;
-  const armLen = 10 * scale;
+  // Cleanup previous
+  if(voxelScenes[containerId]) {
+    voxelScenes[containerId].renderer.dispose();
+    container.innerHTML = '';
+  }
   
-  return `
-    <div id="${containerId}" style="width:200px;height:280px;margin:0 auto;"></div>
-    <script>
-      (function(){
-        const container = document.getElementById('${containerId}');
-        if(!container) return;
-        
-        // Scene
-        const scene = new THREE.Scene();
-        scene.background = new THREE.Color(0x1a2030);
-        
-        // Camera
-        const camera = new THREE.PerspectiveCamera(45, 200/280, 0.1, 100);
-        camera.position.set(0, 0.3, 1.2);
-        camera.lookAt(0, 0, 0);
-        
-        // Renderer
-        const renderer = new THREE.WebGLRenderer({antialias:true});
-        renderer.setSize(200, 280);
-        renderer.shadowMap.enabled = true;
-        container.appendChild(renderer.domElement);
-        
-        // Lighting
-        const ambient = new THREE.AmbientLight(0xffffff, 0.6);
-        scene.add(ambient);
-        const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
-        dirLight.position.set(2, 3, 2);
-        dirLight.castShadow = true;
-        scene.add(dirLight);
-        const backLight = new THREE.DirectionalLight(0x00d4ff, 0.3);
-        backLight.position.set(-2, 1, -2);
-        scene.add(backLight);
-        
-        // Player group
-        const player = new THREE.Group();
-        scene.add(player);
-        
-        // Materials
-        const skinMat = new THREE.MeshLambertMaterial({color:'${skin}'});
-        const jerseyMat = new THREE.MeshLambertMaterial({color:'${jc}'});
-        const shortsMat = new THREE.MeshLambertMaterial({color:'${shorts}'});
-        const socksMat = new THREE.MeshLambertMaterial({color:'${socks}'});
-        const shoesMat = new THREE.MeshLambertMaterial({color:'${shoes}'});
-        const hairMat = new THREE.MeshLambertMaterial({color:'#281408'});
-        
-        // Helper: create box
-        function box(w, h, d, mat, x, y, z) {
-          const geo = new THREE.BoxGeometry(w, h, d);
-          const mesh = new THREE.Mesh(geo, mat);
-          mesh.position.set(x, y, z);
-          mesh.castShadow = true;
-          mesh.receiveShadow = true;
-          return mesh;
-        }
-        
-        // Head
-        const head = box(${headSize}, ${headSize}, ${headSize}, skinMat, 0, ${bodyH/2 + legLen + headSize/2 + 0.02}, 0);
-        player.add(head);
-        // Hair (top)
-        const hairTop = box(${headSize+0.002}, ${headSize*0.25}, ${headSize+0.002}, hairMat, 0, ${bodyH/2 + legLen + headSize + 0.01}, 0);
-        player.add(hairTop);
-        // Hair (back)
-        const hairBack = box(${headSize+0.002}, ${headSize*0.6}, ${headSize*0.25}, hairMat, 0, ${bodyH/2 + legLen + headSize*0.5}, ${-headSize*0.4});
-        player.add(hairBack);
-        
-        // Torso
-        const torso = box(${bodyW}, ${bodyH}, ${bodyW*0.5}, jerseyMat, 0, ${legLen + bodyH/2}, 0);
-        player.add(torso);
-        // Jersey number
-        const numGeo = new THREE.PlaneGeometry(${bodyW*0.4}, ${bodyW*0.4});
-        const numMat = new THREE.MeshBasicMaterial({color:0xffffff, transparent:true, opacity:0.9});
-        const numMesh = new THREE.Mesh(numGeo, numMat);
-        numMesh.position.set(0, ${legLen + bodyH/2}, ${bodyW*0.26});
-        player.add(numMesh);
-        
-        // Shorts
-        const shorts = box(${bodyW*1.05}, ${bodyH*0.4}, ${bodyW*0.55}, shortsMat, 0, ${legLen + bodyH*0.2}, 0);
-        player.add(shorts);
-        
-        // Left Leg
-        const leftLegGroup = new THREE.Group();
-        leftLegGroup.position.set(${-bodyW*0.25}, ${legLen}, 0);
-        // Thigh
-        leftLegGroup.add(box(${bodyW*0.35}, ${legLen*0.5}, ${bodyW*0.35}, skinMat, 0, ${-legLen*0.25}, 0));
-        // Sock
-        leftLegGroup.add(box(${bodyW*0.32}, ${legLen*0.35}, ${bodyW*0.32}, socksMat, 0, ${-legLen*0.65}, 0));
-        // Shoe
-        leftLegGroup.add(box(${bodyW*0.38}, ${legLen*0.15}, ${bodyW*0.45}, shoesMat, 0, ${-legLen*0.9}, ${bodyW*0.05}));
-        player.add(leftLegGroup);
-        
-        // Right Leg
-        const rightLegGroup = new THREE.Group();
-        rightLegGroup.position.set(${bodyW*0.25}, ${legLen}, 0);
-        rightLegGroup.add(box(${bodyW*0.35}, ${legLen*0.5}, ${bodyW*0.35}, skinMat, 0, ${-legLen*0.25}, 0));
-        rightLegGroup.add(box(${bodyW*0.32}, ${legLen*0.35}, ${bodyW*0.32}, socksMat, 0, ${-legLen*0.65}, 0));
-        rightLegGroup.add(box(${bodyW*0.38}, ${legLen*0.15}, ${bodyW*0.45}, shoesMat, 0, ${-legLen*0.9}, ${bodyW*0.05}));
-        player.add(rightLegGroup);
-        
-        // Left Arm
-        const leftArm = new THREE.Group();
-        leftArm.position.set(${-bodyW*0.7}, ${legLen + bodyH*0.8}, 0);
-        leftArm.add(box(${bodyW*0.25}, ${armLen*0.4}, ${bodyW*0.25}, skinMat, 0, ${-armLen*0.2}, 0));
-        leftArm.add(box(${bodyW*0.28}, ${armLen*0.6}, ${bodyW*0.28}, jerseyMat, 0, ${armLen*0.1}, 0));
-        player.add(leftArm);
-        
-        // Right Arm
-        const rightArm = new THREE.Group();
-        rightArm.position.set(${bodyW*0.7}, ${legLen + bodyH*0.8}, 0);
-        rightArm.add(box(${bodyW*0.25}, ${armLen*0.4}, ${bodyW*0.25}, skinMat, 0, ${-armLen*0.2}, 0));
-        rightArm.add(box(${bodyW*0.28}, ${armLen*0.6}, ${bodyW*0.28}, jerseyMat, 0, ${armLen*0.1}, 0));
-        player.add(rightArm);
-        
-        // Shadow plane
-        const shadowGeo = new THREE.CircleGeometry(0.3, 32);
-        const shadowMat = new THREE.MeshBasicMaterial({color:0x000000, transparent:true, opacity:0.3});
-        const shadow = new THREE.Mesh(shadowGeo, shadowMat);
-        shadow.rotation.x = -Math.PI/2;
-        shadow.position.y = ${-legLen*0.95};
-        player.add(shadow);
-        
-        // Animation
-        let angle = 0;
-        function animate() {
-          requestAnimationFrame(animate);
-          angle += 0.02;
-          player.rotation.y = angle;
-          // Subtle breathing
-          torso.scale.y = 1 + Math.sin(angle*2)*0.01;
-          renderer.render(scene, camera);
-        }
-        animate();
-        
-        // Cleanup on page change
-        window.addEventListener('beforeunload', () => {
-          renderer.dispose();
-        });
-      })();
-    </script>
-  `;
+  const h = player.height || 180, w = player.weight || 75, nat = player.nationality || player.nation || 'England';
+  const skinColors = {England:'#F2D8B8',Spain:'#D8A878',Germany:'#F0D8B8',France:'#D8A870',Brazil:'#B87040',Argentina:'#D4A078',Italy:'#D8B088',Nigeria:'#5C2C0C',Japan:'#E8D0A8',Korea:'#E4CC9A',China:'#E0C8A0',USA:'#D0A078'};
+  const skin = skinColors[nat] || '#F2D8B8';
+  const jc = ['#CC1111','#1133BB','#118811','#CC8800','#881188','#008899','#CC4400','#224488'][(player.name.charCodeAt(0)+player.name.charCodeAt(1))%8];
+  
+  const scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x1a2030);
+  const camera = new THREE.PerspectiveCamera(45, 200/280, 0.1, 100);
+  camera.position.set(0, 0.35, 1.1);
+  camera.lookAt(0, 0.15, 0);
+  const renderer = new THREE.WebGLRenderer({antialias:true});
+  renderer.setSize(200, 280);
+  container.appendChild(renderer.domElement);
+  
+  scene.add(new THREE.AmbientLight(0xffffff, 0.7));
+  const dl = new THREE.DirectionalLight(0xffffff, 0.8);
+  dl.position.set(2, 3, 2);
+  scene.add(dl);
+  scene.add(new THREE.DirectionalLight(0x00d4ff, 0.3)).position.set(-2, 1, -2);
+  
+  const playerG = new THREE.Group();
+  scene.add(playerG);
+  
+  const skinM = new THREE.MeshLambertMaterial({color:skin});
+  const jerseyM = new THREE.MeshLambertMaterial({color:jc});
+  const shortM = new THREE.MeshLambertMaterial({color:'#1a1a2e'});
+  const shoeM = new THREE.MeshLambertMaterial({color:'#0a0a0a'});
+  const hairM = new THREE.MeshLambertMaterial({color:'#281408'});
+  
+  function box(w,h,d,m,x,y,z){const g=new THREE.BoxGeometry(w,h,d);const me=new THREE.Mesh(g,m);me.position.set(x,y,z);return me;}
+  
+  // Head
+  playerG.add(box(0.1,0.1,0.1,skinM,0,0.35,0));
+  playerG.add(box(0.102,0.03,0.102,hairM,0,0.41,0));
+  playerG.add(box(0.102,0.06,0.025,hairM,0,0.35,-0.04));
+  // Torso
+  playerG.add(box(0.08,0.12,0.05,jerseyM,0,0.21,0));
+  // Shorts
+  playerG.add(box(0.085,0.04,0.055,shortM,0,0.13,0));
+  // Legs
+  playerG.add(box(0.025,0.08,0.025,skinM,-0.022,0.02,0));
+  playerG.add(box(0.025,0.08,0.025,skinM,0.022,0.02,0));
+  // Socks
+  playerG.add(box(0.023,0.05,0.023,jerseyM,-0.022,-0.05,0));
+  playerG.add(box(0.023,0.05,0.023,jerseyM,0.022,-0.05,0));
+  // Shoes
+  playerG.add(box(0.03,0.015,0.04,shoeM,-0.022,-0.12,0.008));
+  playerG.add(box(0.03,0.015,0.04,shoeM,0.022,-0.12,0.008));
+  // Arms
+  playerG.add(box(0.02,0.07,0.02,skinM,-0.055,0.21,0));
+  playerG.add(box(0.02,0.07,0.02,skinM,0.055,0.21,0));
+  // Shadow
+  const sh = new THREE.Mesh(new THREE.CircleGeometry(0.12,32),new THREE.MeshBasicMaterial({color:0x000000,transparent:true,opacity:0.3}));
+  sh.rotation.x=-Math.PI/2;
+  sh.position.y=-0.13;
+  playerG.add(sh);
+  
+  let angle=0;
+  function animate(){requestAnimationFrame(animate);angle+=0.02;playerG.rotation.y=angle;renderer.render(scene,camera);}
+  animate();
+  
+  voxelScenes[containerId] = {renderer, scene};
 }
 
 // ---- 3D Player Body SVG (fallback) ----
