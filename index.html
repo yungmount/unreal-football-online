@@ -587,6 +587,29 @@ function startMatch() {
       const op = oppFp[i]||[.7,.5];
       return {...p, mx:op[0], my:op[1], x:op[0], y:op[1], hx:op[0], hy:op[1], spd:(p.pace/100)*.45+.15};
     });
+    // OSM-style team stats
+    const calcTeamStats = (team) => {
+      const atks=team.filter(p=>['ST','LW','RW','CAM'].includes(p.position));
+      const defs=team.filter(p=>['GK','CB','LB','RB','CDM'].includes(p.position));
+      const atk=atks.length ? atks.reduce((s,p)=>s+p.shooting+p.pace,0)/atks.length/2 : 45;
+      const def=defs.length ? defs.reduce((s,p)=>s+p.defending,0)/defs.length : 45;
+      const avgMorale=team.reduce((s,p)=>s+(p.morale||70),0)/team.length;
+      const avgFit=team.reduce((s,p)=>s+(p.fitness||80),0)/team.length;
+      const meanOvr=team.reduce((s,p)=>s+p.ovr,0)/team.length;
+      return {
+        atk: atk*(avgFit/80)*(avgMorale/85),
+        def: def*(avgFit/80)*(avgMorale/85),
+        mean: meanOvr*(avgFit/80),
+        form: avgMorale,
+        fitness: avgFit
+      };
+    };
+    const myS=calcTeamStats(myTeam), opS=calcTeamStats(oppTeam);
+    const LUCK=Math.random()*8+4;
+    const RED_EFF=8, FORM_EFF=.12, AGE_EFF=.08;
+    const meanAge=t=>t.reduce((s,p)=>s+(p.age||25),0)/t.length;
+    const ageEffect=(t,m)=>(meanAge(t)-25)*AGE_EFF*(m/90);
+
     MS = {
       myTeam, oppTeam,
       oppName: getLN(oppIdx),
@@ -597,7 +620,10 @@ function startMatch() {
       events:[],
       started:true, finished:false, htDone:false,
       shots:{my:0,opp:0},
-      lastEvt:0
+      lastEvt:0,
+      // OSM stats
+      myS, opS, LUCK, RED_EFF, FORM_EFF, ageEffect,
+      redCards:{my:0,opp:0}
     };
     render();
     lastT = performance.now();
@@ -685,50 +711,110 @@ function updateMatch(dt, ts) {
 
 function genEvt(){
   if(!MS)return;
+  const m=MS.min, isHome=true;
   const myAtk=MS.poss==='my';
   const atk=myAtk?MS.myTeam:MS.oppTeam;
   const def=myAtk?MS.oppTeam:MS.myTeam;
-  const r=rand(1,100);
+  const aS=myAtk?MS.myS:MS.opS;
+  const dS=myAtk?MS.opS:MS.myS;
   const ball=MS.ball;
+  const myRed=MS.redCards.my, oppRed=MS.redCards.opp;
 
-  if(r<=22){
-    // Shot
+  // OSM Engine: decide who starts attack
+  const attVal = aS.atk*(.75)+aS.mean*(.25)
+    - myRed*MS.RED_EFF - MS.ageEffect(atk,m)
+    + aS.form*MS.FORM_EFF;
+  const defVal = dS.def*(.75)+dS.mean*(.25)
+    - oppRed*MS.RED_EFF - MS.ageEffect(def,m)
+    + dS.form*MS.FORM_EFF;
+
+  const r=rand(1,100);
+
+  if(r<=1){
+    // Red card
+    const rcTeam=myAtk?MS.myTeam:MS.oppTeam;
+    const rcPlayer=rcTeam[rand(1,10)];
+    if(rcPlayer){if(myAtk)MS.redCards.my++;else MS.redCards.opp++;}
+    addEvt(`🟥 红牌! ${rcPlayer?.name.split(' ').pop()||'?'}`,'foul');
+    // Reboot: give ball to other team
+    ball.owner=null; ball.vx=(Math.random()-.5)*.3; ball.vy=(Math.random()-.5)*.3;
+    MS.poss=myAtk?'opp':'my';
+  } else if(r<=10){
+    // Foul / Free kick
+    const fouler=atk[rand(0,10)];
+    addEvt(`⚠️ 犯规! ${fouler?.name.split(' ').pop()||'?'}`,'foul');
+    ball.owner=null; ball.vx=(Math.random()-.5)*.3; ball.vy=(Math.random()-.5)*.3;
+    // Direct free kick shot
+    setTimeout(()=>{
+      if(!MS||MS.finished)return;
+      const shooters=atk.filter(p=>['ST','CAM','LW','RW'].includes(p.position));
+      const sk=shooters[rand(0,shooters.length-1)]||atk[rand(0,4)];
+      const gk=def[0];
+      MS.shots[myAtk?'my':'opp']++;
+      const shotVal=sk.shooting+sk.pace*0.3 - ageEffect(atk,m)*0.5;
+      const gkVal=gk.defending+28;
+      ball.tx=myAtk?.88:.12; ball.ty=.25+Math.random()*.5;
+      ball.flying=true;
+      setTimeout(()=>{
+        if(!MS||MS.finished)return;
+        const lr=shotVal/(Math.random()*50+40);
+        const dr=gkVal/(Math.random()*50+40)+MS.LUCK*.01;
+        if(lr>dr&&lr>0.75){if(myAtk){MS.myScore++;sk.goals++}else MS.oppScore++;addEvt(`⚽ ${sk.name.split(' ').pop()}! ${MS.myScore}-${MS.oppScore}`,'goal')}
+        else if(lr>dr*.7){addEvt(`🧤 扑出!`,'shot')}
+        else{addEvt(`❌ 偏出!`,'shot')}},700);
+    },1200);
+  } else if(r<=35){
+    // Attack → possibly shot
     const shooters=atk.filter(p=>['ST','LW','RW','CAM'].includes(p.position));
-    const shooter=shooters[rand(0,shooters.length-1)]||atk[rand(0,4)];
+    const shooter=shooters[rand(0,shooters.length-1)]||atk[rand(0,5)];
     const gk=def[0];
     MS.shots[myAtk?'my':'opp']++;
-    const sq=(shooter.shooting+shooter.pace)/2;
-    const sv=gk.defending+30;
+
+    // Shot quality (OSM formula)
+    const shotVal=(shooter.shooting*.75+shooter.pace*.25)
+      - ageEffect(atk,m)
+      - (myAtk?MS.redCards.my:MS.redCards.opp)*5;
+    const gkVal=gk.defending+28 + ageEffect(def,m)*.5;
+    const luckMod=MS.LUCK*(Math.random()-.5)*6;
+
     ball.sx=ball.x; ball.sy=ball.y;
-    ball.tx=myAtk?.88:.12; ball.ty=.25+Math.random()*.5;
+    ball.tx=myAtk?.88:.12; ball.ty=.2+Math.random()*.6;
     ball.flying=true; ball.owner=shooter;
     setTimeout(()=>{
-      if(!MS)return;
-      if(sq>sv+14){
-        if(myAtk){MS.myScore++;shooter.goals++}else MS.oppScore++;
-        addEvt(`⚽ ${shooter.name.split(' ').pop()} 进球! ${MS.myScore}-${MS.oppScore}`,'goal');
-      } else if(sq>sv-8){addEvt(`🧤 扑出!`,'shot')}
-      else{addEvt(`❌ 射偏!`,'shot')}
-    },700);
-  } else if(r<=45){
-    // Pass
-    const passer=ball.owner||atk[0];
-    const recv=atk.filter(p=>p.id!==passer?.id);
-    const r2=recv[rand(0,Math.min(recv.length-1,5))];
-    if(r2){
+      if(!MS||MS.finished)return;
+      const sr=shotVal/(Math.random()*45+35)+luckMod*.01;
+      const dr=gkVal/(Math.random()*40+30);
+      if(sr>dr&&sr>0.78){if(myAtk){MS.myScore++;shooter.goals++}else MS.oppScore++;addEvt(`⚽ ${shooter.name.split(' ').pop()}! ${MS.myScore}-${MS.oppScore}`,'goal')}
+      else if(sr>dr*.65){addEvt(`🧤 扑出!`,'shot')}
+      else{addEvt(`❌ 偏出!`,'shot')}
+      // Switch possession after shot
+      ball.owner=null; ball.flying=false; ball.x=ball.tx; ball.y=ball.ty;
+      MS.poss=myAtk?'opp':'my';
+    },650);
+  } else if(r<=55){
+    // Pass / Build-up
+    const passer=ball.owner||atk[rand(0,5)];
+    const recv=atk.filter(p=>p&&p.id!==passer?.id);
+    const r2=recv[rand(0,Math.max(recv.length-1,0))];
+    if(r2&&r2.x!==undefined){
       ball.sx=ball.x; ball.sy=ball.y;
-      ball.tx=r2.x+(Math.random()-.5)*.04; ball.ty=r2.y+(Math.random()-.5)*.04;
+      ball.tx=Math.max(0.05,Math.min(0.95,r2.x+(Math.random()-.5)*.08));
+      ball.ty=Math.max(0.05,Math.min(0.95,r2.y+(Math.random()-.5)*.08));
       ball.flying=true; ball.owner=r2;
       addEvt(`👟 ${passer?.name.split(' ').pop()||'?'} → ${r2.name.split(' ').pop()}`,'pass');
     }
-  } else if(r<=58){
-    // Intercept
-    const inter=def[rand(0,5)];
-    if(inter){ball.owner=inter;MS.poss=myAtk?'opp':'my';addEvt(`🔄 抢断!`,'pass')}
-  } else if(r<=65){
-    // Foul
-    const fouler=atk[rand(0,4)];
-    if(fouler){ball.owner=null;ball.vx=(Math.random()-.5)*.3;ball.vy=(Math.random()-.5)*.3;addEvt(`⚠️ ${fouler.name.split(' ').pop()} 犯规!`,'foul')}
+  } else if(r<=70){
+    // Tackle / Turnover
+    const tkl=def[rand(1,Math.min(def.length-1,6))];
+    if(tkl){ball.owner=tkl;MS.poss=myAtk?'opp':'my';addEvt(`🤺 抢断! ${tkl.name.split(' ').pop()}`,'pass')}
+  } else {
+    // Ball out of play / GK kick
+    const gk=def[0];
+    ball.sx=ball.x; ball.sy=ball.y;
+    ball.tx=atk[rand(1,5)]?.x||(myAtk?.7:.3);
+    ball.ty=.2+Math.random()*.6;
+    ball.flying=true; ball.owner=gk;
+    addEvt(`🧤 球门球`,'info');
   }
 }
 
