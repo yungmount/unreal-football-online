@@ -97,239 +97,186 @@ function getAvatar(player) {
 
 function generatePixelAvatar(player) {
   const canvas = document.createElement('canvas');
-  const SIZE = 64; // internal resolution
+  const SIZE = 128;
   canvas.width = SIZE; canvas.height = SIZE;
   const ctx = canvas.getContext('2d');
+  ctx.imageSmoothingEnabled = false;
 
-  // Deterministic RNG from player name
   let seed = 0;
   for (let i = 0; i < player.name.length; i++) seed = (seed * 31 + player.name.charCodeAt(i)) >>> 0;
   function rng() { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 0xFFFFFFFF; }
   function ri(min, max) { return Math.floor(rng() * (max - min + 1)) + min; }
   function pick(arr) { return arr[Math.floor(rng() * arr.length)]; }
 
-  // ── Skin palette by nationality ──
   const skinMap = {
-    England:(r)=>r<0.15?'#f5dfc8':'#f0d0b0', Germany:(r)=>r<0.2?'#f5e0cc':'#eedfc0',
-    Spain:(r)=>'#e8c49a', France:(r)=>r<0.4?'#c8956a':'#e8c49a',
-    Brazil:(r)=>r<0.5?'#c07840':'#d4a070', Argentina:(r)=>'#e8c49a',
-    Italy:(r)=>'#e0b888', Portugal:(r)=>'#d8a878',
-    Nigeria:(r)=>r<0.3?'#5a3010':'#7a4820', Japan:(r)=>'#f0d8b8',
-    Korea:(r)=>'#ecd4b0', China:(r)=>'#e8d0a8', USA:(r)=>r<0.3?'#c07840':'#e0b888',
+    England:(r)=>r<0.5?'#F0D5B8':'#E8C4A0',
+    Germany:(r)=>r<0.5?'#F0D8BC':'#E8C8A4',
+    Spain:(r)=>r<0.5?'#D8A880':'#C8906C',
+    France:(r)=>r<0.5?'#D8A878':'#C08868',
+    Brazil:(r)=>r<0.5?'#B87040':'#A06030',
+    Argentina:(r)=>r<0.5?'#D4A080':'#C49070',
+    Italy:(r)=>r<0.5?'#D8B088':'#C8A078',
+    Portugal:(r)=>r<0.5?'#C8A070':'#B89060',
+    Nigeria:(r)=>r<0.5?'#5C2C0C':'#4A2008',
+    Japan:(r)=>r<0.5?'#E8D0B0':'#D8C0A0',
+    Korea:(r)=>r<0.5?'#E4CC9C':'#D4BC8C',
+    China:(r)=>r<0.5?'#E0C8A4':'#D0B890',
+    USA:(r)=>r<0.5?'#D0A080':'#C09070',
   };
   const nat = player.nationality || player.nation || 'England';
-  const skinFn = skinMap[nat] || ((r)=>'#e0b888');
+  const skinFn = skinMap[nat] || ((r)=>r<0.5?'#D8B090':'#C8A080');
   const skinBase = skinFn(rng());
 
-  function lighten(hex, amt) {
+  function adj(hex, amt) {
     const n = parseInt(hex.slice(1),16);
-    const r = Math.min(255,((n>>16)&0xff)+amt);
-    const g = Math.min(255,((n>>8)&0xff)+amt);
-    const b = Math.min(255,(n&0xff)+amt);
+    const r=Math.min(255,Math.max(0,((n>>16)&0xff)+amt));
+    const g=Math.min(255,Math.max(0,((n>>8)&0xff)+amt));
+    const b=Math.min(255,Math.max(0,(n&0xff)+amt));
     return `rgb(${r},${g},${b})`;
   }
-  function darken(hex, amt) { return lighten(hex, -amt); }
+  const skinHi=adj(skinBase,22), skinShd=adj(skinBase,-18), skinDk=adj(skinBase,-38), skinDK2=adj(skinBase,-55);
 
-  const skin    = skinBase;
-  const skinLit = lighten(skinBase, 28);
-  const skinShd = darken(skinBase, 30);
-  const skinDrk = darken(skinBase, 55);
-
-  // ── Hair colors ──
-  const hairPalettes = [
-    ['#1a0e06','#2a1a0a','#3a2510'],  // black
-    ['#3d2008','#5a3010','#7a4820'],  // dark brown
-    ['#5a3510','#7a4e20','#9a6830'],  // brown
-    ['#8a6020','#b08030','#d0a848'],  // dark blonde
-    ['#c0a040','#d8bc60','#f0d880'],  // blonde
-    ['#7a2010','#a03018','#c04828'],  // auburn
-    ['#606060','#808080','#a0a0a0'],  // grey
+  const hairPalettes=[
+    ['#100804','#281408','#3C2010'],['#281008','#4A2C14','#6A4020'],
+    ['#4A2C10','#6A4820','#8A6430'],['#6A4018','#907028','#B09040'],
+    ['#9A7830','#C8A050','#E0C070'],['#501408','#7A2818','#A04020'],
+    ['#3C3C3C','#606060','#888888'],['#E8C880','#F0D8A0','#F8E8C0'],
   ];
-  const hairIdx = ri(0, hairPalettes.length - 1);
-  const [hairDrk, hairMid, hairLit] = hairPalettes[hairIdx];
+  const [hairDrk,hairMid,hairLit]=hairPalettes[ri(0,hairPalettes.length-1)];
 
-  // ── Eye colors ──
-  const eyeColors = ['#2244aa','#1a6622','#6b3a1a','#333333','#4a7a9a','#8a6020'];
-  const eyeCol = pick(eyeColors);
+  const eyeColors=['#2A4C8C','#1E5420','#6A3418','#404040','#3A6A8C','#8A5A18','#2A6A4C'];
+  const eyeCol=pick(eyeColors);
 
-  // ── Jersey color ──
-  const jerseyPalettes = [
-    ['#cc1111','#ee2222'],['#1122cc','#2233ee'],['#118811','#22aa22'],
-    ['#cc8800','#eebb00'],['#881188','#aa22aa'],['#008899','#00aacc'],
-    ['#cc4400','#ee6600'],['#224488','#3366aa'],
+  const jerseyPalettes=[
+    ['#CC1111','#E82020'],['#1133BB','#2255DD'],['#118811','#22AA22'],
+    ['#CC8800','#EECC00'],['#881188','#AA22AA'],['#008899','#00AACC'],
+    ['#CC4400','#EE6600'],['#224488','#3366AA'],
   ];
-  const [jerseyDrk, jerseyLit] = pick(jerseyPalettes);
+  const [jerseyDrk,jerseyLit]=pick(jerseyPalettes);
 
-  // ── Helper: draw pixel block ──
-  function px(x, y, color, w=1, h=1) {
-    ctx.fillStyle = color;
-    ctx.fillRect(x, y, w, h);
-  }
+  function rpx(x,y,c,w=1,h=1){ctx.fillStyle=c;ctx.fillRect(x,y,w,h);}
 
-  // Scale: 64px canvas, each "pixel" = 2px for RPG feel
-  const P = 2;
-  function rpx(gx, gy, color, gw=1, gh=1) {
-    px(gx*P, gy*P, color, gw*P, gh*P);
-  }
+  // Background
+  const grad=ctx.createLinearGradient(0,0,0,SIZE);
+  grad.addColorStop(0,'#181828'); grad.addColorStop(1,'#282848');
+  ctx.fillStyle=grad; ctx.fillRect(0,0,SIZE,SIZE);
 
-  // Grid is 32x32 logical pixels
-  const G = 32;
+  // Jersey
+  for(let y=88;y<128;y++) for(let x=20;x<108;x++) rpx(x,y,jerseyDrk);
+  for(let y=84;y<88;y++) for(let x=32;x<96;x++) rpx(x,y,jerseyLit);
+  for(let y=80;y<84;y++) for(let x=38;x<90;x++) rpx(x,y,jerseyLit);
+  for(let i=0;i<4;i++){rpx(60-i,80+i,jerseyDrk);rpx(68+i,80+i,jerseyDrk);}
+  for(let i=0;i<3;i++){rpx(61-i,80+i,adj(jerseyDrk,-10));rpx(67+i,80+i,adj(jerseyDrk,-10));}
 
-  // ── Background: dark gradient ──
-  const grad = ctx.createLinearGradient(0,0,0,SIZE);
-  grad.addColorStop(0,'#0d1520'); grad.addColorStop(1,'#1a2840');
-  ctx.fillStyle = grad; ctx.fillRect(0,0,SIZE,SIZE);
+  // Neck
+  for(let y=70;y<80;y++){rpx(52,y,skinDk);rpx(51,y,skinDK2);rpx(53,y,skinShd);rpx(54,y,skinShd);}
+  for(let y=70;y<80;y++){rpx(67,y,skinHi);rpx(73,y,skinHi);rpx(74,y,adj(skinHi,8));}
 
-  // ── Jersey / shoulders ──
-  for (let y=19;y<G;y++) for (let x=4;x<28;x++) rpx(x,y,jerseyDrk);
-  for (let y=17;y<20;y++) for (let x=7;x<25;x++) rpx(x,y,jerseyLit);
-  // V-collar
-  for (let i=0;i<3;i++) { rpx(15-i,19+i,darken(jerseyDrk,20)); rpx(16+i,19+i,darken(jerseyDrk,20)); }
-  // Jersey highlight (left chest)
-  for (let y=19;y<24;y++) rpx(8,y,jerseyLit);
-
-  // ── Neck ──
-  for (let y=16;y<19;y++) for (let x=13;x<19;x++) rpx(x,y,skin);
-  for (let y=16;y<19;y++) { rpx(13,y,skinShd); rpx(12,y,skinDrk); }
-
-  // ── Head shape (oval, not square) ──
-  // Row by row oval
-  const headRows = [
-    [12,20],[10,22],[9,23],[8,24],[8,24],[8,24],[8,24],[8,24],
-    [8,24],[8,24],[8,24],[9,23],[10,22],[11,21],[12,20]
+  // Head oval
+  const headCols=[
+    [56,72],[53,75],[50,78],[47,81],[45,83],[44,84],[44,84],[44,84],
+    [43,85],[43,85],[43,85],[43,85],[43,85],[43,85],[43,85],[43,85],
+    [44,84],[44,84],[44,84],[44,84],[44,84],[45,83],[46,82],[47,81],
+    [49,79],[50,78],[52,76],[54,74],[56,72],[58,70],[60,68],[61,67]
   ];
-  for (let i=0;i<headRows.length;i++) {
-    const y = 3+i;
-    const [lx,rx] = headRows[i];
-    for (let x=lx;x<rx;x++) {
-      const dx = (x - 16) / 8;
-      // Right-side key light
-      let shade;
-      if      (dx < -0.6) shade = skinDrk;
-      else if (dx < -0.2) shade = skinShd;
-      else if (dx >  0.6) shade = skinLit;
-      else if (dx >  0.2) shade = lighten(skin,14);
-      else                shade = skin;
-      // Forehead highlight
-      if (i < 4 && dx > -0.1 && dx < 0.5) shade = skinLit;
-      // Chin shadow
-      if (i > 11) shade = skinShd;
-      rpx(x,y,shade);
+  for(let i=0;i<headCols.length;i++){
+    const y=4+i, [lx,rx]=headCols[i], c=64;
+    for(let x=lx;x<=rx;x++){
+      const dx=(x-c)/20;
+      let s;
+      if(dx<-0.7)s=skinDk;else if(dx<-0.3)s=skinShd;
+      else if(dx>0.7)s=skinHi;else if(dx>0.3)s=adj(skinBase,10);
+      else s=skinBase;
+      if(i<5&&Math.abs(dx)<0.5)s=skinHi;
+      if(i>26)s=skinShd;
+      rpx(x,y,s);
     }
   }
 
-  // ── Ears ──
-  for (let y=8;y<12;y++) {
-    rpx(7,y,skinShd); rpx(6,y,skinDrk);
-    rpx(24,y,skinLit); rpx(25,y,lighten(skin,20));
+  // Ears
+  for(let y=18;y<28;y++){rpx(42,y,skinShd);rpx(41,y,skinDk);}
+  for(let y=18;y<28;y++){rpx(86,y,skinHi);rpx(87,y,adj(skinHi,10));}
+  for(let y=20;y<26;y++)rpx(42,y,adj(skinShd,-8));
+
+  // Hair
+  const hStyle=ri(0,7);
+  for(let y=4;y<22;y++)for(let x=43;x<85;x++){
+    const h=headCols[y-4];
+    if(!h||x<h[0]||x>h[1])rpx(x,y,hairDrk);
+  }
+  for(let y=4;y<18;y++)for(let x=44;x<84;x++){
+    const h=headCols[y-4];
+    if(!h||x<h[0]||x>h[1])rpx(x,y,hairMid);
+  }
+  for(let y=6;y<16;y++)for(let x=70;x<82;x++){
+    const h=headCols[y-4];
+    if(!h||x<h[0]||x>h[1])rpx(x,y,hairLit);
+  }
+  for(let x=45;x<83;x++){rpx(x,16,hairDrk);rpx(x,15,hairMid);rpx(x,14,hairDrk);}
+
+  if(hStyle===1){for(let y=10;y<30;y++){rpx(43,y,hairMid);rpx(85,y,hairMid);}}
+  else if(hStyle===2){for(let x=52;x<76;x++){rpx(x,3,hairMid);rpx(x,2,hairDrk);}for(let x=56;x<72;x++)rpx(x,1,hairLit);}
+  else if(hStyle===3){for(let x=44;x<84;x++){rpx(x,4,hairDrk);rpx(x,5,hairMid);rpx(x,6,hairLit);}}
+  else if(hStyle===4){for(let i=0;i<30;i++){const cx=ri(44,84),cy=ri(4,18);const h=headCols[cy-4];if(!h||cx<h[0]||cx>h[1])rpx(cx,cy,hairMid);}}
+  else if(hStyle===5){for(let x=44;x<84;x++){const f=x<52||x>76?-20:(x<56||x>72?-8:0);rpx(x,14,adj(hairDrk,f));}}
+  else if(hStyle===6){/* bald */}
+
+  // Eyebrows
+  const browCol=adj(hairMid,-12);
+  for(let x=48;x<59;x++)rpx(x,16,browCol);
+  for(let x=69;x<80;x++)rpx(x,16,browCol);
+  rpx(48,17,browCol);rpx(79,17,browCol);
+
+  // Eyes
+  for(let x=48;x<59;x++)rpx(x,21,adj(skinBase,-12));
+  for(let x=69;x<80;x++)rpx(x,21,adj(skinBase,-12));
+  for(let x=48;x<59;x++)rpx(x,27,adj(skinBase,-8));
+  for(let x=69;x<80;x++)rpx(x,27,adj(skinBase,-8));
+  for(let y=21;y<28;y++)for(let x=49;x<58;x++)rpx(x,y,'#D8D0C8');
+  for(let y=21;y<28;y++)for(let x=70;x<79;x++)rpx(x,y,'#D8D0C8');
+  for(let y=22;y<27;y++)for(let x=50;x<57;x++)rpx(x,y,eyeCol);
+  for(let y=22;y<27;y++)for(let x=71;x<78;x++)rpx(x,y,eyeCol);
+  for(let y=22;y<27;y++){rpx(50,y,adj(eyeCol,-25));rpx(56,y,adj(eyeCol,-25));}
+  for(let x=50;x<57;x++){rpx(x,22,adj(eyeCol,-25));rpx(x,26,adj(eyeCol,-25));}
+  for(let y=22;y<27;y++){rpx(71,y,adj(eyeCol,-25));rpx(77,y,adj(eyeCol,-25));}
+  for(let x=71;x<78;x++){rpx(x,22,adj(eyeCol,-25));rpx(x,26,adj(eyeCol,-25));}
+  for(let y=23;y<26;y++)for(let x=51;x<56;x++)rpx(x,y,'#080604');
+  for(let y=23;y<26;y++)for(let x=72;x<77;x++)rpx(x,y,'#080604');
+  rpx(52,23,'#FFFFFF');rpx(73,23,'#FFFFFF');
+  rpx(55,25,'#C8D8F0');rpx(76,25,'#C8D8F0');
+
+  // Nose
+  rpx(63,27,skinShd);rpx(65,27,skinShd);
+  rpx(61,28,skinShd);rpx(67,28,skinShd);
+  rpx(60,29,skinDk);rpx(68,29,skinDk);
+  rpx(60,30,skinDK2);rpx(68,30,skinDK2);
+  rpx(61,29,skinShd);rpx(62,29,skinBase);rpx(63,29,skinBase);rpx(64,29,skinBase);rpx(65,29,skinBase);rpx(66,29,skinShd);rpx(67,29,skinDk);
+  rpx(61,30,skinDk);rpx(67,30,skinDk);
+
+  // Mouth
+  const lc=adj(skinBase,-22),lc2=adj(skinBase,-12);
+  rpx(63,30,skinShd);rpx(65,30,skinShd);
+  for(let x=59;x<69;x++)rpx(x,31,lc);
+  for(let x=60;x<68;x++)rpx(x,32,lc2);
+  rpx(60,32,lc);rpx(68,32,lc);
+  for(let x=60;x<68;x++)rpx(x,33,lc);
+  for(let x=60;x<68;x++)rpx(x,34,lc2);
+  rpx(61,34,adj(lc2,12));rpx(62,34,adj(lc2,15));
+  rpx(66,34,adj(lc2,12));rpx(67,34,adj(lc2,15));
+  for(let x=60;x<68;x++)rpx(x,35,adj(skinBase,-18));
+
+  // Stubble
+  if(rng()>0.5){
+    ctx.globalAlpha=0.35;
+    for(let y=28;y<38;y++)for(let x=48;x<64;x++){if((x*7+y*13+seed)%7===0)rpx(x,y,adj(hairMid,5));}
+    ctx.globalAlpha=1;
   }
 
-  // ── Hair ──
-  const hairStyle = ri(0,5);
-  // Top cap
-  for (let y=1;y<6;y++) for (let x=10;x<22;x++) rpx(x,y,y<3?hairLit:hairMid);
-  for (let y=3;y<7;y++) for (let x=8;x<24;x++) rpx(x,y,hairDrk);
-  // Hairline blend
-  for (let x=9;x<23;x++) rpx(x,6,hairDrk);
-  // Side hair
-  for (let y=4;y<11;y++) { rpx(8,y,hairMid); rpx(7,y,hairDrk); }
-  for (let y=4;y<11;y++) { rpx(23,y,hairMid); rpx(24,y,hairDrk); }
-
-  if (hairStyle===1) { // longer sides
-    for (let y=4;y<14;y++) { rpx(7,y,hairMid); rpx(6,y,hairDrk); rpx(25,y,hairMid); rpx(26,y,hairDrk); }
-  } else if (hairStyle===2) { // quiff
-    for (let x=12;x<20;x++) rpx(x,1,hairLit);
-    for (let x=13;x<19;x++) rpx(x,0,hairMid);
-  } else if (hairStyle===3) { // slick back
-    for (let x=9;x<23;x++) { rpx(x,2,hairDrk); rpx(x,3,hairMid); }
-  } else if (hairStyle===4) { // buzz cut
-    for (let x=9;x<23;x++) rpx(x,5,darken(hairDrk,10));
-  } else if (hairStyle===5) { // wavy
-    for (let x=9;x<23;x+=2) rpx(x,2,hairLit);
-    for (let x=10;x<22;x+=2) rpx(x,3,hairMid);
-  }
-
-  // ── Eyebrows ──
-  const browCol = darken(hairMid, 15);
-  for (let x=9;x<14;x++) rpx(x,7,browCol);
-  for (let x=18;x<23;x++) rpx(x,7,browCol);
-  rpx(9,8,browCol); rpx(22,8,browCol); // arch ends
-  rpx(13,6,browCol); rpx(19,6,browCol); // inner arch
-
-  // ── Eyes ──
-  // Sclera
-  for (let y=9;y<12;y++) for (let x=9;x<14;x++) rpx(x,y,'#e8e4e0');
-  for (let y=9;y<12;y++) for (let x=18;x<23;x++) rpx(x,y,'#e8e4e0');
-  // Upper lid shadow
-  for (let x=9;x<14;x++) rpx(x,9,'#c8c0b8');
-  for (let x=18;x<23;x++) rpx(x,9,'#c8c0b8');
-  // Iris
-  for (let y=9;y<12;y++) for (let x=10;x<13;x++) rpx(x,y,eyeCol);
-  for (let y=9;y<12;y++) for (let x=19;x<22;x++) rpx(x,y,eyeCol);
-  // Limbal ring
-  rpx(10,9,darken(eyeCol,30)); rpx(12,9,darken(eyeCol,30));
-  rpx(19,9,darken(eyeCol,30)); rpx(21,9,darken(eyeCol,30));
-  // Pupil
-  rpx(11,10,'#0a0806'); rpx(20,10,'#0a0806');
-  // Catchlight (key)
-  rpx(10,9,'#ffffff'); rpx(19,9,'#ffffff');
-  // Catchlight (fill)
-  rpx(12,11,'#c8d8f0'); rpx(21,11,'#c8d8f0');
-  // Lower lash
-  for (let x=9;x<14;x++) rpx(x,12,darken(skin,15));
-  for (let x=18;x<23;x++) rpx(x,12,darken(skin,15));
-
-  // ── Nose ──
-  rpx(15,12,skinShd); rpx(16,12,skinShd);
-  rpx(14,13,skinShd); rpx(17,13,skinShd);
-  rpx(13,14,skinDrk); rpx(18,14,skinDrk);
-  rpx(14,14,skinShd); rpx(15,14,skin); rpx(16,14,skin); rpx(17,14,skinShd);
-  // Nostril
-  rpx(14,15,skinDrk); rpx(17,15,skinDrk);
-  rpx(15,15,skinShd); rpx(16,15,skinShd);
-  // Alar highlight
-  rpx(18,13,skinLit);
-
-  // ── Philtrum ──
-  rpx(15,15,skinShd); rpx(16,15,skinShd);
-
-  // ── Lips ──
-  const lipMid = `hsl(${5+ri(0,10)},${50+ri(0,20)}%,${40+ri(0,10)}%)`;
-  const lipLit = lighten(skinBase, 10);
-  const lipDrk = darken(skinBase, 25);
-  // Upper lip (cupid's bow)
-  for (let x=12;x<20;x++) rpx(x,16,lipDrk);
-  rpx(13,16,lipMid); rpx(14,16,lipLit); rpx(15,16,lipMid);
-  rpx(16,16,lipLit); rpx(17,16,lipMid); rpx(18,16,lipLit);
-  // Lip line
-  for (let x=12;x<20;x++) rpx(x,17,darken(skinBase,35));
-  // Lower lip (fuller, lighter)
-  for (let x=12;x<20;x++) rpx(x,18,lipMid);
-  rpx(13,18,lipLit); rpx(14,18,lighten(lipMid,15)); rpx(15,18,lipLit);
-  rpx(16,18,lighten(lipMid,15)); rpx(17,18,lipLit); rpx(18,18,lipMid);
-  for (let x=13;x<19;x++) rpx(x,19,darken(lipMid,15));
-
-  // ── Stubble (some players) ──
-  if (rng() > 0.35) {
-    const stubbleCol = darken(hairMid, 10);
-    const density = ri(3,6);
-    for (let y=15;y<19;y++) {
-      for (let x=9;x<23;x++) {
-        if ((x*7+y*13+seed) % density === 0) {
-          ctx.fillStyle = stubbleCol + '88';
-          ctx.fillRect(x*P, y*P, P, P);
-        }
-      }
-    }
-  }
-
-  // ── Subtle noise/grain ──
-  for (let i=0;i<80;i++) {
-    const gx = ri(0,SIZE-1), gy = ri(0,SIZE-1);
-    const g = (rng()-0.5)*18;
-    const [r,gr,b] = ctx.getImageData(gx,gy,1,1).data;
-    ctx.fillStyle = `rgba(${Math.min(255,r+g)},${Math.min(255,gr+g)},${Math.min(255,b+g)},0.4)`;
-    ctx.fillRect(gx,gy,1,1);
+  // Skin texture
+  for(let i=0;i<60;i++){
+    const gx=ri(43,85),gy=ri(4,38);
+    const h=headCols[gy-4];
+    if(!h||gx<h[0]||gx>h[1]){ctx.globalAlpha=0.25;rpx(gx,gy,adj(skinBase,ri(-8,8)));ctx.globalAlpha=1;}
   }
 
   return canvas.toDataURL('image/png');
