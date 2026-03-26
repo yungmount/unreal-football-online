@@ -473,8 +473,8 @@ function getPlayerBody(player) {
 }
 
 // ---- Player Creation ----
-function createPlayer(region, position, quality=60) {
-  const age = rand(17,35);
+function createPlayer(region, position, quality=60, ageRange=[17,35]) {
+  const age = rand(ageRange[0], ageRange[1]);
   const names = NAMES[region] || NAMES.England;
   const name = names[rand(0,names.length-1)];
   const pb = {GK:{pac:-20,sho:-25,def:20},CB:{pac:-5,sho:-15,def:25,phy:20},LB:{pac:15,def:10,pas:10},RB:{pac:15,def:10,pas:10},CDM:{def:15,pas:15},CM:{sho:10,def:5,pas:18},CAM:{pac:10,sho:18,def:-5,pas:15},LW:{pac:22,sho:18,def:-10},RW:{pac:22,sho:18,def:-10},ST:{pac:12,sho:25,def:-15,phy:15}};
@@ -544,7 +544,7 @@ function scoutAcademy(){
   const cnt=2+Math.floor(G.facilities.academy/2);
   const q=42+G.facilities.academy*4;
   G.prospects=[];
-  for(let i=0;i<Math.min(cnt,4);i++) G.prospects.push(createPlayer('China',['GK','CB','CM','ST'][rand(0,3)],rand(q-12,q+12)));
+  for(let i=0;i<Math.min(cnt,4);i++) G.prospects.push(createPlayer('China',['GK','CB','CM','ST'][rand(0,3)],rand(q-12,q+12),[14,20]));
   addNews('🌟 青训发现'+G.prospects.length+'名人才!');
 }
 function trainTeam(){
@@ -832,7 +832,8 @@ function render(){
   const sorted=[...G.league].sort((a,b)=>b.pts-a.pts);
   const myPos=sorted.findIndex(l=>l.name==='FC United')+1;
   let main='';
-  if(tab==='playerDetail')main=renderDetail();
+  let currentVoxelId = null;
+  if(tab==='playerDetail'){main=renderDetail(); currentVoxelId = currentVoxelPlayerId;}
   else if(tab==='home')main=renderHome(myL,sorted,myPos);
   else if(tab==='team')main=renderTeam();
   else if(tab==='tactics')main=renderTactics();
@@ -868,6 +869,10 @@ function render(){
     ${toast?`<div class="toast">${toast}</div>`:''}
   `;
   if(toast)setTimeout(()=>{toast=null;render()},2000);
+  // Init 3D voxel player after render
+  if(currentVoxelId && window.THREE && selPlayer){
+    setTimeout(()=>initVoxelPlayer(selPlayer, currentVoxelId), 50);
+  }
 }
 
 function showToast(msg){toast=msg;render()}
@@ -938,6 +943,7 @@ function renderDetail(){
   if(!p)return'';
   const av=getAvatar(p);
   const voxelId='voxel-'+Date.now();
+  currentVoxelPlayerId = voxelId;
   const stats=[{l:t('pace'),v:p.pace,c:'#00d4ff'},{l:t('shooting'),v:p.shooting,c:'#ef4444'},{l:t('passing'),v:p.passing,c:'#fbbf24'},{l:t('defending'),v:p.defending,c:'#22c55e'},{l:t('physical'),v:p.physical,c:'#8b5cf6'}];
   const bmi=(p.weight/Math.pow(p.height/100,2)).toFixed(1);
   return `
