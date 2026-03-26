@@ -996,7 +996,7 @@ function renderDetail(){
 
       <button onclick="tab='home';selPlayer=null;render()" class="btn btn-p" style="width:100%">← ${t('back')}</button>
     </div>
-    ${'<scr'+'ipt>setTimeout(function(){var c=document.getElementById("'+voxelId+'");if(c&&window.THREE)initVoxelPlayer(typeof selPlayer==="string"?JSON.parse(selPlayer):selPlayer,"'+voxelId+'");},80);<'+'/script>'}
+    ${'<scr'+'ipt>setTimeout(function(){var c=document.getElementById("'+voxelId+'");if(c&&window.THREE)initVoxelPlayer(${JSON.stringify(p)},"'+voxelId+'");},100);<'+'/script>'}
   `;
 }
 
