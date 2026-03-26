@@ -574,41 +574,49 @@ function startMatch() {
 
   setTimeout(()=>{
     const fp = FP[G.formation]||FP['4-4-2'];
+    // Home: left side (x=0..0.5), Away: right side (x=0.5..1)
     const myTeam = G.team.slice(0,11).map((p,i)=>{
-      const pos = fp[i]||{x:.3,y:.5};
-      return {...p, mx:pos[0], my:pos[1], x:pos[0], y:pos[1], hx:pos[0], hy:pos[1], spd:(p.pace/100)*.45+.15};
+      const pos = fp[i]||{x:.25,y:.5};
+      return {
+        ...p,
+        mx: pos[0]*0.45, my: pos[1],
+        x: pos[0]*0.45, y: pos[1],
+        hx: pos[0]*0.45, hy: pos[1],
+        spd: (p.pace/100)*.5+.12,
+        role: i===0?'GK':i<3?'DEF':i<7?'MID':'ATT'
+      };
     });
     const oppIdx = rand(1,G.league.length-1);
     const oppStr = G.league[oppIdx].strength;
-    const oppFp = fp.map(p=>[1-p[0],p[1]]);
+    const oppFp = fp.map(p=>[0.55+(1-p[0])*0.45,p[1]]);
     const oppPos = ['GK','CB','CB','LB','RB','CDM','CM','CM','LW','RW','ST'];
     const oppTeam = oppPos.map((pos,i)=>{
       const p = createPlayer(['England','Spain','Brazil','Germany','France'][rand(0,4)],pos,oppStr);
       const op = oppFp[i]||[.7,.5];
-      return {...p, mx:op[0], my:op[1], x:op[0], y:op[1], hx:op[0], hy:op[1], spd:(p.pace/100)*.45+.15};
-    });
-    // OSM-style team stats
-    const calcTeamStats = (team) => {
-      const atks=team.filter(p=>['ST','LW','RW','CAM'].includes(p.position));
-      const defs=team.filter(p=>['GK','CB','LB','RB','CDM'].includes(p.position));
-      const atk=atks.length ? atks.reduce((s,p)=>s+p.shooting+p.pace,0)/atks.length/2 : 45;
-      const def=defs.length ? defs.reduce((s,p)=>s+p.defending,0)/defs.length : 45;
-      const avgMorale=team.reduce((s,p)=>s+(p.morale||70),0)/team.length;
-      const avgFit=team.reduce((s,p)=>s+(p.fitness||80),0)/team.length;
-      const meanOvr=team.reduce((s,p)=>s+p.ovr,0)/team.length;
       return {
-        atk: atk*(avgFit/80)*(avgMorale/85),
-        def: def*(avgFit/80)*(avgMorale/85),
-        mean: meanOvr*(avgFit/80),
-        form: avgMorale,
-        fitness: avgFit
+        ...p,
+        mx: op[0], my: op[1],
+        x: op[0], y: op[1],
+        hx: op[0], hy: op[1],
+        spd: (p.pace/100)*.5+.12,
+        role: i===0?'GK':i<3?'DEF':i<7?'MID':'ATT'
       };
+    });
+
+    // Team stats (OSM engine)
+    const calcStats = (team)=>{
+      const atks=team.filter(p=>p.role==='ATT');
+      const defs=team.filter(p=>p.role==='DEF');
+      const mids=team.filter(p=>p.role==='MID');
+      const avgM=team.reduce((s,p)=>s+(p.morale||70),0)/11;
+      const avgF=team.reduce((s,p)=>s+(p.fitness||80),0)/11;
+      const avgO=team.reduce((s,p)=>s+p.ovr,0)/11;
+      const atk=(atks.length?atks.reduce((s,p)=>s+p.shooting+p.pace*0.5,0)/atks.length/1.5:40)*(avgF/80)*(avgM/85);
+      const def=(defs.length?defs.reduce((s,p)=>s+p.defending,0)/defs.length:40)*(avgF/80);
+      const mid=(mids.length?mids.reduce((s,p)=>s+p.passing,0)/mids.length:45)*(avgF/80)*(avgM/90);
+      return {atk,def,mid,ovr:avgO,form:avgM,fitness:avgF};
     };
-    const myS=calcTeamStats(myTeam), opS=calcTeamStats(oppTeam);
-    const LUCK=Math.random()*8+4;
-    const RED_EFF=8, FORM_EFF=.12, AGE_EFF=.08;
-    const meanAge=t=>t.reduce((s,p)=>s+(p.age||25),0)/t.length;
-    const ageEffect=(t,m)=>(meanAge(t)-25)*AGE_EFF*(m/90);
+    const myS=calcStats(myTeam), opS=calcStats(oppTeam);
 
     MS = {
       myTeam, oppTeam,
@@ -616,13 +624,14 @@ function startMatch() {
       myScore:0, oppScore:0,
       min:0, sec:0,
       ball:{x:.5,y:.5,z:0,vx:0,vy:0,owner:null,tx:.5,ty:.5,flying:false,sx:.5,sy:.5},
-      poss:'my',
+      phase:'kickoff', // kickoff, attack_my, attack_opp, goal_my, goal_opp, halftime, end
+      poss:'my', phaseDur:0,
       events:[],
       started:true, finished:false, htDone:false,
-      shots:{my:0,opp:0},
+      shots:{my:0,opp:0}, possTime:{my:0,opp:0},
       lastEvt:0,
-      // OSM stats
-      myS, opS, LUCK, RED_EFF, FORM_EFF, ageEffect,
+      myS, opS,
+      LUCK: Math.random()*7+3,
       redCards:{my:0,opp:0}
     };
     render();
@@ -641,180 +650,180 @@ function matchLoop(ts) {
 }
 
 function updateMatch(dt, ts) {
-  // Time: 1 real second = 1 game minute
+  // 1 real second = 1 game minute
   MS.sec += dt;
   if(MS.sec >= 1) {
     MS.sec = 0;
     MS.min++;
-    if(MS.min===45&&!MS.htDone){MS.htDone=true;addEvt('⏱️ 半场!','info')}
+    if(MS.min===45&&!MS.htDone){MS.htDone=true;MS.phase='halftime';MS.phaseDur=3;addEvt('⏱️ 半场结束!','info')}
     if(MS.min>=90&&!MS.finished){endMatch();return}
   }
 
-  // Ball physics
   const ball = MS.ball;
-  if(ball.flying){
+  const myAtk = MS.poss==='my';
+
+  // Phase state machine
+  MS.phaseDur -= dt;
+
+  // Ball flying: interpolate to target
+  if(ball.flying) {
     const dx=ball.tx-ball.x, dy=ball.ty-ball.y, d=Math.hypot(dx,dy);
-    if(d>.015){
-      ball.x+=dx/d*.55*dt; ball.y+=dy/d*.55*dt;
+    if(d>.012) {
+      ball.x += dx/d*.9*dt;
+      ball.y += dy/d*.9*dt;
       const prog=1-d/Math.max(.001,Math.hypot(ball.tx-ball.sx,ball.ty-ball.sy));
       ball.z=Math.sin(prog*Math.PI)*.12;
     } else {
       ball.x=ball.tx; ball.y=ball.ty; ball.z=0; ball.flying=false;
-      // Check interception
+      // Handoff to nearest player
       const all=[...MS.myTeam,...MS.oppTeam];
-      const near=all.filter(p=>Math.hypot(p.x-ball.x,p.y-ball.y)<.12);
-      if(near.length>0){
-        ball.owner=near[rand(0,near.length-1)];
-        MS.poss=MS.myTeam.includes(ball.owner)?'my':'opp';
-      }
+      let near=null, nd=999;
+      all.forEach(p=>{const dd=Math.hypot(p.x-ball.x,p.y-ball.y);if(dd<nd&&dd<.18){nd=dd;near=p}});
+      if(near){ball.owner=near;MS.poss=MS.myTeam.includes(near)?'my':'opp'}
     }
-  } else if(ball.owner){
-    ball.x+=(ball.owner.x-ball.x)*6*dt;
-    ball.y+=(ball.owner.y-ball.y)*6*dt;
-  } else {
-    ball.x+=ball.vx*dt; ball.y+=ball.vy*dt;
-    ball.vx*=.93; ball.vy*=.93;
-    if(ball.x<.02){ball.x=.02;ball.vx*=-.5}
-    if(ball.x>.98){ball.x=.98;ball.vx*=-.5}
-    if(ball.y<.02){ball.y=.02;ball.vy*=-.5}
-    if(ball.y>.98){ball.y=.98;ball.vy*=-.5}
   }
 
-  // Player AI
-  const myAtk = MS.poss==='my';
+  // Player movement
+  const roleX = {GK:myAtk?.05:.95, DEF:myAtk?.18:.82, MID:myAtk?.35:.65, ATT:myAtk?.65:.35};
   [...MS.myTeam,...MS.oppTeam].forEach((p,i)=>{
-    const isMy = i<11;
-    const atk = isMy===myAtk;
+    const isMy=i<11;
+    const atk=isMy===myAtk;
     let tx=p.hx, ty=p.hy;
-    if(atk){
-      if(ball.owner&&(isMy?MS.myTeam:MS.oppTeam).includes(ball.owner)){
-        if(ball.owner.id===p.id){tx=p.hx+(isMy?.1:-.1);ty=p.hy}
-        else{tx=p.hx+(isMy?.08:-.08)+(Math.random()-.5)*.1;ty=p.hy+(Math.random()-.5)*.15}
+
+    if(MS.phase==='halftime'){
+      tx=p.hx; ty=p.hy; // Stand still at halftime
+    } else if(ball.owner&&atk){
+      // Attacking: converge on ball
+      if(ball.owner.id===p.id){
+        // Ball carrier: advance toward goal
+        const gx=isMy?.88:.12;
+        tx=p.hx+(gx-p.hx)*.06;
+        ty=p.hy+(.5-p.hy)*.04+(Math.random()-.5)*.04;
       } else {
-        tx=ball.x*(isMy?.6:.4)+p.hx*(isMy?.4:.6);
-        ty=ball.y*.5+p.hy*.5;
+        // Support players: spread formation
+        const spread=atk?.35:.3;
+        tx=p.hx+(ball.x-p.hx)*spread+(Math.random()-.5)*.06;
+        ty=p.hy+(ball.y-p.hy)*.35+(Math.random()-.5)*.12;
       }
-    } else {
+    } else if(!ball.owner||!atk){
+      // Defending: compress and chase ball
       const d=Math.hypot(ball.x-p.x,ball.y-p.y);
-      if(d<.25){tx=ball.x+(isMy?-.04:.04);ty=ball.y}
-      else{tx=p.hx+(isMy?-.03:.03);ty=p.hy}
+      if(d<.35){
+        tx=p.hx+(ball.x-p.hx)*.08;
+        ty=p.hy+(ball.y-p.hy)*.06;
+      } else {
+        // Drift toward formation position
+        tx=p.hx+(p.hx-.5)*.01;
+        ty=p.hy+(p.hy-.5)*.005;
+      }
     }
+
+    // Smooth move
     const dx=tx-p.x, dy=ty-p.y, d=Math.hypot(dx,dy);
-    if(d>.008){const spd=Math.min(d*4,p.spd);p.x+=dx/d*spd*dt;p.y+=dy/d*spd*dt}
-    if(isMy){p.x=Math.max(.04,Math.min(.62,p.x))}else{p.x=Math.max(.38,Math.min(.96,p.x))}
+    if(d>.006){const spd=Math.min(d*5,p.spd);p.x+=dx/d*spd*dt;p.y+=dy/d*spd*dt}
+    p.x=Math.max(.04,Math.min(.96,p.x));
     p.y=Math.max(.02,Math.min(.98,p.y));
   });
 
-  // Events
-  if(ts-MS.lastEvt>2500&&Math.random()<.18){genEvt();MS.lastEvt=ts}
+  // Follow ball
+  if(ball.owner&&!ball.flying){
+    ball.x+=(ball.owner.x-ball.x)*8*dt;
+    ball.y+=(ball.owner.y-ball.y)*8*dt;
+  }
+
+  // Trigger events
+  if(MS.phaseDur<=0&&MS.phase!=='halftime'&&ts-MS.lastEvt>1800) {
+    genEvt();
+    MS.lastEvt=ts;
+  }
 }
 
 function genEvt(){
-  if(!MS)return;
-  const m=MS.min, isHome=true;
+  if(!MS||MS.finished||MS.phase==='halftime')return;
   const myAtk=MS.poss==='my';
   const atk=myAtk?MS.myTeam:MS.oppTeam;
   const def=myAtk?MS.oppTeam:MS.myTeam;
   const aS=myAtk?MS.myS:MS.opS;
   const dS=myAtk?MS.opS:MS.myS;
+  const m=MS.min;
   const ball=MS.ball;
-  const myRed=MS.redCards.my, oppRed=MS.redCards.opp;
+  const gk=def[0];
 
-  // OSM Engine: decide who starts attack
-  const attVal = aS.atk*(.75)+aS.mean*(.25)
-    - myRed*MS.RED_EFF - MS.ageEffect(atk,m)
-    + aS.form*MS.FORM_EFF;
-  const defVal = dS.def*(.75)+dS.mean*(.25)
-    - oppRed*MS.RED_EFF - MS.ageEffect(def,m)
-    + dS.form*MS.FORM_EFF;
+  // Distance to goal (how close for shooting)
+  const gx=myAtk?.88:.12;
+  const distToGoal=Math.abs(ball.x-gx);
 
+  // --- Decision: attack progress ---
   const r=rand(1,100);
 
-  if(r<=1){
+  if(r<=1&&MS.poss!=='halftime'){
     // Red card
-    const rcTeam=myAtk?MS.myTeam:MS.oppTeam;
-    const rcPlayer=rcTeam[rand(1,10)];
-    if(rcPlayer){if(myAtk)MS.redCards.my++;else MS.redCards.opp++;}
-    addEvt(`🟥 红牌! ${rcPlayer?.name.split(' ').pop()||'?'}`,'foul');
-    // Reboot: give ball to other team
-    ball.owner=null; ball.vx=(Math.random()-.5)*.3; ball.vy=(Math.random()-.5)*.3;
-    MS.poss=myAtk?'opp':'my';
-  } else if(r<=10){
-    // Foul / Free kick
-    const fouler=atk[rand(0,10)];
-    addEvt(`⚠️ 犯规! ${fouler?.name.split(' ').pop()||'?'}`,'foul');
-    ball.owner=null; ball.vx=(Math.random()-.5)*.3; ball.vy=(Math.random()-.5)*.3;
-    // Direct free kick shot
-    setTimeout(()=>{
-      if(!MS||MS.finished)return;
-      const shooters=atk.filter(p=>['ST','CAM','LW','RW'].includes(p.position));
-      const sk=shooters[rand(0,shooters.length-1)]||atk[rand(0,4)];
-      const gk=def[0];
-      MS.shots[myAtk?'my':'opp']++;
-      const shotVal=sk.shooting+sk.pace*0.3 - ageEffect(atk,m)*0.5;
-      const gkVal=gk.defending+28;
-      ball.tx=myAtk?.88:.12; ball.ty=.25+Math.random()*.5;
-      ball.flying=true;
-      setTimeout(()=>{
-        if(!MS||MS.finished)return;
-        const lr=shotVal/(Math.random()*50+40);
-        const dr=gkVal/(Math.random()*50+40)+MS.LUCK*.01;
-        if(lr>dr&&lr>0.75){if(myAtk){MS.myScore++;sk.goals++}else MS.oppScore++;addEvt(`⚽ ${sk.name.split(' ').pop()}! ${MS.myScore}-${MS.oppScore}`,'goal')}
-        else if(lr>dr*.7){addEvt(`🧤 扑出!`,'shot')}
-        else{addEvt(`❌ 偏出!`,'shot')}},700);
-    },1200);
-  } else if(r<=35){
-    // Attack → possibly shot
-    const shooters=atk.filter(p=>['ST','LW','RW','CAM'].includes(p.position));
-    const shooter=shooters[rand(0,shooters.length-1)]||atk[rand(0,5)];
-    const gk=def[0];
+    const rc=atk[rand(1,10)];
+    if(myAtk)MS.redCards.my++;else MS.redCards.opp++;
+    addEvt(`🟥 红牌! ${rc?.name.split(' ').pop()||'?'}`,'foul');
+    ball.owner=null;ball.vx=(Math.random()-.5)*.3;ball.vy=(Math.random()-.5)*.3;
+    MS.poss=myAtk?'opp':'my';MS.phaseDur=4;
+  } else if(r<=12){
+    // Foul
+    const foul=atk[rand(0,5)];
+    addEvt(`⚠️ ${foul?.name.split(' ').pop()}犯规!`,'foul');
+    ball.owner=null;ball.vx=(Math.random()-.5)*.25;ball.vy=(Math.random()-.5)*.25;
+    MS.phaseDur=2;
+  } else if(r<=40&&distToGoal<.55){
+    // Shot (only if near goal)
+    const shooters=atk.filter(p=>p.role==='ATT');
+    const sk=shooters[rand(0,shooters.length-1)]||atk[rand(5,10)];
+    const sv=(sk.shooting*.7+sk.pace*.3)*(aS.form/85)*(aS.fitness/80)
+      -(myAtk?MS.redCards.my:MS.redCards.opp)*6;
+    const gv=(gk.defending+28)*(dS.fitness/80)+((dS.form-50)*.3);
     MS.shots[myAtk?'my':'opp']++;
-
-    // Shot quality (OSM formula)
-    const shotVal=(shooter.shooting*.75+shooter.pace*.25)
-      - ageEffect(atk,m)
-      - (myAtk?MS.redCards.my:MS.redCards.opp)*5;
-    const gkVal=gk.defending+28 + ageEffect(def,m)*.5;
-    const luckMod=MS.LUCK*(Math.random()-.5)*6;
-
-    ball.sx=ball.x; ball.sy=ball.y;
-    ball.tx=myAtk?.88:.12; ball.ty=.2+Math.random()*.6;
-    ball.flying=true; ball.owner=shooter;
+    ball.sx=ball.x;ball.sy=ball.y;
+    ball.tx=gx;ball.ty=.2+Math.random()*.6;
+    ball.flying=true;ball.owner=sk;
     setTimeout(()=>{
       if(!MS||MS.finished)return;
-      const sr=shotVal/(Math.random()*45+35)+luckMod*.01;
-      const dr=gkVal/(Math.random()*40+30);
-      if(sr>dr&&sr>0.78){if(myAtk){MS.myScore++;shooter.goals++}else MS.oppScore++;addEvt(`⚽ ${shooter.name.split(' ').pop()}! ${MS.myScore}-${MS.oppScore}`,'goal')}
-      else if(sr>dr*.65){addEvt(`🧤 扑出!`,'shot')}
-      else{addEvt(`❌ 偏出!`,'shot')}
-      // Switch possession after shot
-      ball.owner=null; ball.flying=false; ball.x=ball.tx; ball.y=ball.ty;
-      MS.poss=myAtk?'opp':'my';
-    },650);
-  } else if(r<=55){
-    // Pass / Build-up
-    const passer=ball.owner||atk[rand(0,5)];
+      const sr=sv/(Math.random()*38+30)+MS.LUCK*.008;
+      const dr=gv/(Math.random()*35+25);
+      if(sr>dr&&sr>.78){
+        if(myAtk){MS.myScore++;sk.goals++}else{MS.oppScore++;sk.goals++}
+        addEvt(`⚽ ${sk.name.split(' ').pop()}! ${MS.myScore}-${MS.oppScore}`,'goal');
+        ball.owner=null;ball.flying=false;ball.x=ball.tx;ball.y=ball.ty;
+        MS.poss=myAtk?'opp':'my';MS.phaseDur=6;
+      } else if(sr>dr*.6){
+        addEvt(`🧤 扑出!`,'shot');
+        ball.owner=gk;ball.flying=false;ball.x=gk.x;ball.y=gk.y;
+        MS.poss=myAtk?'opp':'my';MS.phaseDur=5;
+      } else {
+        addEvt(`❌ 偏出!`,'shot');
+        ball.owner=null;ball.flying=false;ball.x=ball.tx;ball.y=ball.ty;
+        MS.poss=myAtk?'opp':'my';MS.phaseDur=4;
+      }
+    },550);
+    return;
+  } else if(r<=65){
+    // Pass / build-up play
+    const passer=ball.owner||atk[rand(0,4)];
     const recv=atk.filter(p=>p&&p.id!==passer?.id);
     const r2=recv[rand(0,Math.max(recv.length-1,0))];
     if(r2&&r2.x!==undefined){
-      ball.sx=ball.x; ball.sy=ball.y;
-      ball.tx=Math.max(0.05,Math.min(0.95,r2.x+(Math.random()-.5)*.08));
-      ball.ty=Math.max(0.05,Math.min(0.95,r2.y+(Math.random()-.5)*.08));
-      ball.flying=true; ball.owner=r2;
-      addEvt(`👟 ${passer?.name.split(' ').pop()||'?'} → ${r2.name.split(' ').pop()}`,'pass');
+      const ptx=Math.max(.05,Math.min(.95,r2.x+(Math.random()-.5)*.12));
+      const pty=Math.max(.05,Math.min(.95,r2.y+(Math.random()-.5)*.12));
+      ball.sx=ball.x;ball.sy=ball.y;
+      ball.tx=ptx;ball.ty=pty;
+      ball.flying=true;ball.owner=r2;
+      addEvt(`👟 ${passer?.name.split(' ').pop()}→${r2.name.split(' ').pop()}`,'pass');
+      MS.phaseDur=3;
     }
-  } else if(r<=70){
-    // Tackle / Turnover
+  } else if(r<=80){
+    // Tackle / turnover
     const tkl=def[rand(1,Math.min(def.length-1,6))];
-    if(tkl){ball.owner=tkl;MS.poss=myAtk?'opp':'my';addEvt(`🤺 抢断! ${tkl.name.split(' ').pop()}`,'pass')}
+    if(tkl){ball.owner=tkl;MS.poss=myAtk?'opp':'my';addEvt(`🤺 抢断! ${tkl.name.split(' ').pop()}`,'pass');MS.phaseDur=4;}
   } else {
-    // Ball out of play / GK kick
-    const gk=def[0];
-    ball.sx=ball.x; ball.sy=ball.y;
-    ball.tx=atk[rand(1,5)]?.x||(myAtk?.7:.3);
-    ball.ty=.2+Math.random()*.6;
-    ball.flying=true; ball.owner=gk;
-    addEvt(`🧤 球门球`,'info');
+    // Ball lost / GK
+    ball.owner=gk;
+    ball.x=gk.x;ball.y=gk.y;ball.flying=false;
+    addEvt(`🧤 ${gk.name.split(' ').pop()}球门球`,'info');
+    MS.poss=myAtk?'opp':'my';MS.phaseDur=4;
   }
 }
 
