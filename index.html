@@ -832,8 +832,7 @@ function render(){
   const sorted=[...G.league].sort((a,b)=>b.pts-a.pts);
   const myPos=sorted.findIndex(l=>l.name==='FC United')+1;
   let main='';
-  let currentVoxelId = null;
-  if(tab==='playerDetail'){main=renderDetail();}
+  if(tab==='playerDetail')main=renderDetail();
   else if(tab==='home')main=renderHome(myL,sorted,myPos);
   else if(tab==='team')main=renderTeam();
   else if(tab==='tactics')main=renderTactics();
@@ -869,10 +868,6 @@ function render(){
     ${toast?`<div class="toast">${toast}</div>`:''}
   `;
   if(toast)setTimeout(()=>{toast=null;render()},2000);
-  // Init 3D voxel player after render
-  if(currentVoxelId && window.THREE && selPlayer){
-    setTimeout(()=>initVoxelPlayer(selPlayer, currentVoxelId), 50);
-  }
 }
 
 function showToast(msg){toast=msg;render()}
@@ -943,7 +938,6 @@ function renderDetail(){
   if(!p)return'';
   const av=getAvatar(p);
   const voxelId='voxel-'+Date.now();
-  currentVoxelPlayerId = voxelId;
   const stats=[{l:t('pace'),v:p.pace,c:'#00d4ff'},{l:t('shooting'),v:p.shooting,c:'#ef4444'},{l:t('passing'),v:p.passing,c:'#fbbf24'},{l:t('defending'),v:p.defending,c:'#22c55e'},{l:t('physical'),v:p.physical,c:'#8b5cf6'}];
   const bmi=(p.weight/Math.pow(p.height/100,2)).toFixed(1);
   return `
