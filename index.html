@@ -91,7 +91,8 @@ const NAMES={
 };
 
 function getAvatar(player) {
-  return generatePixelAvatar(player);
+  const seed = encodeURIComponent(player.name);
+  return `https://api.dicebear.com/9.x/pixel-art/svg?seed=${seed}&backgroundColor=1a2030&radius=50`;
 }
 
 function generatePixelAvatar(player) {
