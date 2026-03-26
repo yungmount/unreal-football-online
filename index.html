@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>UFO - Unreal Football Online</title>
 <script src="https://cdn.tailwindcss.com"></script>
-<script src="https://unpkg.com/three@0.128.0/three.min.js"></script>
+<script src="https://cdn.bootcdn.net/ajax/libs/three.js/r128/three.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
 *{font-family:'Inter',sans-serif;-webkit-tap-highlight-color:transparent;user-select:none;box-sizing:border-box}
@@ -355,7 +355,7 @@ function initVoxelPlayer(player, containerId) {
   const dl = new THREE.DirectionalLight(0xffffff, 0.8);
   dl.position.set(2, 3, 2);
   scene.add(dl);
-  scene.add(new THREE.DirectionalLight(0x00d4ff, 0.3)).position.set(-2, 1, -2);
+  const bl = new THREE.DirectionalLight(0x00d4ff, 0.3); bl.position.set(-2, 1, -2); scene.add(bl);
   
   const playerG = new THREE.Group();
   scene.add(playerG);
