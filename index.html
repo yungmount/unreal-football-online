@@ -90,26 +90,9 @@ const NAMES={
   USA:['Christian Pulisic','Weston McKennie','Antonee Robinson','Tyler Adams','Yunus Musah','Gio Reyna','Folarin Balogun','Tim Weah','Brenden Aaronson','Ricardo Pepi','Mark McKenzie','Miles Robinson','Aaron Long','Josh Sargent','Joe Scally']
 };
 
-// ---- Avatar: Pixel art faces (local PNG files) ----
-const pxAvatarMap = {
-  'Harry Kane': 'px_Kane.png',
-  'Lionel Messi': 'px_Messi.png',
-  'Cristiano Ronaldo': 'px_Ronaldo.png',
-  'Mohamed Salah': 'px_Salah.png',
-  'Neymar Jr': 'px_Neymar.png',
-  'Kylian Mbappe': 'px_Mbappe.png',
-};
-
 function getAvatar(player) {
-  const name = player.name;
-  // Try exact match first
-  if (pxAvatarMap[name]) {
-    return `images/px_avatars/${pxAvatarMap[name]}`;
-  }
-  // Fallback to Pravatar
-  const hash = name.split('').reduce((a,c)=>a+c.charCodeAt(0),0);
-  const imgId = (hash % 70) + 1;
-  return `https://i.pravatar.cc/150?img=${imgId}`;
+  // All players use pixel art avatar (generated from name + nationality)
+  return generatePixelAvatar(player);
 }
 
 function generatePixelAvatar(player) {
