@@ -620,52 +620,107 @@ function matchLoop(ts) {
 function updateMatch(dt, ts) {
   const ball = MS.ball;
   const myAtk = MS.poss==='my';
+  const W=960, H=540;
 
-  // Clock
+  // Clock - smooth
   MS.sec += dt;
   if(MS.sec >= 1){MS.sec=0;MS.min++;if(MS.min===45&&!MS.htDone){MS.htDone=true;addEvt('⏱️ 半场!','info')}if(MS.min>=90&&!MS.finished){endMatch();return}}
 
   // Phase countdown
   MS.phaseT = Math.max(0, MS.phaseT - dt);
 
-  // AI decision
+  // AI decision - more frequent for smoother feel
   if(MS.phaseT <= 0 && !MS.finished){genEvt();MS.lastEvt=ts}
 
-  // Move ball toward target
-  if(Math.abs(ball.tx-ball.x)+Math.abs(ball.ty-ball.y) > 0.005){
-    const spd=ball.tx===ball.x&&ball.ty===ball.y?0:dt*2.5;
-    ball.x+=(ball.tx-ball.x)*spd; ball.y+=(ball.ty-ball.y)*spd;
-    if(Math.hypot(ball.tx-ball.x,ball.ty-ball.y)<0.005){ball.x=ball.tx;ball.y=ball.ty}
+  // Ball physics - smoother interpolation
+  const ballSpeed = Math.hypot(ball.tx-ball.x, ball.ty-ball.y);
+  if(ballSpeed > 0.005){
+    const spd = Math.min(ballSpeed, dt*3);
+    const ratio = spd/ballSpeed;
+    ball.x += (ball.tx-ball.x) * ratio;
+    ball.y += (ball.ty-ball.y) * ratio;
+    if(ballSpeed < 0.005){ball.x=ball.tx;ball.y=ball.ty}
+    // Mark ball as flying during shots
+    ball.flying = ballSpeed > .3;
+  } else {
+    ball.flying = false;
   }
 
-  // Move players
+  // Player AI - smoother movement with better formations
   [...MS.myTeam,...MS.oppTeam].forEach((p,i)=>{
-    const isMy=i<11, atk=isMy===myAtk;
-    const bp=MS.ball.owner?(ball.owner.isMy===isMy):false;
-    let tx=p.hx, ty=p.hy;
-    if(atk&&MS.ball.owner&&MS.ball.owner.isMy===isMy){
-      // Attacking — move toward ball
-      if(MS.ball.owner.id===p.id){tx=p.hx+(myAtk?.65:.35-p.hx)*.15+(Math.random()-.5)*.05;ty=.2+Math.random()*.6}
-      else{tx=p.hx+(ball.x-p.hx)*.5+(Math.random()-.5)*.1;ty=p.hy+(ball.y-p.hy)*.4+(Math.random()-.5)*.15}
+    const isMy = i<11;
+    const atk = isMy === myAtk;
+    const inPoss = MS.ball.owner && (MS.ball.owner.isMy === isMy);
+    
+    // Base formation targets
+    let tx = p.hx, ty = p.hy;
+    
+    // Dynamic positioning based on game state
+    if(atk && inPoss){
+      // Attack - spread forward
+      if(MS.ball.owner.id === p.id){
+        // Ball carrier
+        tx = p.hx + (myAtk ? .18 : -.18) + (Math.random()-.5)*.04;
+        ty = .25 + Math.random() * .5;
+      } else if(p.role === 'ATT'){
+        // Attackers - get in position
+        const gx = myAtk ? .88 : .12;
+        tx = p.hx + (gx - p.hx) * .3 + (Math.random()-.5)*.08;
+        ty = p.hy + (ball.y - p.hy) * .35;
+      } else if(p.role === 'MID'){
+        // Midfielders - support
+        tx = p.hx + (ball.x - p.hx) * .25;
+        ty = p.hy + (ball.y - p.hy) * .2 + (Math.random()-.5)*.05;
+      } else {
+        // Defenders - hold position
+        tx = p.hx + (Math.max(.15,Math.min(.5,ball.x)) - p.hx) * .15;
+      }
     } else if(!atk){
-      // Defending — compress, chase
-      const d=Math.hypot(ball.x-p.x,ball.y-p.y);
-      tx=p.hx+(ball.x-p.hx)*.15+(p.hx-.5)*.02;
-      ty=p.hy+(ball.y-p.hy)*.1;
-      if(d>.35){tx=p.hx;ty=p.hy+(ball.y-p.hy)*.04}
+      // Defense - compress and mark
+      const d = Math.hypot(ball.x-p.x, ball.y-p.y);
+      const gx = myAtk ? .12 : .88;
+      
+      if(p.role === 'DEF'){
+        // Defenders - mark attackers
+        tx = p.hx + (gx - p.hx) * .1 + (ball.x - p.hx) * .12;
+        ty = p.hy + (ball.y - p.hy) * .08;
+      } else if(p.role === 'GK'){
+        // Goalkeeper - stay near goal
+        tx = .06; ty = .5 + (ball.y - .5) * .15;
+      } else {
+        // Midfielders - track back
+        tx = p.hx + (ball.x - p.hx) * .08;
+        ty = p.hy + (ball.y - p.hy) * .06;
+      }
     } else {
-      // Midfielders stay balanced
-      tx=p.hx+(p.hx-.5)*.01+(Math.random()-.5)*.02;
-      ty=p.hy+(Math.random()-.5)*.03;
+      // Transition / balanced
+      tx = p.hx + (p.hx - .5) * .02 + (Math.random()-.5)*.03;
+      ty = p.hy + (Math.random()-.5)*.04;
     }
-    const dx=tx-p.x, dy=ty-p.y;
-    const d=Math.hypot(dx,dy);
-    if(d>.005){const mv=Math.min(d,p.spd*dt);p.x+=dx/d*mv;p.y+=dy/d*mv}
-    p.x=Math.max(.04,Math.min(.96,p.x)); p.y=Math.max(.04,Math.min(.96,p.y));
+    
+    // Smooth movement
+    const dx = tx - p.x;
+    const dy = ty - p.y;
+    const d = Math.hypot(dx, dy);
+    
+    if(d > .003){
+      const mv = Math.min(d, p.spd * dt * 1.2);
+      p.x += (dx/d) * mv;
+      p.y += (dy/d) * mv;
+    }
+    
+    // Keep in bounds
+    p.x = Math.max(.05, Math.min(.95, p.x));
+    p.y = Math.max(.05, Math.min(.95, p.y));
   });
 
-  // Ball follows owner
-  if(MS.ball.owner){ball.x+=(MS.ball.owner.x-ball.x)*dt*6;ball.y+=(MS.ball.owner.y-ball.y)*dt*6}
+  // Ball follows owner with smooth lag
+  if(MS.ball.owner){
+    const owner = MS.ball.owner;
+    const lag = 0.08;
+    ball.x += (owner.x + (myAtk?.06:-.06) - ball.x) * lag * dt * 60;
+    ball.y += (owner.y - ball.y) * lag * dt * 60;
+  }
 }
 
 function genEvt(){
@@ -774,74 +829,170 @@ function drawMatch(){
   const W=cvs.width/devicePixelRatio, H=cvs.height/devicePixelRatio;
   const W2=960, H2=540;
 
-  // Field
-  ctx.fillStyle='#1a6b1a';ctx.fillRect(0,0,W,H);
-  // Grass stripes
-  for(let i=0;i<H;i+=H/20){ctx.fillStyle=i%(H/10)<(H/20)?'rgba(0,0,0,.03)':'rgba(255,255,255,.015)';ctx.fillRect(0,i,W,H/20+1)}
-  // Field lines
-  ctx.strokeStyle='rgba(255,255,255,.6)';ctx.lineWidth=2;
-  ctx.strokeRect(10,8,W-20,H-16);
-  ctx.beginPath();ctx.moveTo(W/2,8);ctx.lineTo(W/2,H-8);ctx.stroke();
-  ctx.beginPath();ctx.arc(W/2,H/2,35,0,Math.PI*2);ctx.stroke();
-  ctx.strokeRect(10,H/4,40,H/2);ctx.strokeRect(W-50,H/4,40,H/2);
-  ctx.beginPath();ctx.arc(W/2,H/2,3,0,Math.PI*2);ctx.fillStyle='rgba(255,255,255,.6)';ctx.fill();
-  // Goal nets
-  ctx.strokeStyle='rgba(255,220,100,.5)';ctx.lineWidth=3;
-  ctx.strokeRect(10,H/2-40,2,80);
-  ctx.strokeRect(W-12,H/2-40,2,80);
+  // --- Field with beautiful gradient ---
+  const grad=ctx.createLinearGradient(0,0,0,H);
+  grad.addColorStop(0,'#1a5c1a');
+  grad.addColorStop(.5,'#2d8a2d');
+  grad.addColorStop(1,'#1a5c1a');
+  ctx.fillStyle=grad;ctx.fillRect(0,0,W,H);
+  
+  // Animated grass stripes (subtle)
+  const stripeOffset=(performance.now()/2000)%(H/10);
+  for(let i=0;i<12;i++){
+    const y=i*(H/12)+stripeOffset;
+    ctx.fillStyle=i%2===0?'rgba(255,255,255,.02)':'rgba(0,0,0,.02)';
+    ctx.fillRect(0,y,W,H/12);
+  }
+  
+  // Field lines - cleaner look
+  ctx.strokeStyle='rgba(255,255,255,.7)';ctx.lineWidth=2;
+  ctx.strokeRect(12,10,W-24,H-20);
+  ctx.beginPath();ctx.moveTo(W/2,10);ctx.lineTo(W/2,H-10);ctx.stroke();
+  ctx.beginPath();ctx.arc(W/2,H/2,45,0,Math.PI*2);ctx.stroke();
+  // Penalty areas
+  ctx.strokeRect(12,H/4-10,70,H/2+20);ctx.strokeRect(W-82,H/4-10,70,H/2+20);
+  // Goal areas
+  ctx.strokeRect(12,H/3,30,H/3);ctx.strokeRect(W-42,H/3,30,H/3);
+  
+  // Center circle detail
+  ctx.beginPath();ctx.arc(W/2,H/2,3,0,Math.PI*2);ctx.fillStyle='rgba(255,255,255,.8)';ctx.fill();
+  
+  // Goals with depth
+  ctx.fillStyle='rgba(30,30,30,.8)';
+  ctx.fillRect(4,H/2-35,12,70);ctx.fillRect(W-16,H/2-35,12,70);
+  // Goal net pattern
+  ctx.strokeStyle='rgba(255,255,255,.3)';ctx.lineWidth=1;
+  for(let i=0;i<7;i++){
+    ctx.beginPath();ctx.moveTo(4,H/2-35+i*10);ctx.lineTo(16,H/2-35+i*10);ctx.stroke();
+    ctx.beginPath();ctx.moveTo(W-16,H/2-35+i*10);ctx.lineTo(W-4,H/2-35+i*10);ctx.stroke();
+  }
 
-  // Players
-  const drawP=(p,color,isMy)=>{
+  // --- Draw players with Phaser-style smoothness ---
+  const drawP=(p,color,isMy,idx)=>{
     const x=p.x*W, y=p.y*H;
-    // Shadow
-    ctx.beginPath();ctx.ellipse(x,y+12,10,4,0,0,Math.PI*2);ctx.fillStyle='rgba(0,0,0,.3)';ctx.fill();
-    // Body
-    ctx.beginPath();ctx.arc(x,y,13,0,Math.PI*2);
-    ctx.fillStyle=color;ctx.fill();
-    ctx.strokeStyle='rgba(255,255,255,1)';ctx.lineWidth=2;ctx.stroke();
+    const prevX=p._px||x, prevY=p._py||y;
+    // Smooth interpolation
+    p._px=x; p._py=y;
+    const smoothX=prevX+(x-prevX)*.15;
+    const smoothY=prevY+(y-prevY)*.15;
+    
+    // Shadow with depth
+    ctx.beginPath();ctx.ellipse(smoothX,smoothY+14,12,5,0,0,Math.PI*2);
+    ctx.fillStyle='rgba(0,0,0,.35)';ctx.fill();
+    
+    // Movement direction indicator
+    if(p._dx){
+      const angle=Math.atan2(p._dy,p._dx);
+      ctx.beginPath();ctx.moveTo(smoothX,smoothY-22);
+      ctx.lineTo(smoothX+Math.cos(angle)*8,smoothY-22-Math.sin(angle)*6);
+      ctx.strokeStyle=isMy?'#ffd700':'#ff9999';ctx.lineWidth=2;ctx.stroke();
+    }
+    
+    // Body - layered for depth
+    const r=14;
+    // Jersey gradient
+    const jg=ctx.createRadialGradient(smoothX-3,smoothY-3,0,smoothX,smoothY,r);
+    jg.addColorStop(0,color);
+    jg.addColorStop(1,color==='#0ea5e9'?'#0369a1':'#b91c1c');
+    ctx.beginPath();ctx.arc(smoothX,smoothY,r,0,Math.PI*2);
+    ctx.fillStyle=jg;ctx.fill();
+    // Border
+    ctx.strokeStyle='rgba(255,255,255,.9)';ctx.lineWidth=2.5;ctx.stroke();
+    
     // Jersey number
     const num=p.name.charCodeAt(0)%99+1;
-    ctx.fillStyle='rgba(0,0,0,.7)';ctx.font='bold 8px Arial';ctx.textAlign='center';ctx.textBaseline='middle';
-    ctx.fillText(num,x,y);
-    // Role badge
-    ctx.fillStyle=isMy?'#ffd700':'#ef4444';
-    ctx.font='bold 5.5px Arial';ctx.textAlign='center';
-    ctx.fillText(p.role||'',x,y-16);
+    ctx.fillStyle='rgba(255,255,255,.95)';ctx.font='bold 9px Arial';ctx.textAlign='center';ctx.textBaseline='middle';
+    ctx.fillText(num,smoothX,smoothY);
+    
+    // Role badge - more visible
+    ctx.fillStyle=isMy?'rgba(255,215,0,.9)':'rgba(239,68,68,.9)';
+    ctx.beginPath();ctx.arc(smoothX,smoothY-20,6,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle='#000';ctx.font='bold 5px Arial';
+    ctx.fillText(p.role?.substring(0,2)||'',smoothX,smoothY-20);
+    
+    // Highlight current ball owner
+    if(MS.ball.owner&&MS.ball.owner.id===p.id){
+      ctx.beginPath();ctx.arc(smoothX,smoothY,20,0,Math.PI*2);
+      ctx.strokeStyle='rgba(255,255,255,.5)';ctx.lineWidth=2;ctx.setLineDash([4,4]);ctx.stroke();ctx.setLineDash([]);
+    }
   };
-  MS.myTeam.forEach(p=>drawP(p,'#0ea5e9',true));
-  MS.oppTeam.forEach(p=>drawP(p,'#ef4444',false));
+  
+  // Calculate player movement direction
+  [...MS.myTeam,...MS.oppTeam].forEach((p,i)=>{
+    const d=Math.hypot(p.x-(p._ox||p.x),p.y-(p._oy||p.y));
+    p._dx=d>.001?(p.x-(p._ox||p.x))/d:0;
+    p._dy=d>.001?(p.y-(p._oy||p.y))/d:0;
+    p._ox=p.x;p._oy=p.y;
+  });
+  
+  MS.myTeam.forEach((p,i)=>drawP(p,'#0ea5e9',true,i));
+  MS.oppTeam.forEach((p,i)=>drawP(p,'#ef4444',false,i));
 
-  // Ball
+  // --- Ball with rotation & shadow ---
   const ball=MS.ball;
   const bx=ball.x*W, by=ball.y*H;
-  // Shadow
-  ctx.beginPath();ctx.ellipse(bx,by+4,7,3,0,0,Math.PI*2);ctx.fillStyle='rgba(0,0,0,.3)';ctx.fill();
-  // Ball
-  ctx.beginPath();ctx.arc(bx,by,7,0,Math.PI*2);ctx.fillStyle='#fff';ctx.fill();
-  ctx.strokeStyle='#333';ctx.lineWidth=1;ctx.stroke();
-  // Pentagon pattern
-  ctx.fillStyle='#ddd';ctx.beginPath();ctx.arc(bx,by,3,0,Math.PI*2);ctx.fill();
+  const prevBX=ball._pbx||bx, prevBY=ball._pby||by;
+  ball._pbx=bx;ball._pby=by;
+  const sbx=prevBX+(bx-prevBX)*.2, sby=prevBY+(by-prevBY)*.2;
+  
+  // Ball shadow - scales with height (if flying)
+  const shadowScale=ball.flying?.5:1;
+  ctx.beginPath();ctx.ellipse(sbx,sby+6*shadowScale,7*shadowScale,3*shadowScale,0,0,Math.PI*2);
+  ctx.fillStyle='rgba(0,0,0,.4)';ctx.fill();
+  
+  // Ball body
+  const br=8;
+  ctx.beginPath();ctx.arc(sbx,sby,br,0,Math.PI*2);
+  const bg=ctx.createRadialGradient(sbx-2,sby-2,0,sbx,sby,br);
+  bg.addColorStop(0,'#fff');
+  bg.addColorStop(.7,'#f0f0f0');
+  bg.addColorStop(1,'#ccc');
+  ctx.fillStyle=bg;ctx.fill();
+  ctx.strokeStyle='#444';ctx.lineWidth=1;ctx.stroke();
+  
+  // Ball rotation pattern
+  const rot=(performance.now()/100)%(Math.PI*2);
+  ctx.fillStyle='#333';
+  for(let i=0;i<5;i++){
+    const ang=rot+i*(Math.PI*2/5);
+    ctx.beginPath();ctx.arc(sbx+Math.cos(ang)*4,sby+Math.sin(ang)*4,1.5,0,Math.PI*2);ctx.fill();
+  }
+  
+  // Ball trail when moving fast
+  const ballSpeed=Math.hypot(bx-prevBX,by-prevBY);
+  if(ballSpeed>3){
+    ctx.beginPath();ctx.moveTo(sbx,sby);
+    ctx.lineTo(sbx-(bx-prevBX)*.3,sby-(by-prevBY)*.3);
+    ctx.strokeStyle='rgba(255,255,255,.3)';ctx.lineWidth=4;ctx.stroke();
+  }
 
-  // HUD
-  ctx.fillStyle='rgba(0,0,0,.8)';
-  roundRect(ctx,W/2-50,6,100,30,8);ctx.fill();
-  ctx.fillStyle='#fff';ctx.font='bold 18px Orbitron,Arial';ctx.textAlign='center';
-  ctx.fillText(`${MS.myScore} - ${MS.oppScore}`,W/2,26);
-  ctx.fillStyle='rgba(0,0,0,.8)';
-  roundRect(ctx,W-50,6,44,24,6);ctx.fill();
-  ctx.fillStyle=MS.min>=45?'#ffd700':'#f87171';ctx.font='bold 13px Orbitron,Arial';ctx.textAlign='center';
-  ctx.fillText(`${MS.min}'`,W-28,22);
-
-  // Possession bar
+  // --- HUD - cleaner ---
+  // Score
+  ctx.fillStyle='rgba(15,23,42,.9)';
+  roundRect(ctx,W/2-55,8,110,28,6);ctx.fill();
+  ctx.fillStyle='#fff';ctx.font='bold 20px Orbitron,Arial';ctx.textAlign='center';
+  ctx.fillText(`${MS.myScore} - ${MS.oppScore}`,W/2,27);
+  
+  // Timer
+  ctx.fillStyle='rgba(15,23,42,.9)';
+  roundRect(ctx,W-52,8,44,24,4);ctx.fill();
+  ctx.fillStyle=MS.min>=45?'#ffd700':'#f87171';ctx.font='bold 12px Orbitron,Arial';ctx.textAlign='center';
+  ctx.fillText(`${MS.min}'`,W-28,23);
+  
+  // Possession bar with gradient
   const totShots=(MS.shots.my+MS.shots.opp)||1;
   const myPct=MS.shots.my/totShots;
-  ctx.fillStyle='rgba(0,0,0,.6)';
-  roundRect(ctx,10,6,100,16,4);ctx.fill();
-  ctx.fillStyle='#0ea5e9';ctx.fillRect(12,8,myPct*96,12);
-  ctx.fillStyle='#ef4444';ctx.fillRect(12+myPct*96,8,(1-myPct)*96,12);
-  ctx.fillStyle='#fff';ctx.font='9px Arial';ctx.textAlign='center';
-  ctx.fillText('⚽',12+myPct*96-10,17);
-  ctx.fillText('⚽',12+myPct*96+10,17);
+  ctx.fillStyle='rgba(15,23,42,.7)';
+  roundRect(ctx,12,8,96,14,3);ctx.fill();
+  const pg=ctx.createLinearGradient(12,0,108,0);
+  pg.addColorStop(0,'#0ea5e9');pg.addColorStop(myPct-.01,'#0ea5e9');
+  pg.addColorStop(myPct,'#ef4444');pg.addColorStop(1,'#ef4444');
+  ctx.fillStyle=pg;
+  ctx.fillRect(14,10,(myPct*.92),10);
+  
+  // Ball icons for possession
+  ctx.font='9px Arial';ctx.textAlign='center';
+  ctx.fillText('⚽',20,16);ctx.fillText('⚽',W-20,16);
 }
 
 function roundRect(ctx,x,y,w,h,r){ctx.beginPath();ctx.moveTo(x+r,y);ctx.lineTo(x+w-r,y);ctx.quadraticCurveTo(x+w,y,x+w,y+r);ctx.lineTo(x+w,y+h-r);ctx.quadraticCurveTo(x+w,y+h,x+w-r,y+h);ctx.lineTo(x+r,y+h);ctx.quadraticCurveTo(x,y+h,x,y+h-r);ctx.lineTo(x,y+r);ctx.quadraticCurveTo(x,y,x+r,y);ctx.closePath()}
