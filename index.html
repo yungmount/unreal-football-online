@@ -819,15 +819,15 @@ function endMatch(){
 function drawMatch(){
   const cvs=document.getElementById('mc');
   if(!cvs||!MS)return;
+  // Use fixed internal resolution, CSS scales it
+  const W=960, H=540;
+  if(cvs.width!==W||cvs.height!==H){
+    cvs.width=W; cvs.height=H;
+  }
   if(!ctx||ctx.canvas!==cvs){
     ctx=cvs.getContext('2d');
-    const r=cvs.getBoundingClientRect();
-    cvs.width=r.width*devicePixelRatio;
-    cvs.height=r.height*devicePixelRatio;
-    ctx.scale(devicePixelRatio,devicePixelRatio);
   }
-  const W=cvs.width/devicePixelRatio, H=cvs.height/devicePixelRatio;
-  const W2=960, H2=540;
+  ctx.scale(devicePixelRatio, devicePixelRatio);
 
   // --- Field with beautiful gradient ---
   const grad=ctx.createLinearGradient(0,0,0,H);
@@ -1280,8 +1280,8 @@ function renderMatch(){
         <div style="text-align:center"><div style="font-size:11px;color:#94a3b8">${MS.oppName}</div><div class="gt" style="font-size:40px;font-weight:700;color:#ef4444">${MS.oppScore}</div></div>
       </div>
     </div>
-    <div style="background:#1a5d1a;border-radius:12px;padding:6px;margin-bottom:10px;overflow:hidden">
-      <canvas id="mc" style="width:100%;height:auto;display:block;border-radius:8px;aspect-ratio:16/9"></canvas>
+    <div style="background:#1a5d1a;border-radius:12px;padding:6px;margin-bottom:10px">
+      <canvas id="mc" width="960" height="540" style="width:100%;height:auto;display:block;border-radius:8px"></canvas>
     </div>
     <div class="card" style="padding:12px;max-height:180px;overflow-y:auto">
       <div style="font-size:12px;font-weight:700;margin-bottom:8px">📋 事件</div>
