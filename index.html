@@ -823,11 +823,16 @@ function drawMatch(){
   const W=960, H=540;
   if(cvs.width!==W||cvs.height!==H){
     cvs.width=W; cvs.height=H;
+    // Only set scale once when canvas is reset
+    const dpr = window.devicePixelRatio || 1;
+    ctx = cvs.getContext('2d');
+    ctx.scale(dpr, dpr);
+    return; // Skip this frame, will draw next frame
   }
   if(!ctx||ctx.canvas!==cvs){
     ctx=cvs.getContext('2d');
   }
-  ctx.scale(devicePixelRatio, devicePixelRatio);
+  // Don't scale every frame!
 
   // --- Field with beautiful gradient ---
   const grad=ctx.createLinearGradient(0,0,0,H);
@@ -871,10 +876,10 @@ function drawMatch(){
   const drawP=(p,color,isMy,idx)=>{
     const x=p.x*W, y=p.y*H;
     const prevX=p._px||x, prevY=p._py||y;
-    // Smooth interpolation
+    // Smooth interpolation - faster
     p._px=x; p._py=y;
-    const smoothX=prevX+(x-prevX)*.15;
-    const smoothY=prevY+(y-prevY)*.15;
+    const smoothX=prevX+(x-prevX)*.35;
+    const smoothY=prevY+(y-prevY)*.35;
     
     // Shadow with depth
     ctx.beginPath();ctx.ellipse(smoothX,smoothY+14,12,5,0,0,Math.PI*2);
@@ -933,7 +938,7 @@ function drawMatch(){
   const bx=ball.x*W, by=ball.y*H;
   const prevBX=ball._pbx||bx, prevBY=ball._pby||by;
   ball._pbx=bx;ball._pby=by;
-  const sbx=prevBX+(bx-prevBX)*.2, sby=prevBY+(by-prevBY)*.2;
+  const sbx=prevBX+(bx-prevBX)*.4, sby=prevBY+(by-prevBY)*.4;
   
   // Ball shadow - scales with height (if flying)
   const shadowScale=ball.flying?.5:1;
