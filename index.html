@@ -569,13 +569,18 @@ const FP = {
 // ---- Match Engine ----
 function startMatch() {
   if(rafId){cancelAnimationFrame(rafId);rafId=null}
+  if(window._engine){Matter.Engine.clear(window._engine);window._engine=null}
   MS = null; tab = 'match'; render();
+  
   setTimeout(()=>{
+    if(!window.Matter){alert('Loading physics...');return}
+    
     const fp = FP[G.formation]||FP['4-4-2'];
     const myTeam = G.team.slice(0,11).map((p,i)=>{
       const pos = fp[i]||[.25,.5];
-      return {...p, hx:pos[0]*0.46, hy:pos[1], x:pos[0]*0.46, y:pos[1], spd:(p.pace/100)*.55+.12, role:i===0?'GK':i<3?'DEF':i<7?'MID':'ATT'};
+      return {...p, hx:pos[0]*0.46, hy:pos[1], x:pos[0]*0.46, y:pos[1], spd:(p.pace/100)*.5+.1, role:i===0?'GK':i<3?'DEF':i<7?'MID':'ATT', isMy:true, _idx:i};
     });
+    
     const oppIdx = rand(1,G.league.length-1);
     const oppStr = G.league[oppIdx].strength;
     const oppFp = fp.map(p=>[0.54+(1-p[0])*0.46,p[1]]);
@@ -583,147 +588,96 @@ function startMatch() {
     const oppTeam = oppPos.map((pos,i)=>{
       const p = createPlayer(['England','Spain','Brazil','Germany','France'][rand(0,4)],pos,oppStr);
       const op = oppFp[i]||[.75,.5];
-      return {...p, hx:op[0], hy:op[1], x:op[0], y:op[1], spd:(p.pace/100)*.55+.12, role:i===0?'GK':i<3?'DEF':i<7?'MID':'ATT'};
+      return {...p, hx:op[0], hy:op[1], x:op[0], y:op[1], spd:(p.pace/100)*.5+.1, role:i===0?'GK':i<3?'DEF':i<7?'MID':'ATT', isMy:false, _idx:i};
     });
-    const calcS=(t)=>{
+
+    const calcStats=(t)=>{
       const att=t.filter(p=>p.role==='ATT'), def=t.filter(p=>p.role==='DEF'||p.role==='GK'), mid=t.filter(p=>p.role==='MID');
       const af=t.reduce((s,p)=>s+(p.morale||70),0)/11, ff=t.reduce((s,p)=>s+(p.fitness||80),0)/11;
-      return {atk:(att.length?att.reduce((s,p)=>s+p.shooting+p.pace*.4,0)/att.length/1.4:40)*af/85*ff/80, def:(def.length?def.reduce((s,p)=>s+p.defending,0)/def.length:40)*ff/80, mid:(mid.length?mid.reduce((s,p)=>s+p.passing,0)/mid.length:45)*af/85*ff/80};
+      return {atk:(att.length?att.reduce((s,p)=>s+p.shooting+p.pace*.4,0)/att.length/1.4:40)*af/85*ff/80, def:(def.length?def.reduce((s,p)=>s+p.defending,0)/def.length:40)*ff/80};
     };
-    const myS=calcS(myTeam), opS=calcS(oppTeam);
-    MS = {
-      myTeam, oppTeam, oppName:getLN(oppIdx),
-      myScore:0, oppScore:0,
-      min:0, sec:0,
-      ball:{x:.5,y:.5,vx:0,vy:0,owner:null,tx:.5,ty:.5},
-      poss:'my', phase:'kickoff', phaseT:0,
-      events:[], started:true, finished:false, htDone:false,
-      shots:{my:0,opp:0}, lastEvt:0,
-      myS, opS, LUCK:Math.random()*6+3,
-      redCards:{my:0,opp:0}
-    };
+    const myS=calcStats(myTeam), opS=calcStats(oppTeam);
+
+    const W=960, H=540;
+    const Engine=Matter.Engine, World=Matter.World, Bodies=Matter.Bodies, Body=Matter.Body;
+    const engine = Engine.create({gravity:{x:0,y:0}});
+    const world = engine.world;
+    window._engine = engine;
+    
+    const walls = [Bodies.rectangle(W/2,-5,W,10,{isStatic:true}),Bodies.rectangle(W/2,H+5,W,10,{isStatic:true}),Bodies.rectangle(-5,H/2,10,H,{isStatic:true}),Bodies.rectangle(W+5,H/2,10,H,{isStatic:true})];
+    World.add(world, walls);
+
+    const ballBody = Bodies.circle(W*.5,H*.5,10,{frictionAir:.02,restitution:.8});
+    World.add(world, ballBody);
+
+    const pBodies={};
+    [...myTeam,...oppTeam].forEach((p,i)=>{
+      const bx=p.hx*W, by=p.hy*H;
+      const r=p.role==='GK'?16:14;
+      const b=Bodies.circle(bx,by,r,{frictionAir:.1,friction:.05});
+      Body.setMass(b,2);
+      World.add(world,b);
+      pBodies[p.isMy?'my_'+p._idx:'opp_'+p._idx]={body:b,player:p};
+      p._body=b;
+    });
+
+    MS = {myTeam, oppTeam, oppName:getLN(oppIdx), myScore:0, oppScore:0, min:0, sec:0, ball:{x:.5,y:.5,owner:null,tx:.5,ty:.5}, poss:'my', phaseT:0, events:[], started:true, finished:false, htDone:false, shots:{my:0,opp:0}, lastEvt:0, myS, opS, LUCK:Math.random()*6+3, redCards:{my:0,opp:0}, engine, world, ballBody, pBodies};
+    
     render();
-    // Delay start to let DOM settle
-    setTimeout(() => {
-      lastT = performance.now();
-      rafId = requestAnimationFrame(matchLoop);
-    }, 100);
-  }, 100);
+    setTimeout(()=>{lastT=performance.now();rafId=requestAnimationFrame(matchLoop)},200);
+  },100);
 }
 
 function matchLoop(ts) {
   if(!MS||!MS.started||MS.finished){rafId=null;return}
-  const dt = Math.min((ts-lastT)/1000, .05);
-  lastT = ts;
-  updateMatch(dt, ts);
+  const dt=Math.min((ts-lastT)/1000,.033);
+  lastT=ts;
+  if(MS.engine)Matter.Engine.update(MS.engine,dt*1000);
+  updateMatch(dt,ts);
   drawMatch();
-  rafId = requestAnimationFrame(matchLoop);
+  rafId=requestAnimationFrame(matchLoop);
 }
 
-function updateMatch(dt, ts) {
-  const ball = MS.ball;
-  const myAtk = MS.poss==='my';
-  const W=960, H=540;
-
-  // Clock - smooth
-  MS.sec += dt;
-  if(MS.sec >= 1){MS.sec=0;MS.min++;if(MS.min===45&&!MS.htDone){MS.htDone=true;addEvt('⏱️ 半场!','info')}if(MS.min>=90&&!MS.finished){endMatch();return}}
-
-  // Phase countdown
-  MS.phaseT = Math.max(0, MS.phaseT - dt);
-
-  // AI decision - more frequent for smoother feel
-  if(MS.phaseT <= 0 && !MS.finished){genEvt();MS.lastEvt=ts}
-
-  // Ball physics - smoother interpolation
-  const ballSpeed = Math.hypot(ball.tx-ball.x, ball.ty-ball.y);
-  if(ballSpeed > 0.005){
-    const spd = Math.min(ballSpeed, dt*3);
-    const ratio = spd/ballSpeed;
-    ball.x += (ball.tx-ball.x) * ratio;
-    ball.y += (ball.ty-ball.y) * ratio;
-    if(ballSpeed < 0.005){ball.x=ball.tx;ball.y=ball.ty}
-    // Mark ball as flying during shots
-    ball.flying = ballSpeed > .3;
-  } else {
-    ball.flying = false;
-  }
-
-  // Player AI - smoother movement with better formations
-  [...MS.myTeam,...MS.oppTeam].forEach((p,i)=>{
-    const isMy = i<11;
-    const atk = isMy === myAtk;
-    const inPoss = MS.ball.owner && (MS.ball.owner.isMy === isMy);
-    
-    // Base formation targets
-    let tx = p.hx, ty = p.hy;
-    
-    // Dynamic positioning based on game state
-    if(atk && inPoss){
-      // Attack - spread forward
-      if(MS.ball.owner.id === p.id){
-        // Ball carrier
-        tx = p.hx + (myAtk ? .18 : -.18) + (Math.random()-.5)*.04;
-        ty = .25 + Math.random() * .5;
-      } else if(p.role === 'ATT'){
-        // Attackers - get in position
-        const gx = myAtk ? .88 : .12;
-        tx = p.hx + (gx - p.hx) * .3 + (Math.random()-.5)*.08;
-        ty = p.hy + (ball.y - p.hy) * .35;
-      } else if(p.role === 'MID'){
-        // Midfielders - support
-        tx = p.hx + (ball.x - p.hx) * .25;
-        ty = p.hy + (ball.y - p.hy) * .2 + (Math.random()-.5)*.05;
-      } else {
-        // Defenders - hold position
-        tx = p.hx + (Math.max(.15,Math.min(.5,ball.x)) - p.hx) * .15;
-      }
-    } else if(!atk){
-      // Defense - compress and mark
-      const d = Math.hypot(ball.x-p.x, ball.y-p.y);
-      const gx = myAtk ? .12 : .88;
-      
-      if(p.role === 'DEF'){
-        // Defenders - mark attackers
-        tx = p.hx + (gx - p.hx) * .1 + (ball.x - p.hx) * .12;
-        ty = p.hy + (ball.y - p.hy) * .08;
-      } else if(p.role === 'GK'){
-        // Goalkeeper - stay near goal
-        tx = .06; ty = .5 + (ball.y - .5) * .15;
-      } else {
-        // Midfielders - track back
-        tx = p.hx + (ball.x - p.hx) * .08;
-        ty = p.hy + (ball.y - p.hy) * .06;
-      }
-    } else {
-      // Transition / balanced
-      tx = p.hx + (p.hx - .5) * .02 + (Math.random()-.5)*.03;
-      ty = p.hy + (Math.random()-.5)*.04;
-    }
-    
-    // Smooth movement
-    const dx = tx - p.x;
-    const dy = ty - p.y;
-    const d = Math.hypot(dx, dy);
-    
-    if(d > .003){
-      const mv = Math.min(d, p.spd * dt * 1.2);
-      p.x += (dx/d) * mv;
-      p.y += (dy/d) * mv;
-    }
-    
-    // Keep in bounds
-    p.x = Math.max(.05, Math.min(.95, p.x));
-    p.y = Math.max(.05, Math.min(.95, p.y));
+function updateMatch(dt,ts){
+  const W=960,H=540;
+  const ball=MS.ball;
+  const myAtk=MS.poss==='my';
+  const bb=MS.ballBody;
+  
+  ball.x=bb.position.x/W;
+  ball.y=bb.position.y/H;
+  
+  Object.values(MS.pBodies).forEach(({body,player})=>{
+    player.x=body.position.x/W;
+    player.y=body.position.y/H;
   });
-
-  // Ball follows owner with smooth lag
-  if(MS.ball.owner){
-    const owner = MS.ball.owner;
-    const lag = 0.08;
-    ball.x += (owner.x + (myAtk?.06:-.06) - ball.x) * lag * dt * 60;
-    ball.y += (owner.y - ball.y) * lag * dt * 60;
+  
+  MS.sec+=dt;
+  if(MS.sec>=1){MS.sec=0;MS.min++;if(MS.min===45&&!MS.htDone){MS.htDone=true;addEvt('⏱️ 半场!','info')}if(MS.min>=90&&!MS.finished){endMatch();return}}
+  
+  MS.phaseT=Math.max(0,MS.phaseT-dt);
+  if(MS.phaseT<=0&&!MS.finished){genEvt();MS.lastEvt=ts}
+  
+  const {Body}=Matter;
+  if(ball.owner&&bb){
+    const ob=ball.owner._body;
+    if(ob){Body.setPosition(bb,{x:ob.position.x+(myAtk?15:-15),y:ob.position.y});Body.setVelocity(bb,{x:0,y:0})}
   }
+  
+  [...MS.myTeam,...MS.oppTeam].forEach((p,i)=>{
+    const isMy=i<11,atk=isMy===myAtk;
+    const pb=p._body;
+    if(!pb)return;
+    let tx=p.hx*W,ty=p.hy*H;
+    if(atk&&ball.owner&&ball.owner.isMy===isMy){
+      if(ball.owner.id===p.id){tx=p.hx*W+(myAtk?60:-60)+(Math.random()-0.5)*20;ty=H/2+(Math.random()-0.5)*H*.6}
+      else{const dx=bb.position.x-pb.position.x,dy=bb.position.y-pb.position.y;tx=pb.position.x+dx*0.4;ty=pb.position.y+dy*0.3}
+    }else if(!atk){tx=p.hx*W+(myAtk?-30:30)+(Math.random()-0.5)*10;ty=p.hy*H+(ball.y*H-p.hy*H)*0.1}
+    const dx=tx-pb.position.x,dy=ty-pb.position.y,force=Math.min(Math.hypot(dx,dy)*0.0002,p.spd*0.001);
+    Body.applyForce(pb,pb.position,{x:dx/Math.max(1,Math.hypot(dx,dy))*force,y:dy/Math.max(1,Math.hypot(dx,dy))*force});
+    const nx=Math.max(20,Math.min(W-20,pb.position.x)),ny=Math.max(20,Math.min(H-20,pb.position.y));
+    if(nx!==pb.position.x||ny!==pb.position.y)Body.setPosition(pb,{x:nx,y:ny});
+  });
 }
 
 function genEvt(){
@@ -800,6 +754,7 @@ function endMatch(){
   if(!MS||MS.finished)return;
   MS.finished=true;
   if(rafId){cancelAnimationFrame(rafId);rafId=null}
+  if(MS.engine){Matter.Engine.clear(MS.engine);MS.engine=null;window._engine=null}
   addEvt(`🏁 全场结束 ${MS.myScore}-${MS.oppScore}`,'info');
   const myL=G.league.find(l=>l.name==='FC United');
   const oppL=G.league.find(l=>l.name===MS.oppName);
@@ -824,58 +779,42 @@ function drawMatch(){
   if(!cvs||!MS)return;
   const W=960, H=540;
   
-  // Setup canvas ONCE
-  if(!ctx || ctx.canvas !== cvs){
-    cvs.width = W;
-    cvs.height = H;
-    ctx = cvs.getContext('2d');
-    const dpr = window.devicePixelRatio || 1;
-    ctx.scale(dpr, dpr);
-    return; // Skip first frame
+  if(!ctx||ctx.canvas!==cvs){
+    cvs.width=W;cvs.height=H;
+    ctx=cvs.getContext('2d');
+    ctx.scale(devicePixelRatio,devicePixelRatio);
   }
 
-  // Clear
-  ctx.fillStyle = '#1a5c1a';
-  ctx.fillRect(0, 0, W, H);
+  // Field
+  ctx.fillStyle='#2d8a2d';ctx.fillRect(0,0,W,H);
+  ctx.strokeStyle='rgba(255,255,255,0.5)';ctx.lineWidth=2;
+  ctx.strokeRect(10,10,W-20,H-20);
+  ctx.beginPath();ctx.moveTo(W/2,10);ctx.lineTo(W/2,H-10);ctx.stroke();
+  ctx.beginPath();ctx.arc(W/2,H/2,50,0,Math.PI*2);ctx.stroke();
 
-  // Draw field lines
-  ctx.strokeStyle = 'rgba(255,255,255,0.5)';
-  ctx.lineWidth = 2;
-  ctx.strokeRect(10, 10, W-20, H-20);
-  ctx.beginPath(); ctx.moveTo(W/2, 10); ctx.lineTo(W/2, H-10); ctx.stroke();
-  ctx.beginPath(); ctx.arc(W/2, H/2, 50, 0, Math.PI*2); ctx.stroke();
-
-  // Draw players as simple circles first
-  MS.myTeam.forEach((p, i) => {
-    const x = p.x * W, y = p.y * H;
-    ctx.beginPath();
-    ctx.arc(x, y, 15, 0, Math.PI*2);
-    ctx.fillStyle = '#0ea5e9';
-    ctx.fill();
-    ctx.strokeStyle = '#fff';
-    ctx.stroke();
+  // Draw players from physics bodies
+  ctx.fillStyle='#0ea5e9';
+  MS.myTeam.forEach(p=>{
+    const bx=p._body?p._body.position.x:p.x*W;
+    const by=p._body?p._body.position.y:p.y*H;
+    ctx.beginPath();ctx.arc(bx,by,14,0,Math.PI*2);ctx.fill();ctx.strokeStyle='#fff';ctx.lineWidth=2;ctx.stroke();
   });
-  MS.oppTeam.forEach((p, i) => {
-    const x = p.x * W, y = p.y * H;
-    ctx.beginPath();
-    ctx.arc(x, y, 15, 0, Math.PI*2);
-    ctx.fillStyle = '#ef4444';
-    ctx.fill();
-    ctx.strokeStyle = '#fff';
-    ctx.stroke();
+  ctx.fillStyle='#ef4444';
+  MS.oppTeam.forEach(p=>{
+    const bx=p._body?p._body.position.x:p.x*W;
+    const by=p._body?p._body.position.y:p.y*H;
+    ctx.beginPath();ctx.arc(bx,by,14,0,Math.PI*2);ctx.fill();ctx.strokeStyle='#fff';ctx.lineWidth=2;ctx.stroke();
   });
 
-  // Draw ball
-  const bx = MS.ball.x * W, by = MS.ball.y * H;
-  ctx.beginPath();
-  ctx.arc(bx, by, 8, 0, Math.PI*2);
-  ctx.fillStyle = '#fff';
-  ctx.fill();
+  // Ball
+  const bx=MS.ballBody?MS.ballBody.position.x:MS.ball.x*W;
+  const by=MS.ballBody?MS.ballBody.position.y:MS.ball.y*H;
+  ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(bx,by,10,0,Math.PI*2);ctx.fill();
 
   // HUD
-  ctx.fillStyle = '#000';
-  ctx.font = 'bold 24px Arial';
-  ctx.fillText(`${MS.myScore} - ${MS.oppScore}   ${MS.min}'`, W/2 - 60, 30);
+  ctx.fillStyle='rgba(0,0,0,0.7)';ctx.fillRect(W/2-60,5,120,30);
+  ctx.fillStyle='#fff';ctx.font='bold 22px Arial';ctx.textAlign='center';
+  ctx.fillText(MS.myScore+'-'+MS.oppScore+'  '+MS.min+"'",W/2,27);
 }
 
 function roundRect(ctx,x,y,w,h,r){ctx.beginPath();ctx.moveTo(x+r,y);ctx.lineTo(x+w-r,y);ctx.quadraticCurveTo(x+w,y,x+w,y+r);ctx.lineTo(x+w,y+h-r);ctx.quadraticCurveTo(x+w,y+h,x+w-r,y+h);ctx.lineTo(x+r,y+h);ctx.quadraticCurveTo(x,y+h,x,y+h-r);ctx.lineTo(x,y+r);ctx.quadraticCurveTo(x,y,x+r,y);ctx.closePath()}
