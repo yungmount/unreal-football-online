@@ -603,8 +603,11 @@ function startMatch() {
       redCards:{my:0,opp:0}
     };
     render();
-    lastT = performance.now();
-    rafId = requestAnimationFrame(matchLoop);
+    // Delay start to let DOM settle
+    setTimeout(() => {
+      lastT = performance.now();
+      rafId = requestAnimationFrame(matchLoop);
+    }, 100);
   }, 100);
 }
 
