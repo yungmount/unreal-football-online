@@ -774,47 +774,55 @@ function endMatch(){
   render();
 }
 
+let _mcCtx=null;
+
 function drawMatch(){
   const cvs=document.getElementById('mc');
   if(!cvs||!MS)return;
-  const W=960, H=540;
-  
-  if(!ctx||ctx.canvas!==cvs){
-    cvs.width=W;cvs.height=H;
-    ctx=cvs.getContext('2d');
-    ctx.scale(devicePixelRatio,devicePixelRatio);
-  }
+  const W=960,H=540;
+  if(cvs.width!==W||cvs.height!==H){cvs.width=W;cvs.height=H;_mcCtx=null;}
+  if(!_mcCtx||_mcCtx.canvas!==cvs){_mcCtx=cvs.getContext('2d');}
+  const c=_mcCtx;
 
-  // Field
-  ctx.fillStyle='#2d8a2d';ctx.fillRect(0,0,W,H);
-  ctx.strokeStyle='rgba(255,255,255,0.5)';ctx.lineWidth=2;
-  ctx.strokeRect(10,10,W-20,H-20);
-  ctx.beginPath();ctx.moveTo(W/2,10);ctx.lineTo(W/2,H-10);ctx.stroke();
-  ctx.beginPath();ctx.arc(W/2,H/2,50,0,Math.PI*2);ctx.stroke();
+  // Grass
+  c.fillStyle='#2d8a2d';c.fillRect(0,0,W,H);
+  for(let i=0;i<10;i++){c.fillStyle=i%2?'rgba(0,0,0,0.04)':'rgba(255,255,255,0.03)';c.fillRect(i*(W/10),0,W/10,H);}
 
-  // Draw players from physics bodies
-  ctx.fillStyle='#0ea5e9';
-  MS.myTeam.forEach(p=>{
-    const bx=p._body?p._body.position.x:p.x*W;
-    const by=p._body?p._body.position.y:p.y*H;
-    ctx.beginPath();ctx.arc(bx,by,14,0,Math.PI*2);ctx.fill();ctx.strokeStyle='#fff';ctx.lineWidth=2;ctx.stroke();
-  });
-  ctx.fillStyle='#ef4444';
-  MS.oppTeam.forEach(p=>{
-    const bx=p._body?p._body.position.x:p.x*W;
-    const by=p._body?p._body.position.y:p.y*H;
-    ctx.beginPath();ctx.arc(bx,by,14,0,Math.PI*2);ctx.fill();ctx.strokeStyle='#fff';ctx.lineWidth=2;ctx.stroke();
-  });
+  // Lines
+  c.strokeStyle='rgba(255,255,255,0.55)';c.lineWidth=2;
+  c.strokeRect(20,20,W-40,H-40);
+  c.strokeRect(20,H/2-80,60,160);
+  c.strokeRect(W-80,H/2-80,60,160);
+  c.beginPath();c.moveTo(W/2,20);c.lineTo(W/2,H-20);c.stroke();
+  c.beginPath();c.arc(W/2,H/2,50,0,Math.PI*2);c.stroke();
+
+  // Players
+  const dp=(p,col)=>{
+    let bx=p._body?p._body.position.x:p.x*W;
+    let by=p._body?p._body.position.y:p.y*H;
+    bx=Math.max(25,Math.min(W-25,bx));by=Math.max(25,Math.min(H-25,by));
+    c.fillStyle='rgba(0,0,0,0.2)';c.beginPath();c.ellipse(bx,by+16,11,4,0,0,Math.PI*2);c.fill();
+    c.fillStyle=col;c.beginPath();c.arc(bx,by,12,0,Math.PI*2);c.fill();
+    c.strokeStyle='#fff';c.lineWidth=1.5;c.stroke();
+    c.fillStyle='#fff';c.font='bold 8px Arial';c.textAlign='center';
+    c.fillText((p.name||'').split(' ').pop(),bx,by-16);
+  };
+  MS.myTeam.forEach(p=>dp(p,'#0ea5e9'));
+  MS.oppTeam.forEach(p=>dp(p,'#ef4444'));
 
   // Ball
-  const bx=MS.ballBody?MS.ballBody.position.x:MS.ball.x*W;
-  const by=MS.ballBody?MS.ballBody.position.y:MS.ball.y*H;
-  ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(bx,by,10,0,Math.PI*2);ctx.fill();
+  let bx=MS.ballBody?MS.ballBody.position.x:MS.ball.x*W;
+  let by=MS.ballBody?MS.ballBody.position.y:MS.ball.y*H;
+  bx=Math.max(10,Math.min(W-10,bx));by=Math.max(10,Math.min(H-10,by));
+  c.fillStyle='rgba(0,0,0,0.2)';c.beginPath();c.ellipse(bx,by+7,7,3,0,0,Math.PI*2);c.fill();
+  c.fillStyle='#fff';c.beginPath();c.arc(bx,by,6,0,Math.PI*2);c.fill();
 
-  // HUD
-  ctx.fillStyle='rgba(0,0,0,0.7)';ctx.fillRect(W/2-60,5,120,30);
-  ctx.fillStyle='#fff';ctx.font='bold 22px Arial';ctx.textAlign='center';
-  ctx.fillText(MS.myScore+'-'+MS.oppScore+'  '+MS.min+"'",W/2,27);
+  // Score HUD
+  c.fillStyle='rgba(0,0,0,0.6)';c.fillRect(W/2-55,4,110,24);
+  c.fillStyle='#0ea5e9';c.font='bold 18px Arial';c.textAlign='right';c.fillText(MS.myScore+'',W/2-6,22);
+  c.fillStyle='#aaa';c.font='14px Arial';c.textAlign='center';c.fillText('-',W/2,22);
+  c.fillStyle='#ef4444';c.font='bold 18px Arial';c.textAlign='left';c.fillText(MS.oppScore+'',W/2+6,22);
+  c.fillStyle='#ccc';c.font='11px Arial';c.textAlign='right';c.fillText(MS.min+"'",W/2+54,22);
 }
 
 function roundRect(ctx,x,y,w,h,r){ctx.beginPath();ctx.moveTo(x+r,y);ctx.lineTo(x+w-r,y);ctx.quadraticCurveTo(x+w,y,x+w,y+r);ctx.lineTo(x+w,y+h-r);ctx.quadraticCurveTo(x+w,y+h,x+w-r,y+h);ctx.lineTo(x+r,y+h);ctx.quadraticCurveTo(x,y+h,x,y+h-r);ctx.lineTo(x,y+r);ctx.quadraticCurveTo(x,y,x+r,y);ctx.closePath()}
@@ -1103,7 +1111,7 @@ function renderMatch(){
       </div>
     </div>
     <div style="background:#1a5d1a;border-radius:12px;padding:6px;margin-bottom:10px">
-      <canvas id="mc" width="960" height="540" style="width:100%;height:auto;display:block;border-radius:8px"></canvas>
+      <canvas id="mc" style="width:100%;height:auto;display:block;border-radius:8px;aspect-ratio:16/9;image-rendering:auto"></canvas>
     </div>
     <div class="card" style="padding:12px;max-height:180px;overflow-y:auto">
       <div style="font-size:12px;font-weight:700;margin-bottom:8px">📋 事件</div>
