@@ -758,16 +758,18 @@ const HAIR_STYLES = ['short','fringe','curly','mohawk','bald','side','buzz','lon
 
 // 画球员面部纹理（canvas → THREE.CanvasTexture）
 function drawFaceTexture(faceW, faceH, skinIdx, hairIdx, hairColor, eyeColor, hash, faceWFactor) {
-  const W = Math.round(faceW * 240), H = Math.round(faceH * 240);
+  // 512px 高清面部纹理（比之前的240px细节多4倍）
+  const W = 512, H = 512;
   const cvs = document.createElement('canvas');
   cvs.width = W; cvs.height = H;
   const ctx = cvs.getContext('2d');
+  ctx.imageSmoothingEnabled = true;
 
   // 皮肤渐变
   const skin = SKIN_PALETTES[skinIdx % SKIN_PALETTES.length];
-  const grad = ctx.createLinearGradient(0, 0, W, H);
+  const grad = ctx.createRadialGradient(W*0.42, H*0.35, 0, W*0.5, H*0.5, W*0.55);
   grad.addColorStop(0, skin[0]);
-  grad.addColorStop(0.5, skin[1]);
+  grad.addColorStop(0.6, skin[1]);
   grad.addColorStop(1, skin[2]);
   ctx.fillStyle = grad;
 
@@ -777,93 +779,174 @@ function drawFaceTexture(faceW, faceH, skinIdx, hairIdx, hairColor, eyeColor, ha
   ctx.ellipse(cx, cy, W/2 * faceWFactor, H/2, 0, 0, Math.PI * 2);
   ctx.fill();
 
-  // 耳朵
-  const earW = W*0.12, earH = H*0.22;
-  const earL = playerHash(hash, 91) > 0.3; // 70% 露出左耳
-  const earR = playerHash(hash, 92) > 0.3; // 70% 露出右耳
-  if (earL) {
-    ctx.fillStyle = skin[1];
-    ctx.beginPath(); ctx.ellipse(W*0.06, cy, earW/2, earH/2, 0, 0, Math.PI*2); ctx.fill();
+  // ---- 面部轮廓细节 ----
+  // 颧骨阴影（让脸更有立体感）
+  const cheekL = ctx.createRadialGradient(W*0.22, H*0.48, 0, W*0.22, H*0.48, W*0.14);
+  cheekL.addColorStop(0, 'rgba(0,0,0,0.08)'); cheekL.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = cheekL;
+  ctx.beginPath(); ctx.ellipse(W*0.22, H*0.48, W*0.12, H*0.10, 0, 0, Math.PI*2); ctx.fill();
+  const cheekR = ctx.createRadialGradient(W*0.78, H*0.48, 0, W*0.78, H*0.48, W*0.14);
+  cheekR.addColorStop(0, 'rgba(0,0,0,0.08)'); cheekR.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = cheekR;
+  ctx.beginPath(); ctx.ellipse(W*0.78, H*0.48, W*0.12, H*0.10, 0, 0, Math.PI*2); ctx.fill();
+
+  // 下颌阴影
+  const jawSh = ctx.createRadialGradient(cx, H*0.72, 0, cx, H*0.72, W*0.35);
+  jawSh.addColorStop(0, 'rgba(0,0,0,0)'); jawSh.addColorStop(1, 'rgba(0,0,0,0.10)');
+  ctx.fillStyle = jawSh;
+  ctx.beginPath(); ctx.ellipse(cx, cy, W/2 * faceWFactor, H/2, 0, 0, Math.PI*2); ctx.fill();
+
+  // 耳朵（大小/位置/露出程度由 hash 决定）
+  const earW = W*0.10, earH = H*0.20;
+  const earSize  = 0.6 + playerHash(hash, 91) * 0.6; // 0.6~1.2倍
+  const earAngle  = (playerHash(hash, 93) - 0.5) * 0.3;
+  const earLShow = playerHash(hash, 91) > 0.2;
+  const earRShow = playerHash(hash, 92) > 0.2;
+  ctx.fillStyle = skin[1];
+  if (earLShow) {
+    ctx.save(); ctx.translate(W*0.07, cy - H*0.03); ctx.rotate(earAngle);
+    ctx.beginPath(); ctx.ellipse(0, 0, earW*earSize/2, earH*earSize/2, 0, 0, Math.PI*2); ctx.fill();
+    ctx.restore();
   }
-  if (earR) {
-    ctx.fillStyle = skin[1];
-    ctx.beginPath(); ctx.ellipse(W-W*0.06, cy, earW/2, earH/2, 0, 0, Math.PI*2); ctx.fill();
+  if (earRShow) {
+    ctx.save(); ctx.translate(W*0.93, cy - H*0.03); ctx.rotate(-earAngle);
+    ctx.beginPath(); ctx.ellipse(0, 0, earW*earSize/2, earH*earSize/2, 0, 0, Math.PI*2); ctx.fill();
+    ctx.restore();
   }
 
-  // 画头发
+  // ---- 画头发 ----
   _drawHair(ctx, W, H, hairIdx, hairColor, skin, faceWFactor, hash);
 
-  // 眉毛（深色）
-  const browColor = `rgba(${Math.round(hairColor.r*0.7)},${Math.round(hairColor.g*0.7)},${Math.round(hairColor.b*0.7)},0.7)`;
-  const browH = H*0.028, browY1 = cy - H*0.18, browY2 = cy - H*0.14;
-  const browL = playerHash(hash, 81), browR = playerHash(hash, 82);
-  const browAngleL = (browL - 0.5) * 0.4; // 眉毛倾斜
-  const browAngleR = (browR - 0.5) * 0.4;
-  ctx.strokeStyle = browColor; ctx.lineWidth = browH;
-  ctx.lineCap = 'round';
-  // 左眉
-  ctx.save(); ctx.translate(cx - W*0.18, browY1); ctx.rotate(browAngleL);
-  ctx.beginPath(); ctx.moveTo(-W*0.1, 0); ctx.lineTo(W*0.1, 0); ctx.stroke(); ctx.restore();
-  // 右眉
-  ctx.save(); ctx.translate(cx + W*0.18, browY1); ctx.rotate(browAngleR);
-  ctx.beginPath(); ctx.moveTo(-W*0.1, 0); ctx.lineTo(W*0.1, 0); ctx.stroke(); ctx.restore();
+  // ---- 眉毛（形状/颜色/角度全部千人千面）----
+  const browThick = 5 + playerHash(hash, 80) * 6; // 5~11px
+  const browAngleL = (playerHash(hash, 81) - 0.5) * 0.5;
+  const browAngleR = (playerHash(hash, 82) - 0.5) * 0.5;
+  const browLen   = W * (0.10 + playerHash(hash, 86) * 0.04);
+  const browCurve = (playerHash(hash, 87) - 0.5) * 0.05; // 拱形程度
+  const browColor = `rgba(${Math.round(hairColor.r*0.65)},${Math.round(hairColor.g*0.65)},${Math.round(hairColor.b*0.65)},0.85)`;
+  const browY0 = cy - H*0.19, browY1 = browY0 + browCurve * H;
+  ctx.strokeStyle = browColor; ctx.lineWidth = browThick; ctx.lineCap = 'round';
+  ctx.save(); ctx.translate(cx - W*0.19, browY0); ctx.rotate(browAngleL);
+  ctx.beginPath(); ctx.moveTo(-browLen, browCurve*H*0.5); ctx.quadraticCurveTo(0, -browCurve*H, browLen, browCurve*H*0.5); ctx.stroke(); ctx.restore();
+  ctx.save(); ctx.translate(cx + W*0.19, browY0); ctx.rotate(browAngleR);
+  ctx.beginPath(); ctx.moveTo(-browLen, browCurve*H*0.5); ctx.quadraticCurveTo(0, -browCurve*H, browLen, browCurve*H*0.5); ctx.stroke(); ctx.restore();
 
-  // 眼睛
-  const eyeY = cy - H*0.08, eyeSep = W*0.28; // 眼距
-  const eyeW = W*0.14, eyeH = eyeW * (0.38 + playerHash(hash, 71) * 0.12); // 眼睛高矮
+  // ---- 眼睛（大小/形状/眼神 千人千面）----
+  const eyeSep = W * (0.24 + playerHash(hash, 70) * 0.06); // 眼距变化
+  const eyeW   = W * (0.11 + playerHash(hash, 71) * 0.05);
+  const eyeH   = eyeW * (0.30 + playerHash(hash, 72) * 0.20); // 杏眼/圆眼
+  const eyeYOff = (playerHash(hash, 73) - 0.5) * H * 0.03; // 眼睛高低
+  const eyeY    = cy - H*0.06 + eyeYOff;
   // 眼白
   ctx.fillStyle = '#FAFAFA';
   ctx.beginPath(); ctx.ellipse(cx - eyeSep/2, eyeY, eyeW/2, eyeH/2, 0, 0, Math.PI*2); ctx.fill();
   ctx.beginPath(); ctx.ellipse(cx + eyeSep/2, eyeY, eyeW/2, eyeH/2, 0, 0, Math.PI*2); ctx.fill();
-  // 虹膜
-  const irisR = eyeW * 0.36;
-  const irisColors = ['#3B1F0A','#1A3A0A','#0A1A3A','#2A1A3A','#1A2A2A','#3A1A0A','#4A3010'];
-  const irisIdx = hInt(hash, 72, 0, irisColors.length-1);
-  ctx.fillStyle = irisColors[irisIdx];
-  ctx.beginPath(); ctx.ellipse(cx - eyeSep/2, eyeY, irisR, irisR, 0, 0, Math.PI*2); ctx.fill();
-  ctx.beginPath(); ctx.ellipse(cx + eyeSep/2, eyeY, irisR, irisR, 0, 0, Math.PI*2); ctx.fill();
-  // 瞳孔
-  const pupilR = irisR * 0.45;
-  ctx.fillStyle = '#000';
-  ctx.beginPath(); ctx.ellipse(cx - eyeSep/2, eyeY, pupilR, pupilR, 0, 0, Math.PI*2); ctx.fill();
-  ctx.beginPath(); ctx.ellipse(cx + eyeSep/2, eyeY, pupilR, pupilR, 0, 0, Math.PI*2); ctx.fill();
-  // 高光
-  const hlR = irisR * 0.25;
-  ctx.fillStyle = 'rgba(255,255,255,0.9)';
-  ctx.beginPath(); ctx.ellipse(cx - eyeSep/2 - irisR*0.25, eyeY - irisR*0.2, hlR, hlR, 0, 0, Math.PI*2); ctx.fill();
-  ctx.beginPath(); ctx.ellipse(cx + eyeSep/2 - irisR*0.25, eyeY - irisR*0.2, hlR, hlR, 0, 0, Math.PI*2); ctx.fill();
-
-  // 眼睑线（让眼睛更有神）
+  // 眼眶线（让眼睛更有轮廓）
   ctx.strokeStyle = skin[2]; ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.ellipse(cx - eyeSep/2, eyeY, eyeW/2, eyeH/2, 0, 0, Math.PI*2); ctx.stroke();
+  ctx.beginPath(); ctx.ellipse(cx + eyeSep/2, eyeY, eyeW/2, eyeH/2, 0, 0, Math.PI*2); ctx.stroke();
+  // 虹膜（7种颜色组合）
+  const irisColors = ['#2C1206','#1A2C08','#081830','#281428','#0C1C1C','#2A1408','#3A2810'];
+  const irisIdx = hInt(hash, 74, 0, irisColors.length-1);
+  const irisR = eyeW * (0.32 + playerHash(hash, 75) * 0.08);
+  ctx.fillStyle = irisColors[irisIdx];
+  ctx.beginPath(); ctx.ellipse(cx - eyeSep/2, eyeY, irisR, irisR*1.05, 0, 0, Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(cx + eyeSep/2, eyeY, irisR, irisR*1.05, 0, 0, Math.PI*2); ctx.fill();
+  // 瞳孔（偏心，模拟自然眼神）
+  const pupilOffX = (playerHash(hash, 76) - 0.5) * irisR * 0.3;
+  const pupilOffY = (playerHash(hash, 77) - 0.5) * irisR * 0.2;
+  const pupilR = irisR * 0.42;
+  ctx.fillStyle = '#0A0806';
+  ctx.beginPath(); ctx.ellipse(cx - eyeSep/2 + pupilOffX, eyeY + pupilOffY, pupilR, pupilR, 0, 0, Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(cx + eyeSep/2 + pupilOffX, eyeY + pupilOffY, pupilR, pupilR, 0, 0, Math.PI*2); ctx.fill();
+  // 眼神光（两个高光点，更有神）
+  const hlR = irisR * 0.22;
+  ctx.fillStyle = 'rgba(255,255,255,0.92)';
+  ctx.beginPath(); ctx.ellipse(cx - eyeSep/2 + irisR*0.15, eyeY - irisR*0.25, hlR, hlR*0.8, 0, 0, Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(cx + eyeSep/2 + irisR*0.15, eyeY - irisR*0.25, hlR, hlR*0.8, 0, 0, Math.PI*2); ctx.fill();
+  // 小高光
+  ctx.fillStyle = 'rgba(255,255,255,0.60)';
+  ctx.beginPath(); ctx.ellipse(cx - eyeSep/2 - irisR*0.2, eyeY + irisR*0.15, hlR*0.5, hlR*0.4, 0, 0, Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(cx + eyeSep/2 - irisR*0.2, eyeY + irisR*0.15, hlR*0.5, hlR*0.4, 0, 0, Math.PI*2); ctx.fill();
+  // 眼睑（上眼皮弧线，更有神）
+  ctx.strokeStyle = skin[2]; ctx.lineWidth = 2.0;
   ctx.beginPath(); ctx.ellipse(cx - eyeSep/2, eyeY, eyeW/2, eyeH/2, 0, Math.PI, Math.PI*2); ctx.stroke();
   ctx.beginPath(); ctx.ellipse(cx + eyeSep/2, eyeY, eyeW/2, eyeH/2, 0, Math.PI, Math.PI*2); ctx.stroke();
 
-  // 鼻子（鼻梁+鼻翼）
+  // ---- 睫毛（女性/部分男性可选）----
+  const lash = playerHash(hash, 78) > 0.75;
+  if (lash) {
+    ctx.strokeStyle = `rgba(${Math.round(hairColor.r*0.4)},${Math.round(hairColor.g*0.4)},${Math.round(hairColor.b*0.4)},0.7)`;
+    ctx.lineWidth = 1.5;
+    for (let i=0; i<5; i++) {
+      const a0 = Math.PI + i*Math.PI*0.08;
+      const a1 = Math.PI + (i+1)*Math.PI*0.08;
+      const x0=cx-eyeSep/2+Math.cos(a0)*eyeW/2, y0=eyeY+Math.sin(a0)*eyeH/2;
+      const x1=cx-eyeSep/2+Math.cos(a1)*eyeW/2, y1=eyeY+Math.sin(a1)*eyeH/2;
+      ctx.beginPath(); ctx.moveTo(x0,y0); ctx.lineTo(x1,y1-Math.PI*2); ctx.stroke();
+    }
+  }
+
+  // ---- 鼻子（形状变化）----
   const noseY = cy + H*0.04;
-  ctx.strokeStyle = skin[2]; ctx.lineWidth = 1.2;
-  ctx.beginPath(); ctx.moveTo(cx, cy + H*0.02); ctx.lineTo(cx, noseY); ctx.stroke();
-  // 鼻翼宽度变化
-  const noseW = W * (0.06 + playerHash(hash, 83) * 0.04);
-  ctx.beginPath(); ctx.arc(cx - noseW/2, noseY, noseW/3, 0, Math.PI*2); ctx.fillStyle = skin[1]; ctx.fill();
-  ctx.beginPath(); ctx.arc(cx + noseW/2, noseY, noseW/3, 0, Math.PI*2); ctx.fill();
+  const noseBridge = 1.0 + playerHash(hash, 83) * 0.8; // 鼻梁高低
+  const noseW   = W * (0.05 + playerHash(hash, 84) * 0.05); // 鼻翼宽窄
+  const noseType = hInt(hash, 89, 0, 2); // 0=直鼻 1=鹰钩 2=翘鼻
+  ctx.strokeStyle = skin[2]; ctx.lineWidth = 1.5;
+  if (noseType === 0) {
+    // 直鼻：鼻梁线
+    ctx.beginPath(); ctx.moveTo(cx, cy + H*0.01); ctx.lineTo(cx, noseY); ctx.stroke();
+  } else if (noseType === 1) {
+    // 鹰钩：弧线
+    ctx.beginPath(); ctx.moveTo(cx, cy + H*0.01); ctx.quadraticCurveTo(cx+noseW*0.5, cy+H*0.06, cx+noseW*0.3, noseY+noseW*0.3); ctx.stroke();
+  } else {
+    // 翘鼻：短鼻梁+翘鼻尖
+    ctx.beginPath(); ctx.moveTo(cx, cy + H*0.01); ctx.lineTo(cx+noseW*0.2, noseY+noseW*0.2); ctx.stroke();
+  }
+  // 鼻翼
+  ctx.beginPath(); ctx.arc(cx - noseW/2, noseY, noseW/2.5, 0, Math.PI*2); ctx.fillStyle = skin[1]; ctx.fill();
+  ctx.beginPath(); ctx.arc(cx + noseW/2, noseY, noseW/2.5, 0, Math.PI*2); ctx.fill();
+  // 鼻孔（用深色小圆）
+  ctx.fillStyle = 'rgba(80,40,20,0.5)';
+  ctx.beginPath(); ctx.ellipse(cx - noseW*0.6, noseY + noseW*0.15, noseW*0.12, noseW*0.18, 0, 0, Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(cx + noseW*0.6, noseY + noseW*0.15, noseW*0.12, noseW*0.18, 0, 0, Math.PI*2); ctx.fill();
 
-  // 嘴巴
-  const mouthY = cy + H*0.22;
-  const mouthW = W * (0.15 + playerHash(hash, 84) * 0.1);
-  const smile = (playerHash(hash, 85) - 0.5) * 0.15; // 微笑/严肃程度
-  ctx.strokeStyle = `rgba(${Math.round(hairColor.r*0.8)},${Math.round(hairColor.g*0.5)},${Math.round(hairColor.b*0.3)},0.8)`;
-  ctx.lineWidth = H * 0.022;
-  ctx.lineCap = 'round';
-  ctx.beginPath();
-  ctx.arc(cx, mouthY + smile * H * 0.3, mouthW/2, 0.1, Math.PI - 0.1);
-  ctx.stroke();
+  // ---- 嘴巴（形状+弧度 千人千面）----
+  const mouthY  = cy + H*0.22;
+  const mouthW  = W * (0.13 + playerHash(hash, 85) * 0.09);
+  const smile   = (playerHash(hash, 86) - 0.5) * 0.20; // -0.1~+0.1，微笑/严肃
+  const lipFull = playerHash(hash, 87) * 0.5; // 嘴唇厚薄
+  // 上唇线
+  ctx.strokeStyle = `rgba(${Math.round(hairColor.r*0.75)},${Math.round(hairColor.g*0.40)},${Math.round(hairColor.b*0.25)},0.85)`;
+  ctx.lineWidth = 3 + lipFull * 4; ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.arc(cx, mouthY + smile*H*0.3, mouthW/2, 0.1, Math.PI - 0.1); ctx.stroke();
+  // 下唇（饱满感）
+  const lipGrad = ctx.createRadialGradient(cx, mouthY + H*0.025, 0, cx, mouthY + H*0.025, mouthW*0.35);
+  lipGrad.addColorStop(0, `rgba(${Math.round(hairColor.r*0.5+100)},${Math.round(hairColor.g*0.3+60)},${Math.round(hairColor.b*0.2+40)},0.35)`);
+  lipGrad.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = lipGrad;
+  ctx.beginPath(); ctx.ellipse(cx, mouthY + H*0.025, mouthW*0.45, H*0.025+lipFull*H*0.008, 0, 0, Math.PI*2); ctx.fill();
+  // 嘴角下垂（严肃表情）
+  if (playerHash(hash, 88) > 0.7) {
+    ctx.strokeStyle = skin[2]; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(cx - mouthW/2, mouthY); ctx.lineTo(cx - mouthW/2 - W*0.015, mouthY + H*0.015); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(cx + mouthW/2, mouthY); ctx.lineTo(cx + mouthW/2 + W*0.015, mouthY + H*0.015); ctx.stroke();
+  }
 
-  // 下巴阴影（增加立体感）
-  const jawGrad = ctx.createRadialGradient(cx, cy + H*0.35, 0, cx, cy + H*0.35, W*0.4);
-  jawGrad.addColorStop(0, 'rgba(0,0,0,0)');
-  jawGrad.addColorStop(1, 'rgba(0,0,0,0.12)');
-  ctx.fillStyle = jawGrad;
-  ctx.beginPath(); ctx.ellipse(cx, cy, W/2 * faceWFactor, H/2, 0, 0, Math.PI*2); ctx.fill();
+  // ---- 美人穴（可选）----
+  if (playerHash(hash, 95) > 0.8) {
+    ctx.fillStyle = 'rgba(0,0,0,0.12)';
+    ctx.beginPath(); ctx.ellipse(cx + W*0.04, cy + H*0.06, W*0.012, H*0.018, 0, 0, Math.PI*2); ctx.fill();
+  }
+
+  // ---- 胡茬阴影（男性球员可选，增加成熟感）----
+  if (playerHash(hash, 96) > 0.5) {
+    const beardGrad = ctx.createRadialGradient(cx, cy + H*0.28, 0, cx, cy + H*0.28, W*0.3);
+    beardGrad.addColorStop(0, `rgba(${hairColor.r*0.3|0},${hairColor.g*0.3|0},${hairColor.b*0.3|0},0.08)`);
+    beardGrad.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = beardGrad;
+    ctx.beginPath(); ctx.ellipse(cx, cy + H*0.28, W*0.3, H*0.15, 0, 0, Math.PI*2); ctx.fill();
+  }
 
   return new THREE.CanvasTexture(cvs);
 }
@@ -1127,21 +1210,24 @@ function initVoxelPlayer(player, containerId) {
   const neckY = torsoBottom + torsoH2 - NECK_H * 0.5;
   g.add(rbox(HEAD_R*0.50, NECK_H, HEAD_R*0.40, skinM, 0, neckY, 0));
 
-  // ---- HEAD：球形头部 + Canvas 面部纹理 ----
+  // ---- HEAD：Billboard 面部精灵（永远面向相机）+ 球形后脑勺 ----
   const headCY = neckY + NECK_H * 0.5 + HEAD_R;
-  const headGeo = new THREE.SphereGeometry(HEAD_R, 20, 16);
-  // 用 MeshFaceMaterial：index 0/1=侧面, 2=背面, 3=正面, 4=顶面, 5=底面
+  // 后脑勺（皮肤色球体）
+  const backGeo = new THREE.SphereGeometry(HEAD_R * 0.90, 14, 12);
+  const backMesh = new THREE.Mesh(backGeo, skinM);
+  backMesh.position.set(0, headCY, 0);
+  g.add(backMesh);
+  // 面部 billboard 精灵（始终面向相机，展示完整面孔）
   const faceTex = drawFaceTexture(HEAD_R, HEAD_R, skinIdx, hairIdx, hairColor, eyeIdx, hash, faceWFactor);
-  const faceM   = new THREE.MeshBasicMaterial({map: faceTex});
-  const backM   = new THREE.MeshLambertMaterial({color: skinHex});
-  const mat6 = [backM,backM, backM, faceM, backM, backM]; // 6 faces
-  const headMesh = new THREE.Mesh(headGeo, mat6);
-  headMesh.position.set(0, headCY, 0);
-  g.add(headMesh);
-
-  // ---- 耳朵（左+右，突出头部两侧）----
-  g.add(rbox(HEAD_R*0.18, HEAD_R*0.30, HEAD_R*0.12, skinM, -HEAD_R*0.95, headCY, 0));
-  g.add(rbox(HEAD_R*0.18, HEAD_R*0.30, HEAD_R*0.12, skinM,  HEAD_R*0.95, headCY, 0));
+  const faceSpriteMat = new THREE.SpriteMaterial({map: faceTex, depthTest: false, depthWrite: false});
+  const faceSprite = new THREE.Sprite(faceSpriteMat);
+  // billboard 大小：等于头的直径，让面孔填满球体正面
+  faceSprite.scale.set(HEAD_R * 1.55, HEAD_R * 1.55, 1);
+  faceSprite.position.set(0, headCY, HEAD_R * 0.88);
+  g.add(faceSprite);
+  // 耳朵（左+右，突出头部两侧）
+  g.add(rbox(HEAD_R*0.18, HEAD_R*0.28, HEAD_R*0.10, skinM, -HEAD_R*0.92, headCY, 0));
+  g.add(rbox(HEAD_R*0.18, HEAD_R*0.28, HEAD_R*0.10, skinM,  HEAD_R*0.92, headCY, 0));
 
   // ---- ARMS：上臂 + 前臂（自然下垂，稍向前）----
   const armTop = torsoY + torsoH2 * 0.15;
@@ -1162,19 +1248,20 @@ function initVoxelPlayer(player, containerId) {
   g.add(rbox(ARM_W*1.1, cuffLen, ARM_D*1.05, jerseyM,  SHOULDER_W+ARM_W*0.5, armTop - cuffLen*0.5, ARM_D*0.3));
 
   // ================================================================
-  // 动画：站立呼吸 + 轻微重心转移（不移出画面）
+  // 动画：站立呼吸 + 360度旋转（面孔展示）
   // ================================================================
   let t = 0;
 
   function animate() {
     requestAnimationFrame(animate);
-    t += 0.018;
+    t += 0.012;
 
-    // 呼吸起伏 + 轻微左右重心（不移动mesh，只旋转整体）
-    const breathe = Math.sin(t * 1.5) * 0.006;
-    const sway    = Math.sin(t * 0.8) * 0.04; // 身体左右微倾
-    g.rotation.z = sway;
-    g.rotation.x = breathe;
+    // 呼吸起伏 + 左右微倾 + Y轴360度旋转（8秒一圈）
+    const breathe = Math.sin(t * 1.5) * 0.005;
+    const sway    = Math.sin(t * 0.8) * 0.03;
+    g.rotation.y  = t * 0.78;            // 360度旋转
+    g.rotation.z  = sway;
+    g.rotation.x  = breathe;
 
     renderer.render(scene, camera);
   }
