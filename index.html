@@ -7,6 +7,9 @@
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
 <script>
+// ---- Utils (must be before engine) ----
+const rand=(a,b)=>Math.floor(Math.random()*(b-a+1))+a;
+
 // ============================================================
 // UFO Match Engine v3.0 - INLINE
 // 整合: openfootmanager 多因子模型 + phaser-simple-soccer 状态机
@@ -644,7 +647,7 @@ const T = {
 };
 function t(k){return T[LANG][k]||k}
 function fmt(n){if(n>=1e6)return'€'+(n/1e6).toFixed(1)+'M';if(n>=1e3)return'€'+(n/1e3).toFixed(0)+'K';return'€'+n}
-const rand=(a,b)=>Math.floor(Math.random()*(b-a+1))+a;
+// rand() is defined in <head> before MatchEngine
 const uid=()=>'p'+Date.now().toString(36)+Math.random().toString(36).substr(2,4);
 
 // ---- Player Names ----
