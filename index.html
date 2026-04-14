@@ -6,7 +6,7 @@
 <title>UFO - Unreal Football Online</title>
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/matter-js@0.19.0/build/matter.min.js"></script>
+<script src="match-engine-v3.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
 *{font-family:'Inter',sans-serif;-webkit-tap-highlight-color:transparent;user-select:none;box-sizing:border-box}
@@ -566,263 +566,183 @@ const FP = {
   '3-5-2':[[.08,.5],[.22,.25],[.22,.5],[.22,.75],[.38,.1],[.38,.35],[.38,.5],[.38,.65],[.38,.9],[.52,.35],[.52,.65]]
 };
 
-// ---- Match Engine ----
+// ---- Match Engine v3.0 ----
 function startMatch() {
   if(rafId){cancelAnimationFrame(rafId);rafId=null}
-  if(window._engine){Matter.Engine.clear(window._engine);window._engine=null}
   MS = null; tab = 'match'; render();
   
   setTimeout(()=>{
-    if(!window.Matter){alert('Loading physics...');return}
+    if(!window.MatchEngine){alert('Loading match engine...');return}
     
     const fp = FP[G.formation]||FP['4-4-2'];
     const myTeam = G.team.slice(0,11).map((p,i)=>{
       const pos = fp[i]||[.25,.5];
-      return {...p, hx:pos[0]*0.46, hy:pos[1], x:pos[0]*0.46, y:pos[1], spd:(p.pace/100)*.5+.1, role:i===0?'GK':i<3?'DEF':i<7?'MID':'ATT', isMy:true, _idx:i};
+      return {...p, hx:pos[0], hy:pos[1], role:i===0?'GK':i<3?'DEF':i<7?'MID':'ATT', isMy:true};
     });
     
     const oppIdx = rand(1,G.league.length-1);
     const oppStr = G.league[oppIdx].strength;
-    const oppFp = fp.map(p=>[0.54+(1-p[0])*0.46,p[1]]);
     const oppPos = ['GK','CB','CB','LB','RB','CDM','CM','CM','LW','RW','ST'];
     const oppTeam = oppPos.map((pos,i)=>{
       const p = createPlayer(['England','Spain','Brazil','Germany','France'][rand(0,4)],pos,oppStr);
-      const op = oppFp[i]||[.75,.5];
-      return {...p, hx:op[0], hy:op[1], x:op[0], y:op[1], spd:(p.pace/100)*.5+.1, role:i===0?'GK':i<3?'DEF':i<7?'MID':'ATT', isMy:false, _idx:i};
+      return {...p, role:i===0?'GK':i<3?'DEF':i<7?'MID':'ATT', isMy:false};
     });
 
-    const calcStats=(t)=>{
-      const att=t.filter(p=>p.role==='ATT'), def=t.filter(p=>p.role==='DEF'||p.role==='GK'), mid=t.filter(p=>p.role==='MID');
-      const af=t.reduce((s,p)=>s+(p.morale||70),0)/11, ff=t.reduce((s,p)=>s+(p.fitness||80),0)/11;
-      return {atk:(att.length?att.reduce((s,p)=>s+p.shooting+p.pace*.4,0)/att.length/1.4:40)*af/85*ff/80, def:(def.length?def.reduce((s,p)=>s+p.defending,0)/def.length:40)*ff/80};
-    };
-    const myS=calcStats(myTeam), opS=calcStats(oppTeam);
-
-    const W=960, H=540;
-    const Engine=Matter.Engine, World=Matter.World, Bodies=Matter.Bodies, Body=Matter.Body;
-    const engine = Engine.create({gravity:{x:0,y:0}});
-    const world = engine.world;
-    window._engine = engine;
-    
-    const walls = [Bodies.rectangle(W/2,-5,W,10,{isStatic:true}),Bodies.rectangle(W/2,H+5,W,10,{isStatic:true}),Bodies.rectangle(-5,H/2,10,H,{isStatic:true}),Bodies.rectangle(W+5,H/2,10,H,{isStatic:true})];
-    World.add(world, walls);
-
-    const ballBody = Bodies.circle(W*.5,H*.5,10,{frictionAir:.02,restitution:.8});
-    World.add(world, ballBody);
-
-    const pBodies={};
-    [...myTeam,...oppTeam].forEach((p,i)=>{
-      const bx=p.hx*W, by=p.hy*H;
-      const r=p.role==='GK'?16:14;
-      const b=Bodies.circle(bx,by,r,{frictionAir:.1,friction:.05});
-      Body.setMass(b,2);
-      World.add(world,b);
-      pBodies[p.isMy?'my_'+p._idx:'opp_'+p._idx]={body:b,player:p};
-      p._body=b;
-    });
-
-    MS = {myTeam, oppTeam, oppName:getLN(oppIdx), myScore:0, oppScore:0, min:0, sec:0, ball:{x:.5,y:.5,owner:null,tx:.5,ty:.5}, poss:'my', phaseT:0, events:[], started:true, finished:false, htDone:false, shots:{my:0,opp:0}, lastEvt:0, myS, opS, LUCK:Math.random()*6+3, redCards:{my:0,opp:0}, engine, world, ballBody, pBodies};
+    // 使用新引擎 v3.0
+    MS = new MatchEngine(myTeam, oppTeam, getLN(oppIdx), Tactics.TIKITAKA, Tactics.COUNTER);
+    MS.oppName = getLN(oppIdx);
     
     render();
-    setTimeout(()=>{lastT=performance.now();rafId=requestAnimationFrame(matchLoop)},200);
+    setTimeout(()=>{lastT=performance.now();rafId=requestAnimationFrame(matchLoopV3)},200);
   },100);
 }
 
-function matchLoop(ts) {
+function matchLoopV3(ts) {
   if(!MS||!MS.started||MS.finished){rafId=null;return}
-  const dt=Math.min((ts-lastT)/1000,.033);
+  const dt=Math.min((ts-lastT)/1000,.05);
   lastT=ts;
-  if(MS.engine)Matter.Engine.update(MS.engine,dt*1000);
-  updateMatch(dt,ts);
-  drawMatch();
-  rafId=requestAnimationFrame(matchLoop);
-}
-
-function updateMatch(dt,ts){
-  const W=960,H=540;
-  const ball=MS.ball;
-  const myAtk=MS.poss==='my';
-  const bb=MS.ballBody;
   
-  ball.x=bb.position.x/W;
-  ball.y=bb.position.y/H;
+  // 更新新引擎
+  MS.update(dt);
   
-  Object.values(MS.pBodies).forEach(({body,player})=>{
-    player.x=body.position.x/W;
-    player.y=body.position.y/H;
-  });
+  // 渲染
+  drawMatchV3();
   
-  MS.sec+=dt;
-  if(MS.sec>=1){MS.sec=0;MS.min++;if(MS.min===45&&!MS.htDone){MS.htDone=true;addEvt('⏱️ 半场!','info')}if(MS.min>=90&&!MS.finished){endMatch();return}}
+  // 更新事件显示
+  const evtEl=document.getElementById('evts');
+  if(evtEl)evtEl.innerHTML=evtHTMLV3();
   
-  MS.phaseT=Math.max(0,MS.phaseT-dt);
-  if(MS.phaseT<=0&&!MS.finished){genEvt();MS.lastEvt=ts}
-  
-  const {Body}=Matter;
-  if(ball.owner&&bb){
-    const ob=ball.owner._body;
-    if(ob){Body.setPosition(bb,{x:ob.position.x+(myAtk?15:-15),y:ob.position.y});Body.setVelocity(bb,{x:0,y:0})}
+  // 检查比赛结束
+  if(MS.finished){
+    endMatchV3();
+    return;
   }
   
-  [...MS.myTeam,...MS.oppTeam].forEach((p,i)=>{
-    const isMy=i<11,atk=isMy===myAtk;
-    const pb=p._body;
-    if(!pb)return;
-    let tx=p.hx*W,ty=p.hy*H;
-    if(atk&&ball.owner&&ball.owner.isMy===isMy){
-      if(ball.owner.id===p.id){tx=p.hx*W+(myAtk?60:-60)+(Math.random()-0.5)*20;ty=H/2+(Math.random()-0.5)*H*.6}
-      else{const dx=bb.position.x-pb.position.x,dy=bb.position.y-pb.position.y;tx=pb.position.x+dx*0.4;ty=pb.position.y+dy*0.3}
-    }else if(!atk){tx=p.hx*W+(myAtk?-30:30)+(Math.random()-0.5)*10;ty=p.hy*H+(ball.y*H-p.hy*H)*0.1}
-    const dx=tx-pb.position.x,dy=ty-pb.position.y,force=Math.min(Math.hypot(dx,dy)*0.0002,p.spd*0.001);
-    Body.applyForce(pb,pb.position,{x:dx/Math.max(1,Math.hypot(dx,dy))*force,y:dy/Math.max(1,Math.hypot(dx,dy))*force});
-    const nx=Math.max(20,Math.min(W-20,pb.position.x)),ny=Math.max(20,Math.min(H-20,pb.position.y));
-    if(nx!==pb.position.x||ny!==pb.position.y)Body.setPosition(pb,{x:nx,y:ny});
-  });
+  rafId=requestAnimationFrame(matchLoopV3);
 }
 
-function genEvt(){
-  if(!MS||MS.finished||MS.phaseT>0)return;
-  const myAtk=MS.poss==='my';
-  const atk=myAtk?MS.myTeam:MS.oppTeam, def=myAtk?MS.oppTeam:MS.myTeam;
-  const aS=myAtk?MS.myS:MS.opS, dS=myAtk?MS.opS:MS.myS;
-  const gx=myAtk?.86:.14, gk=def[0];
-  const ball=MS.ball;
-  const dist=Math.abs(ball.x-gx), r=rand(1,100);
-
-  if(r<=1){
-    // Red card
-    const rc=atk[rand(1,9)];
-    if(myAtk)MS.redCards.my++;else MS.redCards.opp++;
-    addEvt('🟥 红牌! '+rc?.name.split(' ').pop(),'foul');
-    MS.ball.owner=null;ball.tx=.5;ball.ty=.5;MS.poss=myAtk?'opp':'my';MS.phaseT=5;
-  } else if(r<=10){
-    // Foul
-    const foul=atk[rand(0,4)];
-    addEvt('⚠️ '+foul?.name.split(' ').pop()+'犯规!','foul');
-    ball.tx=.4+Math.random()*.2;ball.ty=.3+Math.random()*.4;MS.ball.owner=null;MS.phaseT=3;
-  } else if(r<=40&&dist<.5){
-    // Shot
-    const shooters=atk.filter(p=>p.role==='ATT'), sk=shooters[rand(0,shooters.length-1)]||atk[rand(5,10)];
-    const sv=(sk.shooting*.7+sk.pace*.3)*aS.atk/50*(myAtk?1:1);
-    const gv=(gk.defending+28)*dS.def/40;
-    MS.shots[myAtk?'my':'opp']++;
-    const saved=ball.x, savey=ball.y;
-    ball.tx=gx;ball.ty=.18+Math.random()*.64;
-    addEvt('⚡ '+sk.name.split(' ').pop()+'射门!','shot');
-    // Resolve after ball reaches goal
-    setTimeout(()=>{
-      if(!MS||MS.finished)return;
-      const sr=sv/(Math.random()*35+25)+MS.LUCK*.008;
-      const dr=gv/(Math.random()*30+20);
-      if(sr>dr&&sr>.78){if(myAtk){MS.myScore++;sk.goals++}else{MS.oppScore++;sk.goals++}addEvt('⚽ 进球! '+MS.myScore+'-'+MS.oppScore,'goal');}
-      else if(sr>dr*.6)addEvt('🧤 扑出!','shot');
-      else addEvt('❌ 偏出!','shot');
-      ball.tx=.5;ball.ty=.5;MS.ball.owner=null;MS.poss=myAtk?'opp':'my';MS.phaseT=4;
-    },800);
-    MS.phaseT=1; return;
-  } else if(r<=65){
-    // Pass
-    const passer=MS.ball.owner||atk[rand(0,4)];
-    const recv=atk.filter(p=>p&&p.id!==passer?.id);
-    const r2=recv[rand(0,Math.max(recv.length-1,0))];
-    if(r2){ball.tx=r2.x+(Math.random()-.5)*.12;ball.ty=r2.y+(Math.random()-.5)*.12;MS.ball.owner=r2;addEvt('👟 '+passer?.name.split(' ').pop()+'→'+r2.name.split(' ').pop(),'pass');MS.phaseT=3;}
-  } else if(r<=80){
-    // Tackle
-    const tkl=def[rand(1,Math.min(def.length-1,5))];
-    if(tkl){MS.ball.owner=tkl;MS.poss=myAtk?'opp':'my';addEvt('🤺 抢断! '+tkl.name.split(' ').pop(),'pass');MS.phaseT=4;}
-  } else {
-    // GK kick
-    ball.tx=atk[rand(1,5)]?.x||(myAtk?.7:.3);ball.ty=.2+Math.random()*.6;MS.ball.owner=gk;addEvt('🧤 球门球','info');MS.phaseT=4;
-  }
-}
-
-function addEvt(txt,type){
-  if(!MS)return;
-  MS.events.unshift({txt,type,min:`${MS.min}'`});
-  if(MS.events.length>15)MS.events.pop();
-  const el=document.getElementById('evts');
-  if(el)el.innerHTML=evtHTML();
-}
-
-function evtHTML(){
+function evtHTMLV3(){
   if(!MS)return'';
-  const colors={goal:'#22c55e',shot:'#f59e0b',foul:'#ef4444',pass:'#3b82f6',info:'#94a3b8'};
-  return MS.events.map(e=>`<div style="padding:6px 8px;border-radius:6px;font-size:11px;border-left:3px solid ${colors[e.type]||'#94a3b8'};background:${colors[e.type]||'#94a3b8'}18;margin-bottom:4px"><span style="color:#94a3b8;margin-right:6px">${e.min}</span>${e.txt}</div>`).join('');
+  const colors={goal:'#22c55e',shot:'#f59e0b',foul:'#ef4444',pass:'#3b82f6',info:'#94a3b8',defense:'#a855f7',red:'#dc2626',miss:'#6b7280',save:'#f59e0b',end:'#10b981'};
+  return MS.events.slice(0,15).map(e=>`<div style="padding:6px 8px;border-radius:6px;font-size:11px;border-left:3px solid ${colors[e.type]||'#94a3b8'};background:${colors[e.type]||'#94a3b8'}18;margin-bottom:4px"><span style="color:#94a3b8;margin-right:6px">${e.min}</span>${e.txt}</div>`).join('');
 }
 
-function endMatch(){
-  if(!MS||MS.finished)return;
-  MS.finished=true;
+function endMatchV3(){
+  if(!MS||MS.finished===false)return;
   if(rafId){cancelAnimationFrame(rafId);rafId=null}
-  if(MS.engine){Matter.Engine.clear(MS.engine);MS.engine=null;window._engine=null}
-  addEvt(`🏁 全场结束 ${MS.myScore}-${MS.oppScore}`,'info');
+  
   const myL=G.league.find(l=>l.name==='FC United');
   const oppL=G.league.find(l=>l.name===MS.oppName);
+  
   myL.played++;oppL.played++;
-  myL.gf+=MS.myScore;myL.ga+=MS.oppScore;
-  oppL.gf+=MS.oppScore;oppL.ga+=MS.myScore;
-  if(MS.myScore>MS.oppScore){myL.won++;myL.pts+=3;oppL.lost++}
-  else if(MS.myScore===MS.oppScore){myL.drawn++;myL.pts++;oppL.drawn++;oppL.pts++}
+  myL.gf+=MS.score.my;myL.ga+=MS.score.opp;
+  oppL.gf+=MS.score.opp;oppL.ga+=MS.score.my;
+  
+  if(MS.score.my>MS.score.opp){myL.won++;myL.pts+=3;oppL.lost++}
+  else if(MS.score.my===MS.score.opp){myL.drawn++;myL.pts++;oppL.drawn++;oppL.pts++}
   else{myL.lost++;oppL.won++;oppL.pts+=3}
+  
   G.budget+=120000*G.facilities.stadium;
-  G.team.slice(0,11).forEach(p=>{p.matches++;p.fitness=Math.max(45,p.fitness-rand(10,20));p.morale=Math.min(100,p.morale+(MS.myScore>MS.oppScore?6:-4));if(Math.random()<.12)p.assists++});
+  G.team.slice(0,11).forEach(p=>{
+    p.matches++;
+    p.fitness=Math.max(45,p.fitness-rand(10,20));
+    p.morale=Math.min(100,p.morale+(MS.score.my>MS.score.opp?6:-4));
+  });
+  
   G.week++;
-  const res=MS.myScore>MS.oppScore?t('win'):MS.myScore===MS.oppScore?t('draw'):t('lose');
-  addNews(`${res} FC联 ${MS.myScore}-${MS.oppScore} vs ${MS.oppName}`);
-  if(G.week>38){G.season++;G.week=1;G.league.sort((a,b)=>b.pts-a.pts);const pos=G.league.findIndex(l=>l.name==='FC United')+1;addNews(`🏆 第${G.season-1}赛季结束! 排名#${pos}`);G.league.forEach(l=>{if(l.name!=='FC United')l.strength=Math.max(35,Math.min(95,l.strength+rand(-6,6)));l.played=l.won=l.drawn=l.lost=l.gf=l.ga=l.pts=0});G.budget+=2500000}
+  const res=MS.score.my>MS.score.opp?t('win'):MS.score.my===MS.score.opp?t('draw'):t('lose');
+  addNews(`${res} FC联 ${MS.score.my}-${MS.score.opp} vs ${MS.oppName}`);
+  
+  if(G.week>38){
+    G.season++;G.week=1;
+    G.league.sort((a,b)=>b.pts-a.pts);
+    const pos=G.league.findIndex(l=>l.name==='FC United')+1;
+    addNews(`🏆 第${G.season-1}赛季结束! 排名#${pos}`);
+    G.league.forEach(l=>{
+      if(l.name!=='FC United')l.strength=Math.max(35,Math.min(95,l.strength+rand(-6,6)));
+      l.played=l.won=l.drawn=l.lost=l.gf=l.ga=l.pts=0
+    });
+    G.budget+=2500000;
+  }
+  
   save();
   render();
 }
 
 let _mcCtx=null;
 
-function drawMatch(){
+function drawMatchV3(){
   const cvs=document.getElementById('mc');
   if(!cvs||!MS)return;
   const W=960,H=540;
   if(cvs.width!==W||cvs.height!==H){cvs.width=W;cvs.height=H;_mcCtx=null;}
   if(!_mcCtx||_mcCtx.canvas!==cvs){_mcCtx=cvs.getContext('2d');}
   const c=_mcCtx;
+  
+  const data=MS.getRenderData();
 
-  // Grass
+  // Grass with stripes
   c.fillStyle='#2d8a2d';c.fillRect(0,0,W,H);
   for(let i=0;i<10;i++){c.fillStyle=i%2?'rgba(0,0,0,0.04)':'rgba(255,255,255,0.03)';c.fillRect(i*(W/10),0,W/10,H);}
 
   // Lines
-  c.strokeStyle='rgba(255,255,255,0.55)';c.lineWidth=2;
-  c.strokeRect(20,20,W-40,H-40);
-  c.strokeRect(20,H/2-80,60,160);
-  c.strokeRect(W-80,H/2-80,60,160);
-  c.beginPath();c.moveTo(W/2,20);c.lineTo(W/2,H-20);c.stroke();
-  c.beginPath();c.arc(W/2,H/2,50,0,Math.PI*2);c.stroke();
+  c.strokeStyle='rgba(255,255,255,0.6)';c.lineWidth=2.5;
+  c.strokeRect(25,25,W-50,H-50);
+  c.strokeRect(25,H/2-90,70,180);
+  c.strokeRect(W-95,H/2-90,70,180);
+  c.beginPath();c.moveTo(W/2,25);c.lineTo(W/2,H-25);c.stroke();
+  c.beginPath();c.arc(W/2,H/2,60,0,Math.PI*2);c.stroke();
+  c.beginPath();c.arc(W/2,H/2,8,0,Math.PI*2);c.fillStyle='rgba(255,255,255,0.3)';c.fill();
 
-  // Players
-  const dp=(p,col)=>{
-    let bx=p._body?p._body.position.x:p.x*W;
-    let by=p._body?p._body.position.y:p.y*H;
-    bx=Math.max(25,Math.min(W-25,bx));by=Math.max(25,Math.min(H-25,by));
-    c.fillStyle='rgba(0,0,0,0.2)';c.beginPath();c.ellipse(bx,by+16,11,4,0,0,Math.PI*2);c.fill();
-    c.fillStyle=col;c.beginPath();c.arc(bx,by,12,0,Math.PI*2);c.fill();
-    c.strokeStyle='#fff';c.lineWidth=1.5;c.stroke();
-    c.fillStyle='#fff';c.font='bold 8px Arial';c.textAlign='center';
-    c.fillText((p.name||'').split(' ').pop(),bx,by-16);
-  };
-  MS.myTeam.forEach(p=>dp(p,'#0ea5e9'));
-  MS.oppTeam.forEach(p=>dp(p,'#ef4444'));
+  // Players with state visualization
+  data.players.forEach(p=>{
+    const bx=p.x*W, by=p.y*H;
+    const isMy=p.isMy;
+    const col=isMy?'#0ea5e9':'#ef4444';
+    const stateCol={wait:'#666',chase:'#f59e0b',dribble:'#22c55e',pass:'#3b82f6',shoot:'#ef4444',receive:'#a855f7',home:'#666',support:'#14b8a6',press:'#f97316'}[p.state]||'#666';
+    
+    // Shadow
+    c.fillStyle='rgba(0,0,0,0.25)';c.beginPath();c.ellipse(bx,by+18,12,5,0,0,Math.PI*2);c.fill();
+    
+    // Player circle
+    c.fillStyle=col;c.beginPath();c.arc(bx,by,14,0,Math.PI*2);c.fill();
+    c.strokeStyle='#fff';c.lineWidth=2;c.stroke();
+    
+    // State indicator ring
+    c.strokeStyle=stateCol;c.lineWidth=3;c.beginPath();c.arc(bx,by,16,0,Math.PI*2);c.stroke();
+    
+    // Name
+    c.fillStyle='#fff';c.font='bold 9px Arial';c.textAlign='center';
+    c.fillText((p.name||'').split(' ').pop(),bx,by-20);
+    
+    // Role indicator
+    c.fillStyle='rgba(255,255,255,0.8)';c.font='8px Arial';
+    c.fillText(p.role,bx,by+24);
+  });
 
-  // Ball
-  let bx=MS.ballBody?MS.ballBody.position.x:MS.ball.x*W;
-  let by=MS.ballBody?MS.ballBody.position.y:MS.ball.y*H;
-  bx=Math.max(10,Math.min(W-10,bx));by=Math.max(10,Math.min(H-10,by));
-  c.fillStyle='rgba(0,0,0,0.2)';c.beginPath();c.ellipse(bx,by+7,7,3,0,0,Math.PI*2);c.fill();
-  c.fillStyle='#fff';c.beginPath();c.arc(bx,by,6,0,Math.PI*2);c.fill();
+  // Ball with trail effect
+  const bx=data.ball.x*W, by=data.ball.y*H;
+  c.fillStyle='rgba(0,0,0,0.25)';c.beginPath();c.ellipse(bx,by+8,8,3,0,0,Math.PI*2);c.fill();
+  c.fillStyle='#fff';c.beginPath();c.arc(bx,by,7,0,Math.PI*2);c.fill();
+  c.strokeStyle='#333';c.lineWidth=1;c.stroke();
+  // Ball pattern
+  c.strokeStyle='#666';c.beginPath();c.arc(bx,by,4,0,Math.PI*2);c.stroke();
 
   // Score HUD
-  c.fillStyle='rgba(0,0,0,0.6)';c.fillRect(W/2-55,4,110,24);
-  c.fillStyle='#0ea5e9';c.font='bold 18px Arial';c.textAlign='right';c.fillText(MS.myScore+'',W/2-6,22);
-  c.fillStyle='#aaa';c.font='14px Arial';c.textAlign='center';c.fillText('-',W/2,22);
-  c.fillStyle='#ef4444';c.font='bold 18px Arial';c.textAlign='left';c.fillText(MS.oppScore+'',W/2+6,22);
-  c.fillStyle='#ccc';c.font='11px Arial';c.textAlign='right';c.fillText(MS.min+"'",W/2+54,22);
+  c.fillStyle='rgba(0,0,0,0.7)';c.roundRect(W/2-70,6,140,32,8);c.fill();
+  c.fillStyle='#0ea5e9';c.font='bold 22px Arial';c.textAlign='right';c.fillText(data.score.my+'',W/2-8,30);
+  c.fillStyle='#fff';c.font='16px Arial';c.textAlign='center';c.fillText('VS',W/2,30);
+  c.fillStyle='#ef4444';c.font='bold 22px Arial';c.textAlign='left';c.fillText(data.score.opp+'',W/2+8,30);
+  c.fillStyle='#94a3b8';c.font='bold 13px Arial';c.textAlign='right';c.fillText(data.min+"'",W/2+64,30);
+  
+  // Possession bar
+  const totalPoss=data.possession.my+data.possession.opp;
+  if(totalPoss>0){
+    const myPct=data.possession.my/totalPoss;
+    c.fillStyle='rgba(0,0,0,0.5)';c.fillRect(W/2-60,42,120,6);
+    c.fillStyle='#0ea5e9';c.fillRect(W/2-60,42,120*myPct,6);
+    c.fillStyle='#ef4444';c.fillRect(W/2-60+120*myPct,42,120*(1-myPct),6);
+  }
 }
 
 function roundRect(ctx,x,y,w,h,r){ctx.beginPath();ctx.moveTo(x+r,y);ctx.lineTo(x+w-r,y);ctx.quadraticCurveTo(x+w,y,x+w,y+r);ctx.lineTo(x+w,y+h-r);ctx.quadraticCurveTo(x+w,y+h,x+w-r,y+h);ctx.lineTo(x+r,y+h);ctx.quadraticCurveTo(x,y+h,x,y+h-r);ctx.lineTo(x,y+r);ctx.quadraticCurveTo(x,y,x+r,y);ctx.closePath()}
