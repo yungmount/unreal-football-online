@@ -1042,14 +1042,20 @@ function initVoxelPlayer(player, containerId) {
   scene.background = new THREE.Color(0x0d1117);
   scene.add(new THREE.GridHelper && new THREE.GridHelper(4, 8, 0x1e3a5f, 0x0d1a2e) || new THREE.Object3D());
 
-  const ASPECT = 200 / 320; // 宽高比
-  const camera = new THREE.PerspectiveCamera(42, ASPECT, 0.01, 100);
-  // 相机在正面斜上方，看球员 3/4 视角（能看到正面+侧面）
-  camera.position.set(S * 0.25, S * 0.55, S * 1.0);
-  camera.lookAt(0, -S * 0.05, 0);
+  // ================================================================
+  // 相机设置：全视图看到完整球员
+  // ================================================================
+  // 球员中心在 S*0.35（头脚中点），相机放在侧面偏上
+  const bodyCenterY = S * 0.40;       // 球员全身中心（头顶S ~脚底0）
+  const camDist     = S * 1.15;       // 相机距离
+  const camH        = S * 0.55;       // 相机高度
+  const camSide     = S * 0.20;       // 相机侧偏
+  const camera = new THREE.PerspectiveCamera(52, 200/300, 0.01, 50);
+  camera.position.set(camSide, camH, camDist);
+  camera.lookAt(0, bodyCenterY, 0);
 
   const renderer = new THREE.WebGLRenderer({antialias:true, alpha:true});
-  renderer.setSize(200, 320);
+  renderer.setSize(200, 300);
   renderer.setClearColor(0x0d1117, 1);
   container.appendChild(renderer.domElement);
 
@@ -1156,61 +1162,25 @@ function initVoxelPlayer(player, containerId) {
   g.add(rbox(ARM_W*1.1, cuffLen, ARM_D*1.05, jerseyM,  SHOULDER_W+ARM_W*0.5, armTop - cuffLen*0.5, ARM_D*0.3));
 
   // ================================================================
-  // 动画：球员原地跑步姿势 + 轻微呼吸
+  // 动画：站立呼吸 + 轻微重心转移（不移出画面）
   // ================================================================
-  // 记录初始位置
-  const savedPos = g.children.map(c => ({mesh: c, y: c.position.y}));
-
   let t = 0;
-  let lastT = performance.now();
 
   function animate() {
     requestAnimationFrame(animate);
-    const now = performance.now();
-    const dt = (now - lastT) / 1000;
-    lastT = now;
-    t += dt;
+    t += 0.018;
 
-    // 跑步周期（1Hz，1秒一步）
-    const phase = t * Math.PI * 2;
-    const breathe = Math.sin(t * 1.2) * 0.004; // 呼吸起伏
-
-    g.children.forEach((mesh, i) => {
-      mesh.position.y = savedPos[i].y + breathe;
-    });
-
-    // 腿部摆动：左腿前时右腿后
-    const legSwing = Math.sin(phase) * SHOULDER_W * 0.6;
-    // 重建腿部位置（简化：直接摆动大腿部分）
-    g.children.forEach(mesh => {
-      // 找腿部mesh：根据y坐标范围判断
-      const my = mesh.position.y;
-      if (my < sockY + SOCK_H*0.5 + SHOE_H && my > sockY - SHIN_W) {
-        // 小腿/袜子：轻微前后摆
-        if (mesh.position.x < 0) mesh.position.z = legSwing * 0.5;
-        if (mesh.position.x > 0) mesh.position.z = -legSwing * 0.5;
-      }
-      if (my >= thighY - THIGH_H*0.45 && my <= thighY + THIGH_H*0.45) {
-        if (mesh.position.x < 0) mesh.position.z = legSwing;
-        if (mesh.position.x > 0) mesh.position.z = -legSwing;
-      }
-    });
-
-    // 手臂摆动（与腿反向）
-    const armSwing = Math.sin(phase) * ARM_W * 1.2;
-    g.children.forEach(mesh => {
-      const my = mesh.position.y;
-      if (my > armY2 - foreLen && my < armY1 + armLen) {
-        if (mesh.position.x < 0) mesh.position.z = -armSwing;
-        if (mesh.position.x > 0) mesh.position.z = armSwing;
-      }
-    });
+    // 呼吸起伏 + 轻微左右重心（不移动mesh，只旋转整体）
+    const breathe = Math.sin(t * 1.5) * 0.006;
+    const sway    = Math.sin(t * 0.8) * 0.04; // 身体左右微倾
+    g.rotation.z = sway;
+    g.rotation.x = breathe;
 
     renderer.render(scene, camera);
   }
   animate();
 
-  voxelScenes[containerId] = {renderer, scene, g, savedPos};
+  voxelScenes[containerId] = {renderer, scene, g};
 }
 
 // ---- 3D Player Body SVG (fallback) ----
