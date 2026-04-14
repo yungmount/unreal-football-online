@@ -1195,57 +1195,85 @@ function initVoxelPlayer(player, containerId) {
   const shortH = S * 0.075;
   g.add(rbox(WAIST_W*2.0, shortH, WAIST_W*1.1, shortM, 0, shortY + shortH*0.5, 0));
 
-  // ---- 躯干（球衣）----
+  // ================================================================
+  // TORSO + SHOULDER FUSION（躯干+肩膀融合）
+  // ================================================================
   const torsoBottom = shortY + shortH;
-  const torsoH2 = TORSO_H + NECK_H * 0.5;
-  const torsoY = torsoBottom + torsoH2 * 0.5;
-  g.add(rbox(SHOULDER_W*2.0, torsoH2, SHOULDER_W*0.92, jerseyM, 0, torsoY, 0));
+  const torsoTop    = torsoBottom + TORSO_H;           // 肩部 Y
+  const torsoCenter = torsoBottom + TORSO_H * 0.5;     // 躯干中心
 
-  // ---- 球衣号码（白色小盒子贴在胸前）----
-  const numGeo = new THREE.TextGeometry ? null : null; // 不用3D文字，用盒子代替
+  // 躯干主体（球衣色，向下延伸到短裤上方）
+  g.add(rbox(SHOULDER_W*2.0, TORSO_H, SHOULDER_W*0.88, jerseyM, 0, torsoCenter, 0));
+
+  // 肩部过渡块（从躯干顶宽 → 手臂位置，填充肩膀体积）
+  const shoulderBlendH = S * 0.04;  // 肩块高度
+  const shoulderBlendY = torsoTop - shoulderBlendH * 0.5;
+  const shoulderBlendCenter = torsoTop - shoulderBlendH * 0.5;
+  // 肩块：从躯干宽度向手臂延伸处逐渐变窄
+  // 左肩 + 右肩（各一个，从躯干顶部向手臂根部过渡）
+  const sbW = SHOULDER_W + ARM_W * 0.6; // 肩块底部宽度
+  g.add(rbox(sbW * 2.0, shoulderBlendH, SHOULDER_W * 0.80, jerseyM, 0, shoulderBlendCenter, 0));
+
+  // 球衣号码（白色小盒子贴在胸前）
   const numM = new THREE.MeshLambertMaterial({color:0xffffff});
-  g.add(rbox(S*0.045, S*0.055, 0.003, numM, 0, torsoY + S*0.01, SHOULDER_W*0.465));
+  g.add(rbox(S*0.040, S*0.050, 0.003, numM, 0, torsoCenter + S*0.01, SHOULDER_W*0.445));
 
-  // ---- 颈部 ----
-  const neckY = torsoBottom + torsoH2 - NECK_H * 0.5;
-  g.add(rbox(HEAD_R*0.50, NECK_H, HEAD_R*0.40, skinM, 0, neckY, 0));
-
-  // ---- HEAD：Billboard 面部精灵（永远面向相机）+ 球形后脑勺 ----
-  const headCY = neckY + NECK_H * 0.5 + HEAD_R;
-  // 后脑勺（皮肤色球体）
-  const backGeo = new THREE.SphereGeometry(HEAD_R * 0.90, 14, 12);
-  const backMesh = new THREE.Mesh(backGeo, skinM);
-  backMesh.position.set(0, headCY, 0);
-  g.add(backMesh);
-  // 面部 billboard 精灵（始终面向相机，展示完整面孔）
-  const faceTex = drawFaceTexture(HEAD_R, HEAD_R, skinIdx, hairIdx, hairColor, eyeIdx, hash, faceWFactor);
-  const faceSpriteMat = new THREE.SpriteMaterial({map: faceTex, depthTest: false, depthWrite: false});
-  const faceSprite = new THREE.Sprite(faceSpriteMat);
-  // billboard 大小：等于头的直径，让面孔填满球体正面
-  faceSprite.scale.set(HEAD_R * 1.55, HEAD_R * 1.55, 1);
-  faceSprite.position.set(0, headCY, HEAD_R * 0.88);
-  g.add(faceSprite);
-  // 耳朵（左+右，突出头部两侧）
-  g.add(rbox(HEAD_R*0.18, HEAD_R*0.28, HEAD_R*0.10, skinM, -HEAD_R*0.92, headCY, 0));
-  g.add(rbox(HEAD_R*0.18, HEAD_R*0.28, HEAD_R*0.10, skinM,  HEAD_R*0.92, headCY, 0));
-
-  // ---- ARMS：上臂 + 前臂（自然下垂，稍向前）----
-  const armTop = torsoY + torsoH2 * 0.15;
-  const armLen = ARM_H * 0.52; // 上臂
+  // ================================================================
+  // ARMS（手臂在躯干两侧，自然下垂）
+  // ================================================================
+  const armAttachY = torsoTop; // 手臂接在躯干顶（肩部）
+  const armLen  = ARM_H * 0.52; // 上臂
   const foreLen = ARM_H * 0.48; // 前臂
-  const armY1 = armTop - armLen * 0.5;
-  const armY2 = armTop - armLen - foreLen * 0.5;
+  const armY1 = armAttachY - armLen * 0.5;   // 上臂中心
+  const armY2 = armAttachY - armLen - foreLen * 0.5; // 前臂中心
+  const armFwd = SHOULDER_W * 0.25; // 手臂向前的偏移
   // 左臂
-  g.add(rbox(ARM_W, armLen, ARM_D, skinM, -SHOULDER_W - ARM_W*0.5, armY1, ARM_D*0.3));
-  g.add(rbox(ARM_W, foreLen, ARM_D*0.85, skinM, -SHOULDER_W - ARM_W*0.5, armY2, ARM_D*0.3));
+  g.add(rbox(ARM_W, armLen, ARM_D, skinM, -SHOULDER_W - ARM_W*0.5, armY1, armFwd));
+  g.add(rbox(ARM_W, foreLen, ARM_D*0.85, skinM, -SHOULDER_W - ARM_W*0.5, armY2, armFwd));
   // 右臂
-  g.add(rbox(ARM_W, armLen, ARM_D, skinM,  SHOULDER_W + ARM_W*0.5, armY1, ARM_D*0.3));
-  g.add(rbox(ARM_W, foreLen, ARM_D*0.85, skinM,  SHOULDER_W + ARM_W*0.5, armY2, ARM_D*0.3));
-
-  // ---- 袖口（球衣色）----
+  g.add(rbox(ARM_W, armLen, ARM_D, skinM,  SHOULDER_W + ARM_W*0.5, armY1, armFwd));
+  g.add(rbox(ARM_W, foreLen, ARM_D*0.85, skinM,  SHOULDER_W + ARM_W*0.5, armY2, armFwd));
+  // 袖口（球衣色，接在手臂顶部）
   const cuffLen = armLen * 0.28;
-  g.add(rbox(ARM_W*1.1, cuffLen, ARM_D*1.05, jerseyM, -SHOULDER_W-ARM_W*0.5, armTop - cuffLen*0.5, ARM_D*0.3));
-  g.add(rbox(ARM_W*1.1, cuffLen, ARM_D*1.05, jerseyM,  SHOULDER_W+ARM_W*0.5, armTop - cuffLen*0.5, ARM_D*0.3));
+  g.add(rbox(ARM_W*1.1, cuffLen, ARM_D*1.05, jerseyM, -SHOULDER_W-ARM_W*0.5, armAttachY - cuffLen*0.5, armFwd));
+  g.add(rbox(ARM_W*1.1, cuffLen, ARM_D*1.05, jerseyM,  SHOULDER_W+ARM_W*0.5, armAttachY - cuffLen*0.5, armFwd));
+
+  // ================================================================
+  // NECK + HEAD FUSION（颈部+头部融合）
+  // ================================================================
+  // 颈部圆柱：接在躯干顶部 → 头部底部，自然过渡
+  const neckR   = HEAD_R * 0.38;              // 颈半径（比头部小）
+  const neckH   = S * 0.045;                 // 颈高（稍长，向下延伸进躯干）
+  const neckCY  = torsoTop + neckH * 0.3;   // 颈圆柱中心（略低于躯干顶）
+  const neckGeo = new THREE.CylinderGeometry(neckR, neckR*1.05, neckH, 10);
+  const neckMesh = new THREE.Mesh(neckGeo, skinM);
+  neckMesh.position.set(0, neckCY, 0);
+  g.add(neckMesh);
+
+  // 领口填充（皮肤色矩形，连接颈和领口，消除空隙）
+  const collarH = S * 0.028;
+  const collarY = torsoTop + collarH * 0.5;
+  g.add(rbox(neckR * 3.2, collarH, neckR * 2.0, skinM, 0, collarY, 0));
+
+  // 头部： Billboard 面孔精灵（永远面向相机） + 后脑勺球体
+  // 头部中心 Y：颈顶部 + 头半径，让头"坐"在颈上
+  const headCY = torsoTop + neckH * 0.6 + HEAD_R;
+  // 后脑勺（皮肤色球体，略小于正面，留出 billboard 空间）
+  const headBackGeo = new THREE.SphereGeometry(HEAD_R * 0.92, 16, 14);
+  const headBackMesh = new THREE.Mesh(headBackGeo, skinM);
+  headBackMesh.position.set(0, headCY, 0);
+  g.add(headBackMesh);
+  // 面孔 billboard 精灵（略大于后脑勺，自然覆盖头部正面）
+  const faceTex = drawFaceTexture(HEAD_R, HEAD_R, skinIdx, hairIdx, hairColor, eyeIdx, hash, faceWFactor);
+  const faceSpriteMat = new THREE.SpriteMaterial({map: faceTex, depthTest: false, depthWrite: false, transparent: true});
+  const faceSprite = new THREE.Sprite(faceSpriteMat);
+  faceSprite.scale.set(HEAD_R * 1.50, HEAD_R * 1.50, 1); // 面孔略大于头部直径
+  faceSprite.position.set(0, headCY, HEAD_R * 0.90);      // billboard 略突出后脑勺
+  g.add(faceSprite);
+  // 耳朵（左+右，融合在头部两侧）
+  const earW = HEAD_R * 0.18, earH = HEAD_R * 0.28, earD = HEAD_R * 0.12;
+  g.add(rbox(earW, earH, earD, skinM, -HEAD_R * 0.93, headCY, 0));
+  g.add(rbox(earW, earH, earD, skinM,  HEAD_R * 0.93, headCY, 0));
 
   // ================================================================
   // 动画：站立呼吸 + 360度旋转（面孔展示）
