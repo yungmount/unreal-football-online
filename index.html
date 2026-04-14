@@ -1146,7 +1146,8 @@ function startMatch() {
   MS = null; tab = 'match'; render();
   
   setTimeout(()=>{
-    if(typeof MatchEngine==='undefined'){alert('Loading match engine...');return}
+    if(typeof MatchEngine==='undefined'){alert('MatchEngine not loaded. Check console for errors.');console.error('MatchEngine is undefined');return}
+    if(typeof Tactics==='undefined'){alert('Tactics not loaded.');console.error('Tactics is undefined');return}
     
     const fp = FP[G.formation]||FP['4-4-2'];
     const myTeam = G.team.slice(0,11).map((p,i)=>{
