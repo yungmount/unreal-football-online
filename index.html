@@ -1118,179 +1118,107 @@ function initVoxelPlayer(player, containerId) {
   const sockM    = new THREE.MeshLambertMaterial({color: teamColor});
 
   // ================================================================
-  // 场景设置
+  // Bigheads.io 全身 SVG 方案
+  // https://beanheads.robertbroersma.com/ — 完整卡通全身人物（开源）
   // ================================================================
-  const scene = new THREE.Scene();
-  // 深色背景 + 地面网格感
-  scene.background = new THREE.Color(0x0d1117);
-  scene.add(new THREE.GridHelper && new THREE.GridHelper(4, 8, 0x1e3a5f, 0x0d1a2e) || new THREE.Object3D());
 
-  // ================================================================
-  // 相机设置：全视图看到完整球员
-  // ================================================================
-  // 球员中心在 S*0.35（头脚中点），相机放在侧面偏上
-  const bodyCenterY = S * 0.40;       // 球员全身中心（头顶S ~脚底0）
-  const camDist     = S * 1.15;       // 相机距离
-  const camH        = S * 0.55;       // 相机高度
-  const camSide     = S * 0.20;       // 相机侧偏
-  const camera = new THREE.PerspectiveCamera(52, 200/300, 0.01, 50);
-  camera.position.set(camSide, camH, camDist);
-  camera.lookAt(0, bodyCenterY, 0);
+  function toBigheadsBody(phys) {
+    if (phys >= 82) return 'broad';
+    if (phys >= 68) return 'default';
+    return 'lean';
+  }
+  function toBigheadsMouth(stamina) {
+    if (stamina >= 80) return 'grin';
+    if (stamina >= 60) return 'default';
+    if (stamina >= 40) return 'smirk';
+    return 'sad';
+  }
+  function toBigheadsEyes(ovr) {
+    if (ovr >= 85) return 'happy';
+    return 'default';
+  }
+  function toBigheadsHair(idx) {
+    const styles = ['none','short01','short02','short03','long01','long02','bun','curly','afro','pixie'];
+    return styles[idx % styles.length];
+  }
+  function buildBigheadsUrl(p, h, skinHex, teamColor) {
+    const shirt = '#' + teamColor.toString(16).padStart(6,'0');
+    const params = new URLSearchParams({
+      accessoriesType: playerHash(h,97) > 0.85 ? 'glasses' : 'none',
+      body:            toBigheadsBody(p.physical || 75),
+      clothingColor:   shirt,
+      clothing:        'shirt',
+      dy:              '0',
+      eyes:            toBigheadsEyes(p.ovr || 70),
+      eyebrow:         'default',
+      faceColor:       skinHex,
+      graphicType:     'none',
+      hair:            toBigheadsHair(hairIdx),
+      hairColor:       hairColorStr,
+      lashes:          'false',
+      lipColor:        skinHex,
+      lips:            'false',
+      maskFace:        'false',
+      mouth:           toBigheadsMouth(p.stamina || 70),
+      size:            '640',
+      style:           'square'
+    });
+    return 'https://bigheads.io/svg?' + params.toString();
+  }
+
+  // 场景：正交相机 + 球队色背景
+  const scene = new THREE.Scene();
+  const hR = (teamColor >> 16) & 0xFF, hG = (teamColor >> 8) & 0xFF, hB = teamColor & 0xFF;
+  scene.background = new THREE.Color(hR*0.15, hG*0.15, hB*0.15);
+
+  const aspect = 200 / 320;
+  const camera = new THREE.OrthographicCamera(-aspect, aspect, 1, -1, 0.1, 100);
+  camera.position.set(0, 0.05, 5);
+  camera.lookAt(0, 0.05, 0);
 
   const renderer = new THREE.WebGLRenderer({antialias:true, alpha:true});
-  renderer.setSize(200, 300);
-  renderer.setClearColor(0x0d1117, 1);
+  renderer.setSize(200, 320);
+  renderer.setClearColor(0x000000, 0);
   container.appendChild(renderer.domElement);
-
-  // 灯光（暖色主光 + 冷色补光）
-  scene.add(new THREE.AmbientLight(0xffeedd, 0.55));
-  const sun = new THREE.DirectionalLight(0xfff0cc, 1.0);
-  sun.position.set(S*2, S*3, S*2); scene.add(sun);
-  const fill = new THREE.DirectionalLight(0x88bbff, 0.35);
-  fill.position.set(-S*2, S*1, -S*1); scene.add(fill);
 
   const g = new THREE.Group();
   scene.add(g);
 
-  // ================================================================
-  // 坐标基准：g.position.y = 0 是脚底
-  //           头顶在 y = S
-  // ================================================================
-  const TOP = S; // 头顶 y
+  // fetch+Blob 绕过 CORS，加载 Bigheads SVG
+  fetch(buildBigheadsUrl(player, hash, skinHex, teamColor))
+    .then(r => r.text())
+    .then(svgText => {
+      const blob = new Blob([svgText], {type:'image/svg+xml'});
+      const blobUrl = URL.createObjectURL(blob);
+      const img = new Image();
+      img.onload = function() {
+        const tex = new THREE.Texture(img);
+        tex.flipY = false;
+        tex.needsUpdate = true;
+        const geo = new THREE.PlaneGeometry(1.0, 0.99);
+        const mat = new THREE.MeshBasicMaterial({map:tex, transparent:true, alphaTest:0.05, side:THREE.DoubleSide});
+        const mesh = new THREE.Mesh(geo, mat);
+        mesh.position.set(0, 0, 0);
+        g.add(mesh);
+      };
+      img.src = blobUrl;
+    })
+    .catch(() => {
+      container.style.cssText = 'width:200px;height:320px;display:flex;align-items:center;justify-content:center;';
+      const imgEl = document.createElement('img');
+      imgEl.src = buildBigheadsUrl(player, hash, skinHex, teamColor);
+      imgEl.style.cssText = 'width:180px;height:auto;border-radius:8px;';
+      container.appendChild(imgEl);
+    });
 
-  // ---- Helper：创建圆角盒子 ----
-  function rbox(w, h, d, m, x, y, z) {
-    const geo = new THREE.BoxGeometry(w, h, d);
-    const mesh = new THREE.Mesh(geo, m);
-    mesh.position.set(x, y, z);
-    return mesh;
-  }
-
-  // ---- 脚底 y ----
-  const footY = 0;
-
-  // ---- 鞋子 ----
-  const shoeY_center = footY + SHOE_H * 0.5;
-  g.add(rbox(SHOE_D*1.3, SHOE_H, SHOE_D*2.2, shoeM, -THIGH_W*0.7, shoeY_center, SHOE_D*0.4));
-  g.add(rbox(SHOE_D*1.3, SHOE_H, SHOE_D*2.2, shoeM,  THIGH_W*0.7, shoeY_center, SHOE_D*0.4));
-
-  // ---- 袜子（球衣色）----
-  const sockY = shoeY_center + SHOE_H * 0.5 + SOCK_H * 0.5;
-  g.add(rbox(SHIN_W*2.0, SOCK_H, SHIN_W*1.8, sockM, -THIGH_W*0.7, sockY, 0));
-  g.add(rbox(SHIN_W*2.0, SOCK_H, SHIN_W*1.8, sockM,  THIGH_W*0.7, sockY, 0));
-
-  // ---- 小腿（皮肤色，穿在袜子里）----
-  const shinTop = sockY + SOCK_H * 0.5;
-  g.add(rbox(SHIN_W*1.9, THIGH_H*0.55, SHIN_W*1.7, skinM, -THIGH_W*0.7, shinTop + THIGH_H*0.55*0.5, 0));
-  g.add(rbox(SHIN_W*1.9, THIGH_H*0.55, SHIN_W*1.7, skinM,  THIGH_W*0.7, shinTop + THIGH_H*0.55*0.5, 0));
-
-  // ---- 大腿（皮肤色）----
-  const thighTop = shinTop + THIGH_H*0.55;
-  const thighY   = thighTop + THIGH_H*0.45*0.5;
-  g.add(rbox(THIGH_W*2.0, THIGH_H*0.45, THIGH_W*1.8, skinM, -THIGH_W*0.7, thighY, 0));
-  g.add(rbox(THIGH_W*2.0, THIGH_H*0.45, THIGH_W*1.8, skinM,  THIGH_W*0.7, thighY, 0));
-
-  // ---- 短裤 ----
-  const shortY = thighTop + THIGH_H*0.45 + 0.001; // 无缝衔接大腿
-  const shortH = S * 0.075;
-  g.add(rbox(WAIST_W*2.0, shortH, WAIST_W*1.1, shortM, 0, shortY + shortH*0.5, 0));
-
-  // ================================================================
-  // TORSO + SHOULDER FUSION（躯干+肩膀融合）
-  // ================================================================
-  const torsoBottom = shortY + shortH;
-  const torsoTop    = torsoBottom + TORSO_H;           // 肩部 Y
-  const torsoCenter = torsoBottom + TORSO_H * 0.5;     // 躯干中心
-
-  // 躯干主体（球衣色，向下延伸到短裤上方）
-  g.add(rbox(SHOULDER_W*2.0, TORSO_H, SHOULDER_W*0.88, jerseyM, 0, torsoCenter, 0));
-
-  // 肩部过渡块（从躯干顶宽 → 手臂位置，填充肩膀体积）
-  const shoulderBlendH = S * 0.04;  // 肩块高度
-  const shoulderBlendY = torsoTop - shoulderBlendH * 0.5;
-  const shoulderBlendCenter = torsoTop - shoulderBlendH * 0.5;
-  // 肩块：从躯干宽度向手臂延伸处逐渐变窄
-  // 左肩 + 右肩（各一个，从躯干顶部向手臂根部过渡）
-  const sbW = SHOULDER_W + ARM_W * 0.6; // 肩块底部宽度
-  g.add(rbox(sbW * 2.0, shoulderBlendH, SHOULDER_W * 0.80, jerseyM, 0, shoulderBlendCenter, 0));
-
-  // 球衣号码（白色小盒子贴在胸前）
-  const numM = new THREE.MeshLambertMaterial({color:0xffffff});
-  g.add(rbox(S*0.040, S*0.050, 0.003, numM, 0, torsoCenter + S*0.01, SHOULDER_W*0.445));
-
-  // ================================================================
-  // ARMS（手臂在躯干两侧，自然下垂）
-  // ================================================================
-  const armAttachY = torsoTop; // 手臂接在躯干顶（肩部）
-  const armLen  = ARM_H * 0.52; // 上臂
-  const foreLen = ARM_H * 0.48; // 前臂
-  const armY1 = armAttachY - armLen * 0.5;   // 上臂中心
-  const armY2 = armAttachY - armLen - foreLen * 0.5; // 前臂中心
-  const armFwd = SHOULDER_W * 0.25; // 手臂向前的偏移
-  // 左臂
-  g.add(rbox(ARM_W, armLen, ARM_D, skinM, -SHOULDER_W - ARM_W*0.5, armY1, armFwd));
-  g.add(rbox(ARM_W, foreLen, ARM_D*0.85, skinM, -SHOULDER_W - ARM_W*0.5, armY2, armFwd));
-  // 右臂
-  g.add(rbox(ARM_W, armLen, ARM_D, skinM,  SHOULDER_W + ARM_W*0.5, armY1, armFwd));
-  g.add(rbox(ARM_W, foreLen, ARM_D*0.85, skinM,  SHOULDER_W + ARM_W*0.5, armY2, armFwd));
-  // 袖口（球衣色，接在手臂顶部）
-  const cuffLen = armLen * 0.28;
-  g.add(rbox(ARM_W*1.1, cuffLen, ARM_D*1.05, jerseyM, -SHOULDER_W-ARM_W*0.5, armAttachY - cuffLen*0.5, armFwd));
-  g.add(rbox(ARM_W*1.1, cuffLen, ARM_D*1.05, jerseyM,  SHOULDER_W+ARM_W*0.5, armAttachY - cuffLen*0.5, armFwd));
-
-  // ================================================================
-  // NECK + HEAD FUSION（颈部+头部融合）
-  // ================================================================
-  // 颈部圆柱：接在躯干顶部 → 头部底部，自然过渡
-  const neckR   = HEAD_R * 0.38;              // 颈半径（比头部小）
-  const neckH   = S * 0.045;                 // 颈高（稍长，向下延伸进躯干）
-  const neckCY  = torsoTop + neckH * 0.3;   // 颈圆柱中心（略低于躯干顶）
-  const neckGeo = new THREE.CylinderGeometry(neckR, neckR*1.05, neckH, 10);
-  const neckMesh = new THREE.Mesh(neckGeo, skinM);
-  neckMesh.position.set(0, neckCY, 0);
-  g.add(neckMesh);
-
-  // 领口填充（皮肤色矩形，连接颈和领口，消除空隙）
-  const collarH = S * 0.028;
-  const collarY = torsoTop + collarH * 0.5;
-  g.add(rbox(neckR * 3.2, collarH, neckR * 2.0, skinM, 0, collarY, 0));
-
-  // 头部： Billboard 面孔精灵（永远面向相机） + 后脑勺球体
-  // 头部中心 Y：颈顶部 + 头半径，让头"坐"在颈上
-  const headCY = torsoTop + neckH * 0.6 + HEAD_R;
-  // 后脑勺（皮肤色球体，略小于正面，留出 billboard 空间）
-  const headBackGeo = new THREE.SphereGeometry(HEAD_R * 0.92, 16, 14);
-  const headBackMesh = new THREE.Mesh(headBackGeo, skinM);
-  headBackMesh.position.set(0, headCY, 0);
-  g.add(headBackMesh);
-  // 面孔 billboard 精灵（略大于后脑勺，自然覆盖头部正面）
-  const faceTex = drawFaceTexture(HEAD_R, HEAD_R, skinIdx, hairIdx, hairColor, eyeIdx, hash, faceWFactor);
-  const faceSpriteMat = new THREE.SpriteMaterial({map: faceTex, depthTest: false, depthWrite: false, transparent: true});
-  const faceSprite = new THREE.Sprite(faceSpriteMat);
-  faceSprite.scale.set(HEAD_R * 1.50, HEAD_R * 1.50, 1); // 面孔略大于头部直径
-  faceSprite.position.set(0, headCY, HEAD_R * 0.90);      // billboard 略突出后脑勺
-  g.add(faceSprite);
-  // 耳朵（左+右，融合在头部两侧）
-  const earW = HEAD_R * 0.18, earH = HEAD_R * 0.28, earD = HEAD_R * 0.12;
-  g.add(rbox(earW, earH, earD, skinM, -HEAD_R * 0.93, headCY, 0));
-  g.add(rbox(earW, earH, earD, skinM,  HEAD_R * 0.93, headCY, 0));
-
-  // ================================================================
-  // 动画：站立呼吸 + 360度旋转（面孔展示）
-  // ================================================================
+  // 动画：站立呼吸 + Y轴360度旋转
   let t = 0;
-
   function animate() {
     requestAnimationFrame(animate);
     t += 0.012;
-
-    // 呼吸起伏 + 左右微倾 + Y轴360度旋转（8秒一圈）
-    const breathe = Math.sin(t * 1.5) * 0.005;
-    const sway    = Math.sin(t * 0.8) * 0.03;
-    g.rotation.y  = t * 0.78;            // 360度旋转
-    g.rotation.z  = sway;
-    g.rotation.x  = breathe;
-
+    g.rotation.y = t * 0.78;
+    g.rotation.z = Math.sin(t * 0.8) * 0.020;
+    g.rotation.x = Math.sin(t * 1.5) * 0.005;
     renderer.render(scene, camera);
   }
   animate();
