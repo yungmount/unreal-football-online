@@ -985,145 +985,232 @@ function initVoxelPlayer(player, containerId) {
   }
 
   const hash = player.id || player.name || Math.random();
-  const h = player.height || 180;   // cm
-  const w = player.weight || 75;    // kg
-  const str = player.strength || player.defending || 55;
+  const H = player.height || 180; // cm
+  const W = player.weight || 75;  // kg
 
-  // ---- 球员比例计算 ----
-  // 身高基准：180cm = 0.85 世界单位
-  const heightScale = h / 180 * 0.85;
-  // 体型：瘦/正常/壮/肥胖
-  const bmi = w / ((h/100)*(h/100));
-  const bodyFactor = bmi < 18 ? 0.82 : bmi > 24 ? 1.25 : bmi > 21 ? 1.12 : 1.0;
-  // 头大小（头大显得矮，头小显得高挑）
-  const headScale = (h < 175 ? 1.12 : h > 188 ? 0.9 : 1.0) * heightScale;
-  // 肩宽
-  const shoulderW = 0.055 * bodyFactor * heightScale;
-  // 腰宽
-  const waistW = shoulderW * 0.72;
-  // 大腿宽
-  const thighW = 0.028 * bodyFactor * heightScale;
+  // ================================================================
+  // 比例系统：H cm → 1.0 世界单位，H=180 → 1.0
+  // ================================================================
+  const S = H / 180;                           // 缩放系数
+  const bmi = W / ((H/100)*(H/100));
+  // 体型修正（影响肩宽/腿粗）
+  const bf = bmi < 18 ? 0.78 : bmi > 26 ? 1.30 : bmi > 22 ? 1.15 : 1.0;
 
-  // ---- 面部属性（由 hash 决定，千人千面）----
-  const skinIdx    = hInt(hash, 1, 0, SKIN_PALETTES.length - 1);
+  // 人体比例（基于真实人体测量）
+  const HEAD_R  = S * 0.122;        // 头球半径：180cm→0.122（=22cm）✅
+  const NECK_H   = S * 0.033;        // 颈高：6cm
+  const TORSO_H  = S * 0.156;        // 躯干：28cm
+  const LEG_H    = S * 0.474;        // 腿总长：85cm
+  const THIGH_H  = LEG_H * 0.43;     // 大腿：36.5cm
+  const SOCK_H   = LEG_H * 0.30;     // 球袜：25.5cm
+  const SHOE_H   = S  * 0.028;      // 鞋子：5cm
+  const SHOE_D   = S  * 0.062;       // 鞋子进深
+  const ARM_H    = S  * 0.260;       // 上臂+前臂
+  const SHOULDER_W = S * 0.156;     // 肩宽：28cm
+  const WAIST_W    = SHOULDER_W * 0.72;
+  const THIGH_W    = S * 0.042 * bf; // 大腿粗细
+  const SHIN_W     = THIGH_W * 0.70;  // 小腿
+  const ARM_W      = SHOULDER_W * 0.20;
+  const ARM_D      = ARM_W * 0.80;    // 手臂进深
+
+  // 球衣号（从姓名 hash）
+  const num = ((player.name.charCodeAt(0)*7 + (player.name.charCodeAt(2)||0)*3) % 99) + 1;
+
+  // ---- 颜色 ----
+  const skinIdx   = hInt(hash, 1, 0, SKIN_PALETTES.length - 1);
   const hairIdx    = hInt(hash, 2, 0, HAIR_COLORS.length - 1);
   const hairColor  = HAIR_COLORS[hairIdx];
   const eyeIdx     = hInt(hash, 3, 0, 6);
-  const faceWFactor = 0.82 + playerHash(hash, 4) * 0.22; // 0.82–1.04 椭圆宽窄
+  const faceWFactor = 0.82 + playerHash(hash, 4) * 0.22;
+  const teamColor   = player.isMy ? '#CC2233' : '#1133BB';
+  const shortColor  = '#1a1a2e';
+  const shoeColor   = '#111';
 
-  // 球衣颜色（主客队不同）
-  const teamColor = player.isMy ? '#CC2233' : '#1133AA';
-  const shortColor = '#1a1a2e';
-  const shoeColor = '#111111';
+  // 材质
+  const skinHex = SKIN_PALETTES[skinIdx][1];
+  const skinM   = new THREE.MeshLambertMaterial({color: skinHex});
+  const jerseyM  = new THREE.MeshLambertMaterial({color: teamColor});
+  const shortM   = new THREE.MeshLambertMaterial({color: shortColor});
+  const shoeM    = new THREE.MeshLambertMaterial({color: shoeColor});
+  const sockM    = new THREE.MeshLambertMaterial({color: teamColor});
 
-  // ---- Three.js 场景 ----
+  // ================================================================
+  // 场景设置
+  // ================================================================
   const scene = new THREE.Scene();
-  scene.background = new THREE.Color(0x0a0e1a);
-  const camera = new THREE.PerspectiveCamera(38, 200/300, 0.1, 100);
-  camera.position.set(0, heightScale * 0.4, 1.3);
-  camera.lookAt(0, heightScale * 0.12, 0);
+  // 深色背景 + 地面网格感
+  scene.background = new THREE.Color(0x0d1117);
+  scene.add(new THREE.GridHelper && new THREE.GridHelper(4, 8, 0x1e3a5f, 0x0d1a2e) || new THREE.Object3D());
 
-  const renderer = new THREE.WebGLRenderer({antialias:true});
-  renderer.setSize(200, 300);
-  renderer.shadowMap.enabled = false;
+  const ASPECT = 200 / 320; // 宽高比
+  const camera = new THREE.PerspectiveCamera(42, ASPECT, 0.01, 100);
+  // 相机在正面斜上方，看球员 3/4 视角（能看到正面+侧面）
+  camera.position.set(S * 0.25, S * 0.55, S * 1.0);
+  camera.lookAt(0, -S * 0.05, 0);
+
+  const renderer = new THREE.WebGLRenderer({antialias:true, alpha:true});
+  renderer.setSize(200, 320);
+  renderer.setClearColor(0x0d1117, 1);
   container.appendChild(renderer.domElement);
 
-  scene.add(new THREE.AmbientLight(0xffffff, 0.65));
-  const dl = new THREE.DirectionalLight(0xfff5e0, 0.9);
-  dl.position.set(2, 3, 2); scene.add(dl);
-  const bl = new THREE.DirectionalLight(0x88ccff, 0.35);
-  bl.position.set(-2, 1, -1); scene.add(bl);
+  // 灯光（暖色主光 + 冷色补光）
+  scene.add(new THREE.AmbientLight(0xffeedd, 0.55));
+  const sun = new THREE.DirectionalLight(0xfff0cc, 1.0);
+  sun.position.set(S*2, S*3, S*2); scene.add(sun);
+  const fill = new THREE.DirectionalLight(0x88bbff, 0.35);
+  fill.position.set(-S*2, S*1, -S*1); scene.add(fill);
 
-  const playerG = new THREE.Group();
-  scene.add(playerG);
+  const g = new THREE.Group();
+  scene.add(g);
 
-  // 皮肤材质
-  const skinHex = SKIN_PALETTES[skinIdx][1];
-  const skinM = new THREE.MeshLambertMaterial({color: skinHex});
-  const jerseyM = new THREE.MeshLambertMaterial({color: teamColor});
-  const shortM = new THREE.MeshLambertMaterial({color: shortColor});
-  const shoeM  = new THREE.MeshLambertMaterial({color: shoeColor});
-  const sockM  = new THREE.MeshLambertMaterial({color: teamColor});
+  // ================================================================
+  // 坐标基准：g.position.y = 0 是脚底
+  //           头顶在 y = S
+  // ================================================================
+  const TOP = S; // 头顶 y
 
-  function box(w,h,d,m,x,y,z){const g=new THREE.BoxGeometry(w,h,d);const me=new THREE.Mesh(g,m);me.position.set(x,y,z);return me;}
+  // ---- Helper：创建圆角盒子 ----
+  function rbox(w, h, d, m, x, y, z) {
+    const geo = new THREE.BoxGeometry(w, h, d);
+    const mesh = new THREE.Mesh(geo, m);
+    mesh.position.set(x, y, z);
+    return mesh;
+  }
 
-  const Y = heightScale; // 球员顶部 y
+  // ---- 脚底 y ----
+  const footY = 0;
 
-  // ---- HEAD（带面部的方块）----
-  const headSize = headScale * 0.095;
-  const headY = Y - headSize * 0.5;
-  playerG.add(box(headSize, headSize, headSize * 0.88, skinM, 0, headY, 0));
+  // ---- 鞋子 ----
+  const shoeY_center = footY + SHOE_H * 0.5;
+  g.add(rbox(SHOE_D*1.3, SHOE_H, SHOE_D*2.2, shoeM, -THIGH_W*0.7, shoeY_center, SHOE_D*0.4));
+  g.add(rbox(SHOE_D*1.3, SHOE_H, SHOE_D*2.2, shoeM,  THIGH_W*0.7, shoeY_center, SHOE_D*0.4));
 
-  // 面部纹理（canvas）
-  const faceTex = drawFaceTexture(headSize, headSize, skinIdx, hairIdx, hairColor, eyeIdx, hash, faceWFactor);
-  const faceM = new THREE.MeshBasicMaterial({map: faceTex, transparent: false});
-  const facePlane = new THREE.Mesh(new THREE.PlaneGeometry(headSize * 0.82, headSize * 0.82), faceM);
-  facePlane.position.set(0, headY, headSize * 0.45);
-  playerG.add(facePlane);
+  // ---- 袜子（球衣色）----
+  const sockY = shoeY_center + SHOE_H * 0.5 + SOCK_H * 0.5;
+  g.add(rbox(SHIN_W*2.0, SOCK_H, SHIN_W*1.8, sockM, -THIGH_W*0.7, sockY, 0));
+  g.add(rbox(SHIN_W*2.0, SOCK_H, SHIN_W*1.8, sockM,  THIGH_W*0.7, sockY, 0));
 
-  // 颈部
-  const neckH = headScale * 0.03;
-  playerG.add(box(headSize * 0.3, neckH, headSize * 0.28, skinM, 0, Y - headSize - neckH * 0.5, 0));
+  // ---- 小腿（皮肤色，穿在袜子里）----
+  const shinTop = sockY + SOCK_H * 0.5;
+  g.add(rbox(SHIN_W*1.9, THIGH_H*0.55, SHIN_W*1.7, skinM, -THIGH_W*0.7, shinTop + THIGH_H*0.55*0.5, 0));
+  g.add(rbox(SHIN_W*1.9, THIGH_H*0.55, SHIN_W*1.7, skinM,  THIGH_W*0.7, shinTop + THIGH_H*0.55*0.5, 0));
 
-  // ---- TORSO（根据体重调整宽度）----
-  const torsoH = heightScale * 0.18;
-  const torsoY = Y - headSize - neckH - torsoH * 0.5;
-  playerG.add(box(shoulderW * 2, torsoH, shoulderW * 0.9, jerseyM, 0, torsoY, 0));
+  // ---- 大腿（皮肤色）----
+  const thighTop = shinTop + THIGH_H*0.55;
+  const thighY   = thighTop + THIGH_H*0.45*0.5;
+  g.add(rbox(THIGH_W*2.0, THIGH_H*0.45, THIGH_W*1.8, skinM, -THIGH_W*0.7, thighY, 0));
+  g.add(rbox(THIGH_W*2.0, THIGH_H*0.45, THIGH_W*1.8, skinM,  THIGH_W*0.7, thighY, 0));
 
-  // ---- SHORTS ----
-  const shortH = heightScale * 0.075;
-  const shortY = torsoY - torsoH * 0.5 - shortH * 0.5;
-  playerG.add(box(waistW * 2, shortH, waistW * 1.1, shortM, 0, shortY, 0));
+  // ---- 短裤 ----
+  const shortY = thighTop + THIGH_H*0.45 + 0.001; // 无缝衔接大腿
+  const shortH = S * 0.075;
+  g.add(rbox(WAIST_W*2.0, shortH, WAIST_W*1.1, shortM, 0, shortY + shortH*0.5, 0));
 
-  // ---- LEGS（根据体型调整粗细）----
-  const legH = heightScale * 0.21;
-  const legY = shortY - shortH * 0.5 - legH * 0.5;
-  playerG.add(box(thighW * 2, legH, thighW * 1.8, skinM, -thighW, legY, 0));
-  playerG.add(box(thighW * 2, legH, thighW * 1.8, skinM,  thighW, legY, 0));
+  // ---- 躯干（球衣）----
+  const torsoBottom = shortY + shortH;
+  const torsoH2 = TORSO_H + NECK_H * 0.5;
+  const torsoY = torsoBottom + torsoH2 * 0.5;
+  g.add(rbox(SHOULDER_W*2.0, torsoH2, SHOULDER_W*0.92, jerseyM, 0, torsoY, 0));
 
-  // ---- SOCKS（球衣色）----
-  const sockH = heightScale * 0.12;
-  const sockY = legY - legH * 0.5 - sockH * 0.5;
-  playerG.add(box(thighW * 1.8, sockH, thighW * 1.7, sockM, -thighW, sockY, 0));
-  playerG.add(box(thighW * 1.8, sockH, thighW * 1.7, sockM,  thighW, sockY, 0));
+  // ---- 球衣号码（白色小盒子贴在胸前）----
+  const numGeo = new THREE.TextGeometry ? null : null; // 不用3D文字，用盒子代替
+  const numM = new THREE.MeshLambertMaterial({color:0xffffff});
+  g.add(rbox(S*0.045, S*0.055, 0.003, numM, 0, torsoY + S*0.01, SHOULDER_W*0.465));
 
-  // ---- SHOES ----
-  const shoeH = heightScale * 0.025;
-  const shoeY = sockY - sockH * 0.5 - shoeH * 0.5;
-  playerG.add(box(thighW * 2.2, shoeH, thighW * 3.5, shoeM, -thighW, shoeY, thighW * 0.5));
-  playerG.add(box(thighW * 2.2, shoeH, thighW * 3.5, shoeM,  thighW, shoeY, thighW * 0.5));
+  // ---- 颈部 ----
+  const neckY = torsoBottom + torsoH2 - NECK_H * 0.5;
+  g.add(rbox(HEAD_R*0.50, NECK_H, HEAD_R*0.40, skinM, 0, neckY, 0));
 
-  // ---- ARMS（根据体型调整）----
-  const armW = shoulderW * 0.38;
-  const armH = heightScale * 0.16;
-  const armY = torsoY + torsoH * 0.1;
-  playerG.add(box(armW, armH, armW, skinM, -shoulderW - armW * 0.5, armY, 0));
-  playerG.add(box(armW, armH, armW, skinM,  shoulderW + armW * 0.5, armY, 0));
-  // 袖口（球衣色）
-  const cuffH = armH * 0.25;
-  playerG.add(box(armW * 1.05, cuffH, armW * 1.05, jerseyM, -shoulderW - armW * 0.5, armY - armH * 0.38, 0));
-  playerG.add(box(armW * 1.05, cuffH, armW * 1.05, jerseyM,  shoulderW + armW * 0.5, armY - armH * 0.38, 0));
+  // ---- HEAD：球形头部 + Canvas 面部纹理 ----
+  const headCY = neckY + NECK_H * 0.5 + HEAD_R;
+  const headGeo = new THREE.SphereGeometry(HEAD_R, 20, 16);
+  // 用 MeshFaceMaterial：index 0/1=侧面, 2=背面, 3=正面, 4=顶面, 5=底面
+  const faceTex = drawFaceTexture(HEAD_R, HEAD_R, skinIdx, hairIdx, hairColor, eyeIdx, hash, faceWFactor);
+  const faceM   = new THREE.MeshBasicMaterial({map: faceTex});
+  const backM   = new THREE.MeshLambertMaterial({color: skinHex});
+  const mat6 = [backM,backM, backM, faceM, backM, backM]; // 6 faces
+  const headMesh = new THREE.Mesh(headGeo, mat6);
+  headMesh.position.set(0, headCY, 0);
+  g.add(headMesh);
 
-  // ---- 地面阴影 ----
-  const sh = new THREE.Mesh(
-    new THREE.CircleGeometry(thighW * 4, 32),
-    new THREE.MeshBasicMaterial({color:0x000000, transparent:true, opacity:0.25})
-  );
-  sh.rotation.x = -Math.PI / 2;
-  sh.position.y = shoeY - shoeH * 0.5;
-  playerG.add(sh);
+  // ---- 耳朵（左+右，突出头部两侧）----
+  g.add(rbox(HEAD_R*0.18, HEAD_R*0.30, HEAD_R*0.12, skinM, -HEAD_R*0.95, headCY, 0));
+  g.add(rbox(HEAD_R*0.18, HEAD_R*0.30, HEAD_R*0.12, skinM,  HEAD_R*0.95, headCY, 0));
 
-  // ---- 动画 ----
-  let angle = 0;
+  // ---- ARMS：上臂 + 前臂（自然下垂，稍向前）----
+  const armTop = torsoY + torsoH2 * 0.15;
+  const armLen = ARM_H * 0.52; // 上臂
+  const foreLen = ARM_H * 0.48; // 前臂
+  const armY1 = armTop - armLen * 0.5;
+  const armY2 = armTop - armLen - foreLen * 0.5;
+  // 左臂
+  g.add(rbox(ARM_W, armLen, ARM_D, skinM, -SHOULDER_W - ARM_W*0.5, armY1, ARM_D*0.3));
+  g.add(rbox(ARM_W, foreLen, ARM_D*0.85, skinM, -SHOULDER_W - ARM_W*0.5, armY2, ARM_D*0.3));
+  // 右臂
+  g.add(rbox(ARM_W, armLen, ARM_D, skinM,  SHOULDER_W + ARM_W*0.5, armY1, ARM_D*0.3));
+  g.add(rbox(ARM_W, foreLen, ARM_D*0.85, skinM,  SHOULDER_W + ARM_W*0.5, armY2, ARM_D*0.3));
+
+  // ---- 袖口（球衣色）----
+  const cuffLen = armLen * 0.28;
+  g.add(rbox(ARM_W*1.1, cuffLen, ARM_D*1.05, jerseyM, -SHOULDER_W-ARM_W*0.5, armTop - cuffLen*0.5, ARM_D*0.3));
+  g.add(rbox(ARM_W*1.1, cuffLen, ARM_D*1.05, jerseyM,  SHOULDER_W+ARM_W*0.5, armTop - cuffLen*0.5, ARM_D*0.3));
+
+  // ================================================================
+  // 动画：球员原地跑步姿势 + 轻微呼吸
+  // ================================================================
+  // 记录初始位置
+  const savedPos = g.children.map(c => ({mesh: c, y: c.position.y}));
+
+  let t = 0;
+  let lastT = performance.now();
+
   function animate() {
     requestAnimationFrame(animate);
-    angle += 0.012;
-    playerG.rotation.y = angle;
+    const now = performance.now();
+    const dt = (now - lastT) / 1000;
+    lastT = now;
+    t += dt;
+
+    // 跑步周期（1Hz，1秒一步）
+    const phase = t * Math.PI * 2;
+    const breathe = Math.sin(t * 1.2) * 0.004; // 呼吸起伏
+
+    g.children.forEach((mesh, i) => {
+      mesh.position.y = savedPos[i].y + breathe;
+    });
+
+    // 腿部摆动：左腿前时右腿后
+    const legSwing = Math.sin(phase) * SHOULDER_W * 0.6;
+    // 重建腿部位置（简化：直接摆动大腿部分）
+    g.children.forEach(mesh => {
+      // 找腿部mesh：根据y坐标范围判断
+      const my = mesh.position.y;
+      if (my < sockY + SOCK_H*0.5 + SHOE_H && my > sockY - SHIN_W) {
+        // 小腿/袜子：轻微前后摆
+        if (mesh.position.x < 0) mesh.position.z = legSwing * 0.5;
+        if (mesh.position.x > 0) mesh.position.z = -legSwing * 0.5;
+      }
+      if (my >= thighY - THIGH_H*0.45 && my <= thighY + THIGH_H*0.45) {
+        if (mesh.position.x < 0) mesh.position.z = legSwing;
+        if (mesh.position.x > 0) mesh.position.z = -legSwing;
+      }
+    });
+
+    // 手臂摆动（与腿反向）
+    const armSwing = Math.sin(phase) * ARM_W * 1.2;
+    g.children.forEach(mesh => {
+      const my = mesh.position.y;
+      if (my > armY2 - foreLen && my < armY1 + armLen) {
+        if (mesh.position.x < 0) mesh.position.z = -armSwing;
+        if (mesh.position.x > 0) mesh.position.z = armSwing;
+      }
+    });
+
     renderer.render(scene, camera);
   }
   animate();
 
-  voxelScenes[containerId] = {renderer, scene};
+  voxelScenes[containerId] = {renderer, scene, g, savedPos};
 }
 
 // ---- 3D Player Body SVG (fallback) ----
