@@ -1146,8 +1146,8 @@ function startMatch() {
   MS = null; tab = 'match'; render();
   
   setTimeout(()=>{
-    if(typeof MatchEngine==='undefined'){alert('MatchEngine not loaded. Check console for errors.');console.error('MatchEngine is undefined');return}
-    if(typeof Tactics==='undefined'){alert('Tactics not loaded.');console.error('Tactics is undefined');return}
+    if(typeof MatchEngine==='undefined'){alert('MatchEngine not loaded.');return}
+    if(typeof Tactics==='undefined'){alert('Tactics not loaded.');return}
     
     const fp = FP[G.formation]||FP['4-4-2'];
     const myTeam = G.team.slice(0,11).map((p,i)=>{
@@ -1185,7 +1185,7 @@ function matchLoopV3(ts) {
   
   // 更新事件显示
   const evtEl=document.getElementById('evts');
-  if(evtEl)evtEl.innerHTML=evtHTMLV3();
+  if(evtEl)evtEl.innerHTML=evtHTML();
   
   // 检查比赛结束
   if(MS.finished){
@@ -1196,7 +1196,7 @@ function matchLoopV3(ts) {
   rafId=requestAnimationFrame(matchLoopV3);
 }
 
-function evtHTMLV3(){
+function evtHTML(){
   if(!MS)return'';
   const colors={goal:'#22c55e',shot:'#f59e0b',foul:'#ef4444',pass:'#3b82f6',info:'#94a3b8',defense:'#a855f7',red:'#dc2626',miss:'#6b7280',save:'#f59e0b',end:'#10b981'};
   return MS.events.slice(0,15).map(e=>`<div style="padding:6px 8px;border-radius:6px;font-size:11px;border-left:3px solid ${colors[e.type]||'#94a3b8'};background:${colors[e.type]||'#94a3b8'}18;margin-bottom:4px"><span style="color:#94a3b8;margin-right:6px">${e.min}</span>${e.txt}</div>`).join('');
