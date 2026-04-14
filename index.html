@@ -123,7 +123,9 @@ class MatchEngine {
 
   update(dt) {
     if (!this.started || this.finished) return;
-    this.sec += dt;
+    // 时间加速：游戏 90 分钟 = 现实 5 分钟 → 加速 18 倍
+    const timeScale = 18;
+    this.sec += dt * timeScale;
     if (this.sec >= 1) {
       this.sec = 0;
       this.min++;
@@ -148,12 +150,16 @@ class MatchEngine {
       this.phaseT -= dt;
       return;
     }
-    this.updatePlayersAI(dt);
-    this.updateBall(dt);
+    // AI 降频：每 100ms 更新一次（每秒约 10 次）
+    this._aiTimer = (this._aiTimer || 0) + dt;
+    if (this._aiTimer >= 0.1) {
+      this._aiTimer = 0;
+      this.updatePlayersAI(0.1);
+      this.updateBall(0.1);
+    }
     if (this.ball.owner) {
       this.possession[this.ball.owner.isMy ? 'my' : 'opp'] += dt;
     }
-    this.generateEvents();
   }
 
   updatePlayersAI(dt) {
@@ -1172,27 +1178,31 @@ function startMatch() {
   },100);
 }
 
+let _lastEvtLen=0;
 function matchLoopV3(ts) {
   if(!MS||!MS.started||MS.finished){rafId=null;return}
   const dt=Math.min((ts-lastT)/1000,.05);
   lastT=ts;
-  
+
   // 更新新引擎
   MS.update(dt);
-  
+
   // 渲染
   drawMatchV3();
-  
-  // 更新事件显示
-  const evtEl=document.getElementById('evts');
-  if(evtEl)evtEl.innerHTML=evtHTML();
-  
+
+  // 仅事件数量变化时更新 DOM
+  if(MS.events.length!==_lastEvtLen){
+    const evtEl=document.getElementById('evts');
+    if(evtEl)evtEl.innerHTML=evtHTML();
+    _lastEvtLen=MS.events.length;
+  }
+
   // 检查比赛结束
   if(MS.finished){
     endMatchV3();
     return;
   }
-  
+
   rafId=requestAnimationFrame(matchLoopV3);
 }
 
@@ -1249,75 +1259,47 @@ let _mcCtx=null;
 function drawMatchV3(){
   const cvs=document.getElementById('mc');
   if(!cvs||!MS)return;
-  const W=960,H=540;
+  const W=480,H=270;
   if(cvs.width!==W||cvs.height!==H){cvs.width=W;cvs.height=H;_mcCtx=null;}
   if(!_mcCtx||_mcCtx.canvas!==cvs){_mcCtx=cvs.getContext('2d');}
   const c=_mcCtx;
-  
+
   const data=MS.getRenderData();
 
-  // Grass with stripes
+  // Grass
   c.fillStyle='#2d8a2d';c.fillRect(0,0,W,H);
-  for(let i=0;i<10;i++){c.fillStyle=i%2?'rgba(0,0,0,0.04)':'rgba(255,255,255,0.03)';c.fillRect(i*(W/10),0,W/10,H);}
 
-  // Lines
-  c.strokeStyle='rgba(255,255,255,0.6)';c.lineWidth=2.5;
-  c.strokeRect(25,25,W-50,H-50);
-  c.strokeRect(25,H/2-90,70,180);
-  c.strokeRect(W-95,H/2-90,70,180);
-  c.beginPath();c.moveTo(W/2,25);c.lineTo(W/2,H-25);c.stroke();
-  c.beginPath();c.arc(W/2,H/2,60,0,Math.PI*2);c.stroke();
-  c.beginPath();c.arc(W/2,H/2,8,0,Math.PI*2);c.fillStyle='rgba(255,255,255,0.3)';c.fill();
+  // Simple stripes (fewer iterations)
+  for(let i=0;i<10;i+=2){c.fillStyle='rgba(0,0,0,0.03)';c.fillRect(i*(W/10),0,W/10,H);}
 
-  // Players with state visualization
+  // Lines (simplified)
+  c.strokeStyle='rgba(255,255,255,0.5)';c.lineWidth=1;
+  c.strokeRect(12,12,W-24,H-24);
+  c.strokeRect(12,H/2-45,35,90);
+  c.strokeRect(W-47,H/2-45,35,90);
+  c.beginPath();c.moveTo(W/2,12);c.lineTo(W/2,H-12);c.stroke();
+  c.beginPath();c.arc(W/2,H/2,30,0,Math.PI*2);c.stroke();
+
+  // Players (simplified - no shadows, fewer state colors)
+  c.font='7px Arial';c.textAlign='center';
   data.players.forEach(p=>{
     const bx=p.x*W, by=p.y*H;
-    const isMy=p.isMy;
-    const col=isMy?'#0ea5e9':'#ef4444';
-    const stateCol={wait:'#666',chase:'#f59e0b',dribble:'#22c55e',pass:'#3b82f6',shoot:'#ef4444',receive:'#a855f7',home:'#666',support:'#14b8a6',press:'#f97316'}[p.state]||'#666';
-    
-    // Shadow
-    c.fillStyle='rgba(0,0,0,0.25)';c.beginPath();c.ellipse(bx,by+18,12,5,0,0,Math.PI*2);c.fill();
-    
-    // Player circle
-    c.fillStyle=col;c.beginPath();c.arc(bx,by,14,0,Math.PI*2);c.fill();
-    c.strokeStyle='#fff';c.lineWidth=2;c.stroke();
-    
-    // State indicator ring
-    c.strokeStyle=stateCol;c.lineWidth=3;c.beginPath();c.arc(bx,by,16,0,Math.PI*2);c.stroke();
-    
-    // Name
-    c.fillStyle='#fff';c.font='bold 9px Arial';c.textAlign='center';
-    c.fillText((p.name||'').split(' ').pop(),bx,by-20);
-    
-    // Role indicator
-    c.fillStyle='rgba(255,255,255,0.8)';c.font='8px Arial';
-    c.fillText(p.role,bx,by+24);
+    const col=p.isMy?'#0ea5e9':'#ef4444';
+    c.fillStyle=col;c.beginPath();c.arc(bx,by,7,0,Math.PI*2);c.fill();
+    c.strokeStyle='#fff';c.lineWidth=1;c.stroke();
+    c.fillStyle='#fff';c.fillText((p.name||'').split(' ').pop().substr(0,6),bx,by-10);
   });
 
-  // Ball with trail effect
+  // Ball
   const bx=data.ball.x*W, by=data.ball.y*H;
-  c.fillStyle='rgba(0,0,0,0.25)';c.beginPath();c.ellipse(bx,by+8,8,3,0,0,Math.PI*2);c.fill();
-  c.fillStyle='#fff';c.beginPath();c.arc(bx,by,7,0,Math.PI*2);c.fill();
-  c.strokeStyle='#333';c.lineWidth=1;c.stroke();
-  // Ball pattern
-  c.strokeStyle='#666';c.beginPath();c.arc(bx,by,4,0,Math.PI*2);c.stroke();
+  c.fillStyle='#fff';c.beginPath();c.arc(bx,by,4,0,Math.PI*2);c.fill();
 
-  // Score HUD
-  c.fillStyle='rgba(0,0,0,0.7)';c.roundRect(W/2-70,6,140,32,8);c.fill();
-  c.fillStyle='#0ea5e9';c.font='bold 22px Arial';c.textAlign='right';c.fillText(data.score.my+'',W/2-8,30);
-  c.fillStyle='#fff';c.font='16px Arial';c.textAlign='center';c.fillText('VS',W/2,30);
-  c.fillStyle='#ef4444';c.font='bold 22px Arial';c.textAlign='left';c.fillText(data.score.opp+'',W/2+8,30);
-  c.fillStyle='#94a3b8';c.font='bold 13px Arial';c.textAlign='right';c.fillText(data.min+"'",W/2+64,30);
-  
-  // Possession bar
-  const totalPoss=data.possession.my+data.possession.opp;
-  if(totalPoss>0){
-    const myPct=data.possession.my/totalPoss;
-    c.fillStyle='rgba(0,0,0,0.5)';c.fillRect(W/2-60,42,120,6);
-    c.fillStyle='#0ea5e9';c.fillRect(W/2-60,42,120*myPct,6);
-    c.fillStyle='#ef4444';c.fillRect(W/2-60+120*myPct,42,120*(1-myPct),6);
-  }
+  // Score HUD (HTML overlay is faster, but keep simple)
+  c.fillStyle='rgba(0,0,0,0.7)';c.fillRect(W/2-50,4,100,20);
+  c.fillStyle='#0ea5e9';c.font='bold 14px Arial';c.textAlign='right';c.fillText(data.score.my,W/2-6,18);
+  c.fillStyle='#fff';c.font='12px Arial';c.textAlign='center';c.fillText('-',W/2,18);
+  c.fillStyle='#ef4444';c.font='bold 14px Arial';c.textAlign='left';c.fillText(data.score.opp,W/2+6,18);
+  c.fillStyle='#94a3b8';c.font='bold 9px Arial';c.textAlign='right';c.fillText(data.min+"'",W/2+44,18);
 }
 
 function roundRect(ctx,x,y,w,h,r){ctx.beginPath();ctx.moveTo(x+r,y);ctx.lineTo(x+w-r,y);ctx.quadraticCurveTo(x+w,y,x+w,y+r);ctx.lineTo(x+w,y+h-r);ctx.quadraticCurveTo(x+w,y+h,x+w-r,y+h);ctx.lineTo(x+r,y+h);ctx.quadraticCurveTo(x,y+h,x,y+h-r);ctx.lineTo(x,y+r);ctx.quadraticCurveTo(x,y,x+r,y);ctx.closePath()}
