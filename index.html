@@ -4,7 +4,6 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>UFO - Unreal Football Online</title>
-<script src="https://cdn.tailwindcss.com"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
 <script>
 // ---- Utils (must be before engine) ----
@@ -1252,12 +1251,65 @@ function initVoxelPlayer(player, containerId) {
   const faceH = FACE_SPRITE_R * 2;
   // 用 Pravatar 真实照片：hash%70 保证同球员同脸
   const avatarIdx = Math.abs(playerHash(hash, 99) * 70) | 0; // 0-69
-  const faceImg = document.createElement('img');
-  faceImg.crossOrigin = 'anonymous';
-  faceImg.src = `https://i.pravatar.cc/200?img=${avatarIdx}`;
-  const faceTex = new THREE.Texture(faceImg);
+  // ---- 面孔精灵：Canvas2D 画球员面孔 → Three.js Sprite ----
+  // Pravatar 无 CORS，用 Canvas2D 画图绕过
+  const fcvs = document.createElement('canvas');
+  fcvs.width = 200; fcvs.height = 200;
+  const fctx = fcvs.getContext('2d');
+  // 画球员姓名首字母（每人不同）
+  const ini = (player.name.charCodeAt(0) || 65) % 26;
+  const letter = String.fromCharCode(65 + ini);
+  const skinHexFill = skinHex || '#FDBCB4';
+  const jerseyFill = '#' + teamColorRaw.toString(16).padStart(6,'0');
+  // 球衣背景 + 号码
+  fctx.fillStyle = jerseyFill;
+  fctx.fillRect(0, 0, 200, 200);
+  fctx.fillStyle = '#fff';
+  fctx.font = 'bold 100px Arial, sans-serif';
+  fctx.textAlign = 'center';
+  fctx.textBaseline = 'middle';
+  fctx.fillText(letter, 100, 100);
+  // 画皮肤色椭圆（球员头部）
+  fctx.fillStyle = skinHexFill;
+  fctx.beginPath();
+  fctx.ellipse(100, 80, 40, 50, 0, 0, Math.PI*2);
+  fctx.fill();
+  // 画眼睛（每人不同的间距）
+  const eyeSpread = 12 + (playerHash(hash, 88) * 12) | 0;
+  fctx.fillStyle = '#222';
+  fctx.beginPath(); fctx.arc(100 - eyeSpread, 72, 6, 0, Math.PI*2); fctx.fill();
+  fctx.beginPath(); fctx.arc(100 + eyeSpread, 72, 6, 0, Math.PI*2); fctx.fill();
+  // 画嘴巴
+  const mouthOpen = playerHash(hash, 55) > 0.5;
+  fctx.strokeStyle = '#222'; fctx.lineWidth = 3;
+  fctx.beginPath();
+  if(mouthOpen) {
+    fctx.arc(100, 100, 10, 0, Math.PI); // 张嘴笑
+  } else {
+    fctx.moveTo(90, 97); fctx.lineTo(110, 97); // 闭嘴
+  }
+  fctx.stroke();
+  // 画头发（根据 hairIdx 风格）
+  const hairStyles = ['none','short','wavy','buzz','curly','bald'];
+  const hs = hairStyles[(hairIdx || 0) % hairStyles.length];
+  fctx.fillStyle = hairColorStr || '#333';
+  if(hs !== 'none') {
+    fctx.beginPath();
+    if(hs === 'buzz') {
+      fctx.ellipse(100, 48, 42, 18, 0, 0, Math.PI*2); fctx.fill();
+    } else if(hs === 'short') {
+      fctx.ellipse(100, 42, 42, 28, 0, Math.PI, Math.PI*2); fctx.fill();
+    } else if(hs === 'wavy') {
+      fctx.ellipse(100, 38, 46, 35, 0, Math.PI, Math.PI*2); fctx.fill();
+    } else if(hs === 'curly') {
+      for(let ci=0;ci<5;ci++) {
+        fctx.beginPath();
+        fctx.arc(65+ci*17, 40, 15, 0, Math.PI*2); fctx.fill();
+      }
+    }
+  }
+  const faceTex = new THREE.CanvasTexture(fcvs);
   faceTex.flipY = false;
-  faceImg.addEventListener('load', () => { faceTex.needsUpdate = true; });
   const faceSpriteMat = new THREE.SpriteMaterial({
     map: faceTex, depthTest: false, depthWrite: false, transparent: true
   });
