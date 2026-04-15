@@ -1145,20 +1145,6 @@ function initVoxelPlayer(player, containerId) {
   // 透视相机：球员占据 canvas 的大比例区域
   // 球员高度约 S*1.20 世界单位，目标：占 260/320 ≈ 81% 的 canvas 高度
   // 需要 Vertical FOV 约 90°，camera z ≈ -0.28
-  const CAM_Z = -S * 0.28;   // 相机在 z 轴前方（Three.js z+ 向屏幕外）
-  const CAM_Y = S * 0.50;    // 相机高度：看球员上半身
-  const CAM_X = S * 0.12;    // 稍微偏右一点
-  const BODY_CY = S * 0.35;  // 相机看向：身体中部
-  const FOV_V = 90;           // 垂直 FOV，确保球员占满画面
-  const camera = new THREE.PerspectiveCamera(FOV_V, 200/320, 0.01, 50);
-  camera.position.set(CAM_X, CAM_Y, CAM_Z);
-  camera.lookAt(0, BODY_CY, 0);
-
-  const renderer = new THREE.WebGLRenderer({antialias:true, alpha:true});
-  renderer.setSize(200, 320);
-  renderer.setClearColor(0x000000, 0);
-  container.appendChild(renderer.domElement);
-
   // ---- 灯光 ----
   scene.add(new THREE.AmbientLight(0xffffff, 0.55));
   const sun = new THREE.DirectionalLight(0xfff5e0, 1.0);
@@ -1169,90 +1155,97 @@ function initVoxelPlayer(player, containerId) {
   const g = new THREE.Group();
   scene.add(g);
 
-  // ---- Helper ----
+  // ---- Helper：创建盒子，传入中心坐标 ----
   function rbox(w, h, d, m, x, y, z) {
-    const geo = new THREE.BoxGeometry(w, h, d);
-    const mesh = new THREE.Mesh(geo, m);
+    const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m);
     mesh.position.set(x, y, z);
     return mesh;
   }
 
-  // ---- 坐标基准：g.position.y=0 是脚底，顶点在 y=S ----
-  const footY = 0;
+  // ================================================================
+  // 球员几何（从脚底向上堆叠，g.position.y=0 是地面）
+  // ================================================================
+  const SHOE_T = 0;            // 鞋顶 = 地面
+  const SOCK_B = SHOE_T + SHOE_H;
+  const SOCK_T = SOCK_B + SOCK_H;
+  const SHIN_B = SOCK_T;
+  const SHIN_T = SHIN_B + SHIN_H;
+  const THIGH_B = SHIN_T;      // 大腿紧接小腿
+  const THIGH_T = THIGH_B + THIGH_H;
+  const SHORT_B = THIGH_T;
+  const SHORT_T = SHORT_B + SHORT_H;
+  const TORSO_B = SHORT_T;
+  const TORSO_T = TORSO_B + TORSO_H;
+  const NECK_B  = TORSO_T;
+  const NECK_T  = NECK_B + NECK_H;
+  const HEAD_B  = NECK_T;
+  const HEAD_CY = HEAD_B + HEAD_R;  // 头部球心
+  const LEG_T   = SHORT_T;           // 腿顶 = 短裤顶
 
-  // 鞋
-  const shoeY = footY + SHOE_H * 0.5;
-  g.add(rbox(THIGH_W*2.6, SHOE_H, SHOE_D*2.0, shoeM, -THIGH_W*0.7, shoeY, SHOE_D*0.4));
-  g.add(rbox(THIGH_W*2.6, SHOE_H, SHOE_D*2.0, shoeM,  THIGH_W*0.7, shoeY, SHOE_D*0.4));
+  // 鞋（地面 + 向上）
+  g.add(rbox(THIGH_W*2.8, SHOE_H, SHOE_D*2.2, shoeM, -THIGH_W*0.65, SHOE_T+SHOE_H*0.5, SHOE_D*0.4));
+  g.add(rbox(THIGH_W*2.8, SHOE_H, SHOE_D*2.2, shoeM,  THIGH_W*0.65, SHOE_T+SHOE_H*0.5, SHOE_D*0.4));
 
   // 球袜（球队色）
-  const sockY = shoeY + SHOE_H*0.5 + SOCK_H*0.5;
-  g.add(rbox(THIGH_W*3.8, SOCK_H, THIGH_W*3.4, sockM, -THIGH_W*0.7, sockY, 0));
-  g.add(rbox(THIGH_W*3.8, SOCK_H, THIGH_W*3.4, sockM,  THIGH_W*0.7, sockY, 0));
+  g.add(rbox(THIGH_W*3.8, SOCK_H, THIGH_W*3.4, sockM, -THIGH_W*0.65, SOCK_B+SOCK_H*0.5, 0));
+  g.add(rbox(THIGH_W*3.8, SOCK_H, THIGH_W*3.4, sockM,  THIGH_W*0.65, SOCK_B+SOCK_H*0.5, 0));
 
-  // 小腿（皮肤）
-  const shinTop = sockY + SOCK_H*0.5;
-  g.add(rbox(THIGH_W*3.6, SHIN_H*0.55, THIGH_W*3.2, skinM, -THIGH_W*0.7, shinTop+SHIN_H*0.55*0.5, 0));
-  g.add(rbox(THIGH_W*3.6, SHIN_H*0.55, THIGH_W*3.2, skinM,  THIGH_W*0.7, shinTop+SHIN_H*0.55*0.5, 0));
+  // 小腿（皮肤，从袜子顶部开始）
+  g.add(rbox(THIGH_W*3.6, SHIN_H, THIGH_W*3.2, skinM, -THIGH_W*0.65, SHIN_B+SHIN_H*0.5, 0));
+  g.add(rbox(THIGH_W*3.6, SHIN_H, THIGH_W*3.2, skinM,  THIGH_W*
+  // 相机在 z=-0.28（靠近球员），看头部中心偏上
+  // HEAD_CY 已在前面定义，是头部球心 Y 坐标
+  // 相机在 z=+0.28（屏幕外，球员面前），看向 z=0 的球员正面
+  const CAM_Z = S * 0.55;            // z+ = 朝向观众，球员正面朝观众，在 z=0
+  const CAM_Y = S * 0.90;            // 相机高度：头顶上方
+  const CAM_X = S * 0.12;            // 稍微偏右（制造立体感）
+  const FOV_V = 80;                  // 垂直 FOV，确保球员全身在画面内
+  const camera = new THREE.PerspectiveCamera(FOV_V, 200/320, 0.01, 50);
+  camera.position.set(CAM_X, CAM_Y, CAM_Z);
+  camera.lookAt(0, HEAD_CY - HEAD_R * 0.2, 0);  // 看向头部中心
 
-  // 大腿（皮肤）
-  const thighTop = shinTop + SHIN_H*0.55;
-  const thighY = thighTop + THIGH_H*0.45*0.5;
-  g.add(rbox(THIGH_W*3.8, THIGH_H*0.45, THIGH_W*3.4, skinM, -THIGH_W*0.7, thighY, 0));
-  g.add(rbox(THIGH_W*3.8, THIGH_H*0.45, THIGH_W*3.4, skinM,  THIGH_W*0.7, thighY, 0));
+  const renderer = new THREE.WebGLRenderer({antialias:true, alpha:true});
+  renderer.setSize(200, 320);
+  renderer.setClearColor(0x000000, 0);
+  container.appendChild(renderer.domElement);
 
-  // 短裤（深色）
-  const shortY = thighTop + THIGH_H*0.45 + 0.001;
-  g.add(rbox(WAIST_W*2.0, SHORT_H, WAIST_W*1.1, shortM, 0, shortY+SHORT_H*0.5, 0));
+0.65, SHIN_B+SHIN_H*0.5, 0));
 
-  // 躯干（球衣色）
-  const torsoBot = shortY + SHORT_H;
-  const torsoTop = torsoBot + TORSO_H;
-  const torsoCtr = torsoBot + TORSO_H*0.5;
-  g.add(rbox(SHLDR_W*2.0, TORSO_H, SHLDR_W*0.88, jerseyM, 0, torsoCtr, 0));
+  // 大腿（皮肤，紧接小腿顶部）
+  g.add(rbox(THIGH_W*3.8, THIGH_H, THIGH_W*3.4, skinM, -THIGH_W*0.65, THIGH_B+THIGH_H*0.5, 0));
+  g.add(rbox(THIGH_W*3.8, THIGH_H, THIGH_W*3.4, skinM,  THIGH_W*0.65, THIGH_B+THIGH_H*0.5, 0));
 
-  // 肩块（从躯干向手臂过渡）
-  const sblH = S * 0.04;
-  const sblC = torsoTop - sblH*0.5;
-  g.add(rbox((SHLDR_W+ARM_W*0.6)*2, sblH, SHLDR_W*0.80, jerseyM, 0, sblC, 0));
+  // 短裤（深色，紧接大腿顶）
+  g.add(rbox(WAIST_W*2.0, SHORT_H, WAIST_W*1.1, shortM, 0, SHORT_B+SHORT_H*0.5, 0));
 
-  // 球衣号（白色）
-  const numM = new THREE.MeshLambertMaterial({color:0xffffff});
-  g.add(rbox(S*0.040, S*0.050, 0.003, numM, 0, torsoCtr+S*0.01, SHLDR_W*0.445));
+  // 躯干（球衣色，紧接短裤顶）
+  g.add(rbox(SHLDR_W*2.0, TORSO_H, SHLDR_W*0.88, jerseyM, 0, TORSO_B+TORSO_H*0.5, 0));
 
-  // 手臂
-  const armY1 = torsoTop - ARM_H*0.52;
-  const armY2 = torsoTop - ARM_H - ARM_H*0.48;
-  const armFwd = SHLDR_W*0.25;
-  // 左臂
-  g.add(rbox(ARM_W, ARM_H*0.52, ARM_W*0.80, skinM, -SHLDR_W-ARM_W*0.5, armY1, armFwd));
-  g.add(rbox(ARM_W, ARM_H*0.48, ARM_W*0.68, skinM, -SHLDR_W-ARM_W*0.5, armY2, armFwd));
-  // 右臂
-  g.add(rbox(ARM_W, ARM_H*0.52, ARM_W*0.80, skinM,  SHLDR_W+ARM_W*0.5, armY1, armFwd));
-  g.add(rbox(ARM_W, ARM_H*0.48, ARM_W*0.68, skinM,  SHLDR_W+ARM_W*0.5, armY2, armFwd));
-  // 袖口（球衣色）
-  const cuffLen = ARM_H*0.28;
-  g.add(rbox(ARM_W*1.1, cuffLen, ARM_W*1.05, jerseyM, -SHLDR_W-ARM_W*0.5, torsoTop-cuffLen*0.5, armFwd));
-  g.add(rbox(ARM_W*1.1, cuffLen, ARM_W*1.05, jerseyM,  SHLDR_W+ARM_W*0.5, torsoTop-cuffLen*0.5, armFwd));
+  // 肩块（球衣色）
+  g.add(rbox((SHLDR_W+ARM_W*0.6)*2, S*0.040, SHLDR_W*0.80, jerseyM, 0, TORSO_T-S*0.020, 0));
 
-  // 颈部
-  const neckCY = torsoTop + NECK_H*0.3;
-  const neckGeo = new THREE.CylinderGeometry(NECK_R, NECK_R*1.05, NECK_H, 10);
-  const neckMesh = new THREE.Mesh(neckGeo, skinM);
-  neckMesh.position.set(0, neckCY, 0);
+  // 球衣号（白色小方块贴在胸前）
+  g.add(rbox(S*0.038, S*0.048, 0.002, new THREE.MeshLambertMaterial({color:0xffffff}), 0, TORSO_B+TORSO_H*0.5, SHLDR_W*0.445));
+
+  // 手臂（自然下垂）
+  const UPPER = ARM_H * 0.50;
+  const LOWER = ARM_H * 0.50;
+  const armX = SHLDR_W + ARM_W*0.5;
+  const ELBOW = TORSO_T - UPPER*0.52;
+  g.add(rbox(ARM_W, UPPER, ARM_W*0.80, skinM, -armX, TORSO_T-UPPER*0.50, SHLDR_W*0.20));
+  g.add(rbox(ARM_W, LOWER, ARM_W*0.65, skinM, -armX, ELBOW-LOWER*0.50, SHLDR_W*0.20));
+  g.add(rbox(ARM_W, UPPER, ARM_W*0.80, skinM,  armX, TORSO_T-UPPER*0.50, SHLDR_W*0.20));
+  g.add(rbox(ARM_W, LOWER, ARM_W*0.65, skinM,  armX, ELBOW-LOWER*0.50, SHLDR_W*0.20));
+
+  // 颈部（从躯干顶向上）
+  const neckMesh = new THREE.Mesh(new THREE.CylinderGeometry(NECK_R, NECK_R*1.05, NECK_H, 10), skinM);
+  neckMesh.position.set(0, NECK_B+NECK_H*0.5, 0);
   g.add(neckMesh);
 
-  // 领口（消除颈和躯干空隙）
-  g.add(rbox(NECK_R*3.2, S*0.028, NECK_R*2.0, skinM, 0, torsoTop+S*0.014, 0));
-
-  // 头部中心
-  const headCY = torsoTop + NECK_H*0.6 + HEAD_R;
-
-  // 后脑勺（皮肤球体）
-  const headBackGeo = new THREE.SphereGeometry(HEAD_R*0.92, 16, 14);
-  const headBackMesh = new THREE.Mesh(headBackGeo, skinM);
-  headBackMesh.position.set(0, headCY, 0);
-  g.add(headBackMesh);
+  // 头部（球体，头顶紧接颈部）
+  const headMesh = new THREE.Mesh(new THREE.SphereGeometry(HEAD_R, 18, 16), skinM);
+  headMesh.position.set(0, HEAD_CY, 0);
+  g.add(headMesh);
 
   // ---- 面孔 Billboard：正相关于球员 ID（不同球员不同脸）----
   const faceW = FACE_SPRITE_R * 2;
@@ -1323,7 +1316,7 @@ function initVoxelPlayer(player, containerId) {
   });
   const faceSprite = new THREE.Sprite(faceSpriteMat);
   faceSprite.scale.set(faceW, faceH, 1);
-  faceSprite.position.set(0, headCY, HEAD_R*0.90);
+  faceSprite.position.set(0, HEAD_CY, HEAD_R*1.02);
   g.add(faceSprite);
 
   // ---- 动画：站立呼吸 + Y轴360度旋转 ----
