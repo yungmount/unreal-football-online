@@ -1073,23 +1073,6 @@ function initVoxelPlayer(player, containerId) {
   const bmi = W / ((H/100)*(H/100));
   const bf = bmi < 18 ? 0.78 : bmi > 26 ? 1.30 : bmi > 22 ? 1.15 : 1.0;
 
-  const S = H / 180;
-  const HEAD_R   = S * 0.122;
-  const NECK_H   = S * 0.033;
-  const TORSO_H  = S * 0.156;
-  const LEG_H    = S * 0.474;
-  const THIGH_H  = LEG_H * 0.43;
-  const SOCK_H   = LEG_H * 0.30;
-  const SHOE_H   = S * 0.028;
-  const SHOE_D   = S * 0.062;
-  const ARM_H    = S * 0.260;
-  const SHOULDER_W = S * 0.156;
-  const WAIST_W  = SHOULDER_W * 0.72;
-  const THIGH_W  = S * 0.042 * bf;
-  const SHIN_W   = THIGH_W * 0.70;
-  const ARM_W    = SHOULDER_W * 0.20;
-  const ARM_D    = ARM_W * 0.80;
-
   // ---- 颜色 ----
   const skinIdx   = hInt(hash, 1, 0, SKIN_PALETTES.length - 1);
   const hairIdx   = hInt(hash, 2, 0, HAIR_COLORS.length - 1);
@@ -1114,159 +1097,183 @@ function initVoxelPlayer(player, containerId) {
   const sockM    = new THREE.MeshLambertMaterial({color: teamColorRaw});
 
   // ================================================================
-  // Bigheads.io 全身 SVG 方案
-  // https://beanheads.robertbroersma.com/ — 完整卡通全身人物（开源）
+  // 完全重写：Three.js 程序化 3D 球员
+  // - 体型正相关：身高/体重/physical
+  // - 面孔正相关：Pravatar 真实照片 Billboard
+  // - 持续 360 度旋转 + 轻微摇摆呼吸
   // ================================================================
 
-  function toBigheadsBody(phys) {
-    if (phys >= 82) return 'broad';
-    if (phys >= 68) return 'default';
-    return 'lean';
-  }
-  function toBigheadsMouth(stamina) {
-    if (stamina >= 80) return 'grin';
-    if (stamina >= 60) return 'default';
-    if (stamina >= 40) return 'smirk';
-    return 'sad';
-  }
-  function toBigheadsEyes(ovr) {
-    if (ovr >= 85) return 'happy';
-    return 'default';
-  }
-  function toBigheadsHair(idx) {
-    const styles = ['none','short01','short02','short03','long01','long02','bun','curly','afro','pixie'];
-    return styles[idx % styles.length];
-  }
-  function buildBigheadsUrl(p, h, skinHex, teamColor) {
-    const shirt = '#' + teamColor.toString(16).padStart(6,'0');
-    const params = new URLSearchParams({
-      accessoriesType: playerHash(h,97) > 0.85 ? 'glasses' : 'none',
-      body:            toBigheadsBody(p.physical || 75),
-      clothingColor:   shirt,
-      clothing:        'shirt',
-      dy:              '0',
-      eyes:            toBigheadsEyes(p.ovr || 70),
-      eyebrow:         'default',
-      faceColor:       skinHex,
-      graphicType:     'none',
-      hair:            toBigheadsHair(hairIdx),
-      hairColor:       hairColorStr,
-      lashes:          'false',
-      lipColor:        skinHex,
-      lips:            'false',
-      maskFace:        'false',
-      mouth:           toBigheadsMouth(p.stamina || 70),
-      size:            '640',
-      style:           'square'
-    });
-    return 'https://bigheads.io/svg?' + params.toString();
-  }
+  // ---- 体型参数（正相关于球员数据）----
+  const S = H / 180;                   // 身高缩放
 
-  // ================================================================
-  // Bigheads.io SVG 全身球员 — Canvas Rasterize 方案
-  // 业界标准：SVG → Image → Canvas → Three.js Texture（100% 可靠）
-  // ================================================================
+  // 头（头部大小正相关于身高）
+  const HEAD_R = S * 0.115;           // 头球半径：175cm→0.112，190cm→0.121
+  // 颈
+  const NECK_H = S * 0.035;           // 颈高
+  const NECK_R = HEAD_R * 0.38;
+  // 躯干（宽度正相关于体重/physical）
+  const TORSO_H  = S * 0.165;         // 躯干高
+  const SHLDR_W = S * 0.145 * bf;    // 肩宽，正相关于体型
+  const WAIST_W = SHLDR_W * 0.72;
+  // 手臂
+  const ARM_H  = S * 0.260;
+  const ARM_W  = SHLDR_W * 0.19 * bf;
+  // 腿（长度正相关于身高）
+  const LEG_H  = S * 0.470;
+  const THIGH_H = LEG_H * 0.43;
+  const SHIN_H  = LEG_H * 0.34;
+  const THIGH_W = S * 0.040 * bf;    // 大腿粗细，正相关
+  const SHIN_W  = THIGH_W * 0.68;
+  // 鞋/袜
+  const SHOE_H  = S * 0.040;
+  const SOCK_H  = LEG_H * 0.28;
+  // 短裤
+  const SHORT_H = S * 0.095;
+  // 头部精灵大小（和头部球体比例）
+  const FACE_SPRITE_R = HEAD_R * 1.48; // 面孔精灵略大于头部直径
 
+  // ---- 场景 ----
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(
-    ((teamColorRaw >> 16) & 0xFF) * 0.15,
-    ((teamColorRaw >> 8) & 0xFF) * 0.15,
-    (teamColorRaw & 0xFF) * 0.15
+    ((teamColorRaw >> 16) & 0xFF) / 12,
+    ((teamColorRaw >> 8) & 0xFF) / 12,
+    (teamColorRaw & 0xFF) / 12
   );
 
-  const aspect = 200 / 320;
-  const camera = new THREE.OrthographicCamera(-aspect, aspect, 1, -1, 0.1, 100);
-  camera.position.set(0, 0.05, 5);
-  camera.lookAt(0, 0.05, 0);
+  const BODY_CY = S * 0.50; // 球员全身中心（用于相机定位）
+  const CAM_DIST = S * 1.20;
+  const CAM_H    = S * 0.55;
+  const camera = new THREE.PerspectiveCamera(52, 200/320, 0.01, 50);
+  camera.position.set(CAM_DIST * 0.20, CAM_H, CAM_DIST);
+  camera.lookAt(0, BODY_CY, 0);
 
   const renderer = new THREE.WebGLRenderer({antialias:true, alpha:true});
   renderer.setSize(200, 320);
   renderer.setClearColor(0x000000, 0);
   container.appendChild(renderer.domElement);
 
+  // ---- 灯光 ----
+  scene.add(new THREE.AmbientLight(0xffffff, 0.55));
+  const sun = new THREE.DirectionalLight(0xfff5e0, 1.0);
+  sun.position.set(S*2, S*3, S*2); scene.add(sun);
+  const fill = new THREE.DirectionalLight(0x8899ff, 0.35);
+  fill.position.set(-S*2, S*1, -S*1); scene.add(fill);
+
   const g = new THREE.Group();
   scene.add(g);
 
-  // Canvas Rasterize：SVG → Image → Canvas → Three.js Texture
-  function loadBigheadsTex() {
-    const svgUrl = buildBigheadsUrl(player, hash, skinHex, teamColorHex);
-    fetch(svgUrl)
-      .then(r => r.text())
-      .then(svgText => {
-        const blob = new Blob([svgText], {type:'image/svg+xml'});
-        const blobUrl = URL.createObjectURL(blob);
-        const img = new Image();
-        img.onload = function() {
-          // Canvas Rasterize（解决 SVG 直接作为 Three.js Texture 的问题）
-          const cw = 512, ch = Math.round(512 / img.naturalWidth * img.naturalHeight);
-          const cv = document.createElement('canvas');
-          cv.width = cw; cv.height = ch;
-          const ctx2 = cv.getContext('2d');
-          ctx2.drawImage(img, 0, 0, cw, ch);
-          // 人物在 SVG 中 y 区间约 [100, 990]，需中心对齐
-          // Bigheads viewBox 1000×990，人物中间在 y=500
-          // Canvas 尺寸 cw×ch，已按比例缩放
-          // PlaneGeometry: 宽 1.0，高 0.99（1:0.99 ≈ 1000:990）
-          const tex = new THREE.CanvasTexture(cv);
-          tex.flipY = false;
-          tex.needsUpdate = true;
-          const geo = new THREE.PlaneGeometry(1.0, 0.99);
-          const mat = new THREE.MeshBasicMaterial({
-            map: tex, transparent: true, alphaTest: 0.05, side: THREE.DoubleSide
-          });
-          const mesh = new THREE.Mesh(geo, mat);
-          mesh.position.set(0, 0, 0);
-          g.add(mesh);
-          URL.revokeObjectURL(blobUrl);
-        };
-        img.onerror = function() {
-          showFallback();
-        };
-        img.src = blobUrl;
-      })
-      .catch(() => { showFallback(); });
+  // ---- Helper ----
+  function rbox(w, h, d, m, x, y, z) {
+    const geo = new THREE.BoxGeometry(w, h, d);
+    const mesh = new THREE.Mesh(geo, m);
+    mesh.position.set(x, y, z);
+    return mesh;
   }
 
-  function showFallback() {
-    // 备用：直接用 <img> 标签 + CSS 旋转（完全不需要 Three.js）
-    container.innerHTML = '';
-    container.style.cssText =
-      'width:200px;height:320px;display:flex;align-items:center;justify-content:center;perspective:400px;';
-    const wrap = document.createElement('div');
-    wrap.style.cssText = 'width:200px;height:300px;display:flex;align-items:center;justify-content:center;transform-style:preserve-3d;';
-    const inner = document.createElement('div');
-    inner.style.cssText = 'width:180px;height:270px;border-radius:8px;overflow:hidden;transform-style:preserve-3d;animation:playerRotate 8s linear infinite;';
-    const imgEl = document.createElement('img');
-    imgEl.src = buildBigheadsUrl(player, hash, skinHex, teamColorHex);
-    imgEl.style.cssText = 'width:100%;height:100%;object-fit:contain;border-radius:8px;';
-    inner.appendChild(imgEl);
-    wrap.appendChild(inner);
-    container.appendChild(wrap);
-    // 注入旋转动画
-    if(!document.getElementById('playerRotateStyle')) {
-      const s = document.createElement('style');
-      s.id = 'playerRotateStyle';
-      s.textContent = '@keyframes playerRotate{' +
-        '0%{transform:rotateY(0deg)}' +
-        '100%{transform:rotateY(360deg)}' +
-        '}@keyframes playerBreath{' +
-        '0%,100%{transform:rotateY(var(--r)) scaleY(1)}' +
-        '50%{transform:rotateY(var(--r)) scaleY(1.005)}' +
-        '}';
-      document.head.appendChild(s);
-    }
-  }
+  // ---- 坐标基准：g.position.y=0 是脚底，顶点在 y=S ----
+  const footY = 0;
 
-  loadBigheadsTex();
+  // 鞋
+  const shoeY = footY + SHOE_H * 0.5;
+  g.add(rbox(THIGH_W*2.6, SHOE_H, SHOE_D*2.0, shoeM, -THIGH_W*0.7, shoeY, SHOE_D*0.4));
+  g.add(rbox(THIGH_W*2.6, SHOE_H, SHOE_D*2.0, shoeM,  THIGH_W*0.7, shoeY, SHOE_D*0.4));
 
-  // 动画：站立呼吸 + Y轴360度旋转
+  // 球袜（球队色）
+  const sockY = shoeY + SHOE_H*0.5 + SOCK_H*0.5;
+  g.add(rbox(THIGH_W*3.8, SOCK_H, THIGH_W*3.4, sockM, -THIGH_W*0.7, sockY, 0));
+  g.add(rbox(THIGH_W*3.8, SOCK_H, THIGH_W*3.4, sockM,  THIGH_W*0.7, sockY, 0));
+
+  // 小腿（皮肤）
+  const shinTop = sockY + SOCK_H*0.5;
+  g.add(rbox(THIGH_W*3.6, SHIN_H*0.55, THIGH_W*3.2, skinM, -THIGH_W*0.7, shinTop+SHIN_H*0.55*0.5, 0));
+  g.add(rbox(THIGH_W*3.6, SHIN_H*0.55, THIGH_W*3.2, skinM,  THIGH_W*0.7, shinTop+SHIN_H*0.55*0.5, 0));
+
+  // 大腿（皮肤）
+  const thighTop = shinTop + SHIN_H*0.55;
+  const thighY = thighTop + THIGH_H*0.45*0.5;
+  g.add(rbox(THIGH_W*3.8, THIGH_H*0.45, THIGH_W*3.4, skinM, -THIGH_W*0.7, thighY, 0));
+  g.add(rbox(THIGH_W*3.8, THIGH_H*0.45, THIGH_W*3.4, skinM,  THIGH_W*0.7, thighY, 0));
+
+  // 短裤（深色）
+  const shortY = thighTop + THIGH_H*0.45 + 0.001;
+  g.add(rbox(WAIST_W*2.0, SHORT_H, WAIST_W*1.1, shortM, 0, shortY+SHORT_H*0.5, 0));
+
+  // 躯干（球衣色）
+  const torsoBot = shortY + SHORT_H;
+  const torsoTop = torsoBot + TORSO_H;
+  const torsoCtr = torsoBot + TORSO_H*0.5;
+  g.add(rbox(SHLDR_W*2.0, TORSO_H, SHLDR_W*0.88, jerseyM, 0, torsoCtr, 0));
+
+  // 肩块（从躯干向手臂过渡）
+  const sblH = S * 0.04;
+  const sblC = torsoTop - sblH*0.5;
+  g.add(rbox((SHLDR_W+ARM_W*0.6)*2, sblH, SHLDR_W*0.80, jerseyM, 0, sblC, 0));
+
+  // 球衣号（白色）
+  const numM = new THREE.MeshLambertMaterial({color:0xffffff});
+  g.add(rbox(S*0.040, S*0.050, 0.003, numM, 0, torsoCtr+S*0.01, SHLDR_W*0.445));
+
+  // 手臂
+  const armY1 = torsoTop - ARM_H*0.52;
+  const armY2 = torsoTop - ARM_H - ARM_H*0.48;
+  const armFwd = SHLDR_W*0.25;
+  // 左臂
+  g.add(rbox(ARM_W, ARM_H*0.52, ARM_W*0.80, skinM, -SHLDR_W-ARM_W*0.5, armY1, armFwd));
+  g.add(rbox(ARM_W, ARM_H*0.48, ARM_W*0.68, skinM, -SHLDR_W-ARM_W*0.5, armY2, armFwd));
+  // 右臂
+  g.add(rbox(ARM_W, ARM_H*0.52, ARM_W*0.80, skinM,  SHLDR_W+ARM_W*0.5, armY1, armFwd));
+  g.add(rbox(ARM_W, ARM_H*0.48, ARM_W*0.68, skinM,  SHLDR_W+ARM_W*0.5, armY2, armFwd));
+  // 袖口（球衣色）
+  const cuffLen = ARM_H*0.28;
+  g.add(rbox(ARM_W*1.1, cuffLen, ARM_W*1.05, jerseyM, -SHLDR_W-ARM_W*0.5, torsoTop-cuffLen*0.5, armFwd));
+  g.add(rbox(ARM_W*1.1, cuffLen, ARM_W*1.05, jerseyM,  SHLDR_W+ARM_W*0.5, torsoTop-cuffLen*0.5, armFwd));
+
+  // 颈部
+  const neckCY = torsoTop + NECK_H*0.3;
+  const neckGeo = new THREE.CylinderGeometry(NECK_R, NECK_R*1.05, NECK_H, 10);
+  const neckMesh = new THREE.Mesh(neckGeo, skinM);
+  neckMesh.position.set(0, neckCY, 0);
+  g.add(neckMesh);
+
+  // 领口（消除颈和躯干空隙）
+  g.add(rbox(NECK_R*3.2, S*0.028, NECK_R*2.0, skinM, 0, torsoTop+S*0.014, 0));
+
+  // 头部中心
+  const headCY = torsoTop + NECK_H*0.6 + HEAD_R;
+
+  // 后脑勺（皮肤球体）
+  const headBackGeo = new THREE.SphereGeometry(HEAD_R*0.92, 16, 14);
+  const headBackMesh = new THREE.Mesh(headBackGeo, skinM);
+  headBackMesh.position.set(0, headCY, 0);
+  g.add(headBackMesh);
+
+  // ---- 面孔 Billboard：正相关于球员 ID（不同球员不同脸）----
+  const faceW = FACE_SPRITE_R * 2;
+  const faceH = FACE_SPRITE_R * 2;
+  // 用 Pravatar 真实照片：hash%70 保证同球员同脸
+  const avatarIdx = Math.abs(playerHash(hash, 99) * 70) | 0; // 0-69
+  const faceImg = document.createElement('img');
+  faceImg.crossOrigin = 'anonymous';
+  faceImg.src = `https://i.pravatar.cc/200?img=${avatarIdx}`;
+  const faceTex = new THREE.Texture(faceImg);
+  faceTex.flipY = false;
+  faceImg.addEventListener('load', () => { faceTex.needsUpdate = true; });
+  const faceSpriteMat = new THREE.SpriteMaterial({
+    map: faceTex, depthTest: false, depthWrite: false, transparent: true
+  });
+  const faceSprite = new THREE.Sprite(faceSpriteMat);
+  faceSprite.scale.set(faceW, faceH, 1);
+  faceSprite.position.set(0, headCY, HEAD_R*0.90);
+  g.add(faceSprite);
+
+  // ---- 动画：站立呼吸 + Y轴360度旋转 ----
   let t = 0;
   function animate() {
     requestAnimationFrame(animate);
     t += 0.012;
-    g.rotation.y = t * 0.78;
-    g.rotation.z = Math.sin(t * 0.8) * 0.020;
-    g.rotation.x = Math.sin(t * 1.5) * 0.005;
+    g.rotation.y = t * 0.78;                    // 360度旋转
+    g.rotation.z = Math.sin(t * 0.8) * 0.025;  // 左右微晃
+    g.rotation.x = Math.sin(t * 1.5) * 0.006; // 呼吸起伏
     renderer.render(scene, camera);
   }
   animate();
