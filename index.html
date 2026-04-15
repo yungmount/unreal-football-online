@@ -1058,7 +1058,12 @@ function _drawHair(ctx, W, H, hairIdx, hairColor, skin, faceWFactor, hash) {
 
 // ---- 主要 3D 球员渲染函数 ----
 function initVoxelPlayer(player, containerId) {
-  if(!window.THREE) return;
+  console.log('[Voxel] initVoxelPlayer called:', player.name, containerId);
+  if(!window.THREE) {
+    console.warn('[Voxel] THREE not loaded, using fallback');
+    container.innerHTML = '<div style="width:200px;height:300px;background:#333;border-radius:8px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:14px">3D Loading...</div>';
+    return;
+  }
   const container = document.getElementById(containerId);
   if(!container) return;
   if(voxelScenes[containerId]) {
@@ -1133,17 +1138,20 @@ function initVoxelPlayer(player, containerId) {
 
   // ---- 场景 ----
   const scene = new THREE.Scene();
-  scene.background = new THREE.Color(
-    ((teamColorRaw >> 16) & 0xFF) / 12,
-    ((teamColorRaw >> 8) & 0xFF) / 12,
-    (teamColorRaw & 0xFF) / 12
-  );
+  // 深色背景 + 地面光效
+  const tcR = ((teamColorRaw >> 16) & 0xFF), tcG = ((teamColorRaw >> 8) & 0xFF), tcB = teamColorRaw & 0xFF;
+  scene.background = new THREE.Color(tcR/8, tcG/8, tcB/8);
 
-  const BODY_CY = S * 0.50; // 球员全身中心（用于相机定位）
-  const CAM_DIST = S * 1.20;
-  const CAM_H    = S * 0.55;
-  const camera = new THREE.PerspectiveCamera(52, 200/320, 0.01, 50);
-  camera.position.set(CAM_DIST * 0.20, CAM_H, CAM_DIST);
+  // 透视相机：球员占据 canvas 的大比例区域
+  // 球员高度约 S*1.20 世界单位，目标：占 260/320 ≈ 81% 的 canvas 高度
+  // 需要 Vertical FOV 约 90°，camera z ≈ -0.28
+  const CAM_Z = -S * 0.28;   // 相机在 z 轴前方（Three.js z+ 向屏幕外）
+  const CAM_Y = S * 0.50;    // 相机高度：看球员上半身
+  const CAM_X = S * 0.12;    // 稍微偏右一点
+  const BODY_CY = S * 0.35;  // 相机看向：身体中部
+  const FOV_V = 90;           // 垂直 FOV，确保球员占满画面
+  const camera = new THREE.PerspectiveCamera(FOV_V, 200/320, 0.01, 50);
+  camera.position.set(CAM_X, CAM_Y, CAM_Z);
   camera.lookAt(0, BODY_CY, 0);
 
   const renderer = new THREE.WebGLRenderer({antialias:true, alpha:true});
@@ -1331,6 +1339,7 @@ function initVoxelPlayer(player, containerId) {
   animate();
 
   voxelScenes[containerId] = {renderer, scene, g};
+  console.log('[Voxel] Done. mesh count:', g.children.length, 'renderer:', !!renderer);
 }
 
 // ---- 3D Player Body SVG (fallback) ----
@@ -1708,8 +1717,9 @@ function render(){
       try{
         const raw=el.dataset.player.replace(/&apos;/g,"'");
         const p=JSON.parse(raw);
+        console.log('[Voxel] Init player:', p.name, 'container:', el.id, 'THREE:', !!window.THREE);
         initVoxelPlayer(p,el.id);
-      }catch(e){}
+      }catch(e){ console.error('[Voxel] Error:', e); }
     });
   });
 }
