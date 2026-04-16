@@ -1140,10 +1140,13 @@ function initVoxelPlayer(player, containerId) {
   scene.background = new THREE.Color(teamR/10, teamG/10, teamB/10);
 
   var totalH = (P.footH+P.sockH+P.shinH+P.thighH+P.shortH+P.torsoH+P.neckH+P.headR*2)*PS;
-  var halfH  = totalH * 0.58;
-  var camera = new THREE.OrthographicCamera(-halfH*0.6, halfH*0.6, halfH*0.6, -halfH*0.6, 0.01, 100);
-  camera.position.set(0, totalH*0.38, 3.5);
-  camera.lookAt(0, totalH*0.38, 0);
+  // 正交相机：视口高度 = totalH * 1.15（留10%上下边距），宽度按 200/320 比例
+  var camHalf = totalH * 0.58;   // 上下各留 16% 边距
+  var camW    = camHalf * (200/320);
+  var camera  = new THREE.OrthographicCamera(-camW, camW, camHalf, -camHalf, 0.01, 100);
+  // 相机在正面 z=3.5，看向球员垂直中心
+  camera.position.set(0, totalH * 0.5, 3.5);
+  camera.lookAt(0, totalH * 0.5, 0);
 
   var renderer = new THREE.WebGLRenderer({antialias: false});
   renderer.setSize(200, 320);
@@ -1451,23 +1454,8 @@ function initVoxelPlayer(player, containerId) {
     window._reqAF = requestAnimationFrame(animate);
     t += 0.018;
 
-    scene.rotation.y = t * 0.65;
-
-    var legSwing = Math.sin(t * 2.5) * 0.06;
-    thighG.rotation.x = legSwing;
-    shinG.rotation.x  = Math.max(0, legSwing) * 1.2;
-    footG.rotation.x  = Math.max(0, legSwing) * 0.5;
-    sockG.rotation.x  = Math.max(0, legSwing) * 0.5;
-    armG.rotation.x   = -legSwing * 0.4;
-    torsoG.position.y = Math.sin(t * 1.8) * PS * 1.5;
-    headG.rotation.z  = Math.sin(t * 0.7) * 0.03;
-    headG.rotation.x  = Math.sin(t * 1.2) * 0.02;
-
-    bgG.children.forEach(function(v, i) {
-      v.position.y += 0.0008;
-      if(v.position.y > 0.5) v.position.y = -0.5;
-      v.rotation.y += 0.004;
-    });
+    // 旋转暂时关闭，固定正面显示
+    scene.rotation.y = 0;
 
     renderer.render(scene, camera);
   }
