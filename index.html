@@ -1155,8 +1155,10 @@ function initVoxelPlayer(player, containerId) {
   scene.add(new THREE.AmbientLight(0xffffff, 0.65));
   var sun = new THREE.DirectionalLight(0xfff5e0, 1.1);
   sun.position.set(2,4,3); scene.add(sun);
-  scene.add(Object.assign(new THREE.DirectionalLight(0x8899cc, 0.4),{position:{x:-2,y:1,z:-1}}));
-  scene.add(Object.assign(new THREE.DirectionalLight(0xffffff, 0.3),{position:{x:0,y:0,z:-2}}));
+  var fill2 = new THREE.DirectionalLight(0x8899cc, 0.4);
+  fill2.position.set(-2,1,-1); scene.add(fill2);
+  var rim2 = new THREE.DirectionalLight(0xffffff, 0.3);
+  rim2.position.set(0,0,-2); scene.add(rim2);
 
   // ================================================================
   // 体素构建工具
