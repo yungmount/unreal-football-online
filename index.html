@@ -727,6 +727,18 @@ function hInt(val, salt, min, max) {
   return min + Math.floor(playerHash(val, salt) * (max - min + 1));
 }
 
+// 颜色辅助：hex 颜色加深/变浅
+function shadeColor(hex, percent) {
+  if(!hex || hex[0]!='#') return '#888888';
+  var num = parseInt(hex.slice(1), 16);
+  var r = Math.min(255, Math.max(0, ((num>>16)&0xFF) + percent));
+  var g = Math.min(255, Math.max(0, ((num>>8)&0xFF) + percent));
+  var b = Math.min(255, Math.max(0, (num&0xFF) + percent));
+  return '#'+((r<<16)|(g<<8)|b).toString(16).padStart(6,'0');
+}
+
+
+
 // ---- 肤色调色盘（按地区细分）----
 const SKIN_PALETTES = [
   ['#FFDFC4','#F0D0A8','#E8C090'],  // 浅肤色
@@ -1057,282 +1069,411 @@ function _drawHair(ctx, W, H, hairIdx, hairColor, skin, faceWFactor, hash) {
 }
 
 // ---- 主要 3D 球员渲染函数 ----
+
+// ================================================================
+// 方案 B: 完整像素化 3D 球员 - 体型/面孔/动作全部程序化
+// ================================================================
+
+// ================================================================
+// 方案 B: 完整像素化 3D 球员 - 体型/面孔/动作全部程序化
+// 每个身体部位由 N×N×N 个小方块(InstancedMesh)组成
+// ================================================================
 function initVoxelPlayer(player, containerId) {
-  console.log('[Voxel] initVoxelPlayer called:', player.name, containerId);
-  if(!window.THREE) {
-    console.warn('[Voxel] THREE not loaded, using fallback');
-    container.innerHTML = '<div style="width:200px;height:300px;background:#333;border-radius:8px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:14px">3D Loading...</div>';
-    return;
-  }
-  const container = document.getElementById(containerId);
+  var container = document.getElementById(containerId);
   if(!container) return;
+
   if(voxelScenes[containerId]) {
-    voxelScenes[containerId].renderer.dispose();
+    try { voxelScenes[containerId].renderer.dispose(); } catch(e){}
     container.innerHTML = '';
   }
 
-  const hash = player.id || player.name || Math.random();
-  const H = player.height || 180;
-  const W = player.weight || 75;
-  const bmi = W / ((H/100)*(H/100));
-  const bf = bmi < 18 ? 0.78 : bmi > 26 ? 1.30 : bmi > 22 ? 1.15 : 1.0;
+  // ---- 球员数据 ----
+  var hash   = player.id || player.name || Math.random();
+  var H      = player.height || 180;
+  var W      = player.weight || 75;
+  var ovr    = player.ovr || 70;
+  var isMy   = !!player.isMy;
+  var pNum   = player.num || 10;
+  var S      = H / 180;
+  var bmi    = W / Math.pow(H/100, 2);
+  var bf     = bmi < 18 ? 0.75 : bmi > 26 ? 1.35 : bmi > 22 ? 1.18 : 1.0;
 
   // ---- 颜色 ----
-  const skinIdx   = hInt(hash, 1, 0, SKIN_PALETTES.length - 1);
-  const hairIdx   = hInt(hash, 2, 0, HAIR_COLORS.length - 1);
-  const hairColor = HAIR_COLORS[hairIdx];
-  const eyeIdx   = hInt(hash, 3, 0, 6);
-  const faceWFactor = 0.82 + playerHash(hash, 4) * 0.22;
-  const teamColorRaw  = player.isMy ? 0xCC2233 : 0x1133BB;
-  const shortColor = 0x1a1a2e;
-  const shoeColor  = 0x111111;
+  var SKIN_H = ['#FDBCB4','#F1C27D','#E0AC69','#C68642','#8D5524','#5C3317'];
+  var skinHex = SKIN_H[hInt(hash,1,0,5)] || '#FDBCB4';
+  var teamRaw = isMy ? 0xCC2233 : 0x1133BB;
+  var teamHex = '#'+teamRaw.toString(16).padStart(6,'0');
+  var teamR=(teamRaw>>16)&0xFF, teamG=(teamRaw>>8)&0xFF, teamB=teamRaw&0xFF;
 
-  const skinHex   = SKIN_PALETTES[skinIdx][1];
-  // hairColor 是 {r,g,b} 对象，转 hex 字符串
-  const hairColorStr = '#' + [hairColor.r, hairColor.g, hairColor.b]
-    .map(v => Math.round(v*255).toString(16).padStart(2,'0')).join('');
-  // teamColor 转 hex 字符串
-  const teamColorHex = '#' + teamColorRaw.toString(16).padStart(6,'0');
+  var HAIR_H = ['#1a1a1a','#4a3728','#8B6914','#8B0000','#888888','#3D1C02'];
+  var hairHex = HAIR_H[hInt(hash,2,0,5)] || '#1a1a1a';
 
-  const skinM   = new THREE.MeshLambertMaterial({color: skinHex});
-  const jerseyM  = new THREE.MeshLambertMaterial({color: teamColorRaw});
-  const shortM   = new THREE.MeshLambertMaterial({color: shortColor});
-  const shoeM    = new THREE.MeshLambertMaterial({color: shoeColor});
-  const sockM    = new THREE.MeshLambertMaterial({color: teamColorRaw});
+  var shortHex = '#1a1a2e';
+  var sockHex  = teamHex;
+  var shoeHex  = '#111111';
 
-  // ================================================================
-  // 完全重写：Three.js 程序化 3D 球员
-  // - 体型正相关：身高/体重/physical
-  // - 面孔正相关：Pravatar 真实照片 Billboard
-  // - 持续 360 度旋转 + 轻微摇摆呼吸
-  // ================================================================
+  // ---- 像素尺寸 ----
+  var PS = S * 0.013;
+  function PH(n) { return Math.round(n); }
 
-  // ---- 体型参数（正相关于球员数据）----
-  const S = H / 180;                   // 身高缩放
+  var P = {
+    footW:  PH(3+bf*0.8),  footH: 2,  footD: 5,
+    sockW:  PH(2+bf*0.4), sockH: 6,
+    shinW:  PH(2+bf*0.5), shinH: 7,
+    thighW: PH(3+bf*0.9), thighH: 8,
+    shortW: PH(4+bf*1.1), shortH: 5,
+    torsoW: PH(5+bf*1.4), torsoH: 10,
+    armW:   PH(1+bf*0.2), armH: 8,
+    headR:  PH(4+S*0.5),
+    neckW:  2, neckH: 3,
+    shldW:  PH(5+bf*1.3),
+  };
+  var ARM_X = P.shldW + 1;
 
-  // 头（头部大小正相关于身高）
-  const HEAD_R = S * 0.115;           // 头球半径：175cm→0.112，190cm→0.121
-  // 颈
-  const NECK_H = S * 0.035;           // 颈高
-  const NECK_R = HEAD_R * 0.38;
-  // 躯干（宽度正相关于体重/physical）
-  const TORSO_H  = S * 0.165;         // 躯干高
-  const SHLDR_W = S * 0.145 * bf;    // 肩宽，正相关于体型
-  const WAIST_W = SHLDR_W * 0.72;
-  // 手臂
-  const ARM_H  = S * 0.260;
-  const ARM_W  = SHLDR_W * 0.19 * bf;
-  // 腿（长度正相关于身高）
-  const LEG_H  = S * 0.470;
-  const THIGH_H = LEG_H * 0.43;
-  const SHIN_H  = LEG_H * 0.34;
-  const THIGH_W = S * 0.040 * bf;    // 大腿粗细，正相关
-  const SHIN_W  = THIGH_W * 0.68;
-  // 鞋/袜
-  const SHOE_H  = S * 0.040;
-  const SOCK_H  = LEG_H * 0.28;
-  // 短裤
-  const SHORT_H = S * 0.095;
-  // 头部精灵大小（和头部球体比例）
-  const FACE_SPRITE_R = HEAD_R * 1.48; // 面孔精灵略大于头部直径
-
-  // ---- 场景 ----
-  const scene = new THREE.Scene();
-  // 深色背景 + 地面光效
-  const tcR = ((teamColorRaw >> 16) & 0xFF), tcG = ((teamColorRaw >> 8) & 0xFF), tcB = teamColorRaw & 0xFF;
-  scene.background = new THREE.Color(tcR/8, tcG/8, tcB/8);
-
-  // 透视相机：球员占据 canvas 的大比例区域
-  // 球员高度约 S*1.20 世界单位，目标：占 260/320 ≈ 81% 的 canvas 高度
-  // 需要 Vertical FOV 约 90°，camera z ≈ -0.28
-  // ---- 灯光 ----
-  scene.add(new THREE.AmbientLight(0xffffff, 0.55));
-  const sun = new THREE.DirectionalLight(0xfff5e0, 1.0);
-  sun.position.set(S*2, S*3, S*2); scene.add(sun);
-  const fill = new THREE.DirectionalLight(0x8899ff, 0.35);
-  fill.position.set(-S*2, S*1, -S*1); scene.add(fill);
-
-  const g = new THREE.Group();
-  scene.add(g);
-
-  // ---- Helper：创建盒子，传入中心坐标 ----
-  function rbox(w, h, d, m, x, y, z) {
-    const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m);
-    mesh.position.set(x, y, z);
-    return mesh;
+  // ---- Three.js 场景 ----
+  if(!window.THREE) {
+    container.innerHTML = '<div style="width:200px;height:320px;background:'+teamHex+
+      ';display:flex;align-items:center;justify-content:center;color:#fff;font-size:12px">T.js Loading</div>';
+    return;
   }
+  var scene = new THREE.Scene();
+  scene.background = new THREE.Color(teamR/10, teamG/10, teamB/10);
 
-  // ================================================================
-  // 球员几何（从脚底向上堆叠，g.position.y=0 是地面）
-  // ================================================================
-  const SHOE_T = 0;            // 鞋顶 = 地面
-  const SOCK_B = SHOE_T + SHOE_H;
-  const SOCK_T = SOCK_B + SOCK_H;
-  const SHIN_B = SOCK_T;
-  const SHIN_T = SHIN_B + SHIN_H;
-  const THIGH_B = SHIN_T;      // 大腿紧接小腿
-  const THIGH_T = THIGH_B + THIGH_H;
-  const SHORT_B = THIGH_T;
-  const SHORT_T = SHORT_B + SHORT_H;
-  const TORSO_B = SHORT_T;
-  const TORSO_T = TORSO_B + TORSO_H;
-  const NECK_B  = TORSO_T;
-  const NECK_T  = NECK_B + NECK_H;
-  const HEAD_B  = NECK_T;
-  const HEAD_CY = HEAD_B + HEAD_R;  // 头部球心
-  const LEG_T   = SHORT_T;           // 腿顶 = 短裤顶
+  var totalH = (P.footH+P.sockH+P.shinH+P.thighH+P.shortH+P.torsoH+P.neckH+P.headR*2)*PS;
+  var halfH  = totalH * 0.58;
+  var camera = new THREE.OrthographicCamera(-halfH*0.6, halfH*0.6, halfH*0.6, -halfH*0.6, 0.01, 100);
+  camera.position.set(0, totalH*0.38, 3.5);
+  camera.lookAt(0, totalH*0.38, 0);
 
-  // 鞋（地面 + 向上）
-  g.add(rbox(THIGH_W*2.8, SHOE_H, SHOE_D*2.2, shoeM, -THIGH_W*0.65, SHOE_T+SHOE_H*0.5, SHOE_D*0.4));
-  g.add(rbox(THIGH_W*2.8, SHOE_H, SHOE_D*2.2, shoeM,  THIGH_W*0.65, SHOE_T+SHOE_H*0.5, SHOE_D*0.4));
-
-  // 球袜（球队色）
-  g.add(rbox(THIGH_W*3.8, SOCK_H, THIGH_W*3.4, sockM, -THIGH_W*0.65, SOCK_B+SOCK_H*0.5, 0));
-  g.add(rbox(THIGH_W*3.8, SOCK_H, THIGH_W*3.4, sockM,  THIGH_W*0.65, SOCK_B+SOCK_H*0.5, 0));
-
-  // 小腿（皮肤，从袜子顶部开始）
-  g.add(rbox(THIGH_W*3.6, SHIN_H, THIGH_W*3.2, skinM, -THIGH_W*0.65, SHIN_B+SHIN_H*0.5, 0));
-  g.add(rbox(THIGH_W*3.6, SHIN_H, THIGH_W*3.2, skinM,  THIGH_W*0.65, SHIN_B+SHIN_H*0.5, 0));
-  // HEAD_CY 已在前面定义，是头部球心 Y 坐标
-  // 相机在 z=+0.28（屏幕外，球员面前），看向 z=0 的球员正面
-  const CAM_Z = S * 0.55;            // z+ = 朝向观众，球员正面朝观众，在 z=0
-  const CAM_Y = S * 0.90;            // 相机高度：头顶上方
-  const CAM_X = S * 0.12;            // 稍微偏右（制造立体感）
-  const FOV_V = 80;                  // 垂直 FOV，确保球员全身在画面内
-  const camera = new THREE.PerspectiveCamera(FOV_V, 200/320, 0.01, 50);
-  camera.position.set(CAM_X, CAM_Y, CAM_Z);
-  camera.lookAt(0, HEAD_CY - HEAD_R * 0.2, 0);  // 看向头部中心
-
-  const renderer = new THREE.WebGLRenderer({antialias:true, alpha:true});
+  var renderer = new THREE.WebGLRenderer({antialias: false});
   renderer.setSize(200, 320);
+  renderer.setPixelRatio(1);
   renderer.setClearColor(0x000000, 0);
   container.appendChild(renderer.domElement);
 
+  // ---- 灯光 ----
+  scene.add(new THREE.AmbientLight(0xffffff, 0.65));
+  var sun = new THREE.DirectionalLight(0xfff5e0, 1.1);
+  sun.position.set(2,4,3); scene.add(sun);
+  scene.add(Object.assign(new THREE.DirectionalLight(0x8899cc, 0.4),{position:{x:-2,y:1,z:-1}}));
+  scene.add(Object.assign(new THREE.DirectionalLight(0xffffff, 0.3),{position:{x:0,y:0,z:-2}}));
 
-  // 大腿（皮肤，紧接小腿顶部）
-  g.add(rbox(THIGH_W*3.8, THIGH_H, THIGH_W*3.4, skinM, -THIGH_W*0.65, THIGH_B+THIGH_H*0.5, 0));
-  g.add(rbox(THIGH_W*3.8, THIGH_H, THIGH_W*3.4, skinM,  THIGH_W*0.65, THIGH_B+THIGH_H*0.5, 0));
+  // ================================================================
+  // 体素构建工具
+  // ================================================================
 
-  // 短裤（深色，紧接大腿顶）
-  g.add(rbox(WAIST_W*2.0, SHORT_H, WAIST_W*1.1, shortM, 0, SHORT_B+SHORT_H*0.5, 0));
+  function mkGrp() { var g = new THREE.Group(); scene.add(g); return g; }
 
-  // 躯干（球衣色，紧接短裤顶）
-  g.add(rbox(SHLDR_W*2.0, TORSO_H, SHLDR_W*0.88, jerseyM, 0, TORSO_B+TORSO_H*0.5, 0));
-
-  // 肩块（球衣色）
-  g.add(rbox((SHLDR_W+ARM_W*0.6)*2, S*0.040, SHLDR_W*0.80, jerseyM, 0, TORSO_T-S*0.020, 0));
-
-  // 球衣号（白色小方块贴在胸前）
-  g.add(rbox(S*0.038, S*0.048, 0.002, new THREE.MeshLambertMaterial({color:0xffffff}), 0, TORSO_B+TORSO_H*0.5, SHLDR_W*0.445));
-
-  // 手臂（自然下垂）
-  const UPPER = ARM_H * 0.50;
-  const LOWER = ARM_H * 0.50;
-  const armX = SHLDR_W + ARM_W*0.5;
-  const ELBOW = TORSO_T - UPPER*0.52;
-  g.add(rbox(ARM_W, UPPER, ARM_W*0.80, skinM, -armX, TORSO_T-UPPER*0.50, SHLDR_W*0.20));
-  g.add(rbox(ARM_W, LOWER, ARM_W*0.65, skinM, -armX, ELBOW-LOWER*0.50, SHLDR_W*0.20));
-  g.add(rbox(ARM_W, UPPER, ARM_W*0.80, skinM,  armX, TORSO_T-UPPER*0.50, SHLDR_W*0.20));
-  g.add(rbox(ARM_W, LOWER, ARM_W*0.65, skinM,  armX, ELBOW-LOWER*0.50, SHLDR_W*0.20));
-
-  // 颈部（从躯干顶向上）
-  const neckMesh = new THREE.Mesh(new THREE.CylinderGeometry(NECK_R, NECK_R*1.05, NECK_H, 10), skinM);
-  neckMesh.position.set(0, NECK_B+NECK_H*0.5, 0);
-  g.add(neckMesh);
-
-  // 头部（球体，头顶紧接颈部）
-  const headMesh = new THREE.Mesh(new THREE.SphereGeometry(HEAD_R, 18, 16), skinM);
-  headMesh.position.set(0, HEAD_CY, 0);
-  g.add(headMesh);
-
-  // ---- 面孔 Billboard：正相关于球员 ID（不同球员不同脸）----
-  const faceW = FACE_SPRITE_R * 2;
-  const faceH = FACE_SPRITE_R * 2;
-  // 用 Pravatar 真实照片：hash%70 保证同球员同脸
-  const avatarIdx = Math.abs(playerHash(hash, 99) * 70) | 0; // 0-69
-  // ---- 面孔精灵：Canvas2D 画球员面孔 → Three.js Sprite ----
-  // Pravatar 无 CORS，用 Canvas2D 画图绕过
-  const fcvs = document.createElement('canvas');
-  fcvs.width = 200; fcvs.height = 200;
-  const fctx = fcvs.getContext('2d');
-  // 画球员姓名首字母（每人不同）
-  const ini = (player.name.charCodeAt(0) || 65) % 26;
-  const letter = String.fromCharCode(65 + ini);
-  const skinHexFill = skinHex || '#FDBCB4';
-  const jerseyFill = '#' + teamColorRaw.toString(16).padStart(6,'0');
-  // 球衣背景 + 号码
-  fctx.fillStyle = jerseyFill;
-  fctx.fillRect(0, 0, 200, 200);
-  fctx.fillStyle = '#fff';
-  fctx.font = 'bold 100px Arial, sans-serif';
-  fctx.textAlign = 'center';
-  fctx.textBaseline = 'middle';
-  fctx.fillText(letter, 100, 100);
-  // 画皮肤色椭圆（球员头部）
-  fctx.fillStyle = skinHexFill;
-  fctx.beginPath();
-  fctx.ellipse(100, 80, 40, 50, 0, 0, Math.PI*2);
-  fctx.fill();
-  // 画眼睛（每人不同的间距）
-  const eyeSpread = 12 + (playerHash(hash, 88) * 12) | 0;
-  fctx.fillStyle = '#222';
-  fctx.beginPath(); fctx.arc(100 - eyeSpread, 72, 6, 0, Math.PI*2); fctx.fill();
-  fctx.beginPath(); fctx.arc(100 + eyeSpread, 72, 6, 0, Math.PI*2); fctx.fill();
-  // 画嘴巴
-  const mouthOpen = playerHash(hash, 55) > 0.5;
-  fctx.strokeStyle = '#222'; fctx.lineWidth = 3;
-  fctx.beginPath();
-  if(mouthOpen) {
-    fctx.arc(100, 100, 10, 0, Math.PI); // 张嘴笑
-  } else {
-    fctx.moveTo(90, 97); fctx.lineTo(110, 97); // 闭嘴
+  function addVoxel(parent, w, h, d, color, ox, oy, oz) {
+    if(w<1||h<1||d<1) return;
+    var count = w*h*d;
+    var geo = new THREE.BoxGeometry(PS, PS, PS);
+    var mat = new THREE.MeshLambertMaterial({color: color});
+    var mesh = new THREE.InstancedMesh(geo, mat, count);
+    mesh.castShadow = true;
+    var idx = 0;
+    for(var x=0;x<w;x++)
+    for(var y=0;y<h;y++)
+    for(var z=0;z<d;z++) {
+      var m4 = new THREE.Matrix4();
+      m4.setPosition(ox+(x-(w-1)*0.5)*PS, oy+(y-(h-1)*0.5)*PS, oz+(z-(d-1)*0.5)*PS);
+      mesh.setMatrixAt(idx++, m4);
+    }
+    mesh.instanceMatrix.needsUpdate = true;
+    parent.add(mesh);
   }
-  fctx.stroke();
-  // 画头发（根据 hairIdx 风格）
-  const hairStyles = ['none','short','wavy','buzz','curly','bald'];
-  const hs = hairStyles[(hairIdx || 0) % hairStyles.length];
-  fctx.fillStyle = hairColorStr || '#333';
-  if(hs !== 'none') {
-    fctx.beginPath();
-    if(hs === 'buzz') {
-      fctx.ellipse(100, 48, 42, 18, 0, 0, Math.PI*2); fctx.fill();
-    } else if(hs === 'short') {
-      fctx.ellipse(100, 42, 42, 28, 0, Math.PI, Math.PI*2); fctx.fill();
-    } else if(hs === 'wavy') {
-      fctx.ellipse(100, 38, 46, 35, 0, Math.PI, Math.PI*2); fctx.fill();
-    } else if(hs === 'curly') {
-      for(let ci=0;ci<5;ci++) {
-        fctx.beginPath();
-        fctx.arc(65+ci*17, 40, 15, 0, Math.PI*2); fctx.fill();
+
+  function addFlat(parent, w, h, color, ox, oy, oz) {
+    if(w<1||h<1) return;
+    var count = w*h;
+    var geo = new THREE.BoxGeometry(PS, PS, PS);
+    var mat = new THREE.MeshLambertMaterial({color: color});
+    var mesh = new THREE.InstancedMesh(geo, mat, count);
+    var idx = 0;
+    for(var x=0;x<w;x++)
+    for(var y=0;y<h;y++) {
+      var m4 = new THREE.Matrix4();
+      m4.setPosition(ox+(x-(w-1)*0.5)*PS, oy+(y-(h-1)*0.5)*PS, oz);
+      mesh.setMatrixAt(idx++, m4);
+    }
+    mesh.instanceMatrix.needsUpdate = true;
+    parent.add(mesh);
+  }
+
+  function addBorder(parent, w, h, color, ox, oy, oz) {
+    if(w<1||h<1) return;
+    var count = w*2 + Math.max(0,(h-2))*2;
+    if(count < 4) { addFlat(parent, w, h, color, ox, oy, oz); return; }
+    var geo = new THREE.BoxGeometry(PS, PS, PS);
+    var mat = new THREE.MeshLambertMaterial({color: color});
+    var mesh = new THREE.InstancedMesh(geo, mat, count);
+    var idx = 0;
+    for(var x=0;x<w;x++){
+      var m4u=new THREE.Matrix4(); m4u.setPosition(ox+(x-(w-1)*0.5)*PS, oy+(h-1)*0.5*PS, oz); mesh.setMatrixAt(idx++,m4u);
+      var m4d=new THREE.Matrix4(); m4d.setPosition(ox+(x-(w-1)*0.5)*PS, oy-(h-1)*0.5*PS, oz); mesh.setMatrixAt(idx++,m4d);
+    }
+    for(var y=1;y<h-1;y++){
+      var m4l=new THREE.Matrix4(); m4l.setPosition(ox-(w-1)*0.5*PS, oy+(y-(h-1)*0.5)*PS, oz); mesh.setMatrixAt(idx++,m4l);
+      var m4r=new THREE.Matrix4(); m4r.setPosition(ox+(w-1)*0.5*PS, oy+(y-(h-1)*0.5)*PS, oz); mesh.setMatrixAt(idx++,m4r);
+    }
+    mesh.instanceMatrix.needsUpdate = true;
+    parent.add(mesh);
+  }
+
+  var footG  = mkGrp();
+  var sockG  = mkGrp();
+  var shinG  = mkGrp();
+  var thighG = mkGrp();
+  var shortG = mkGrp();
+  var torsoG = mkGrp();
+  var shldG  = mkGrp();
+  var armG   = mkGrp();
+  var headG  = mkGrp();
+  var bgG    = mkGrp();
+
+  // ---- 从脚底向上堆叠 ----
+  var cy = 0;
+
+  // 鞋
+  addFlat(footG, P.footW, 1, shoeHex, -P.footW*PS*0.55, cy - P.footH*PS*0.5, -P.footD*PS*0.5);
+  addVoxel(footG, P.footW-1, P.footH-1, P.footD-1, shoeHex, -P.footW*PS*0.5+PS*0.5, cy - P.footH*PS*0.5+PS*0.5, 0);
+  addVoxel(footG, P.footW-1, P.footH-1, P.footD-1, shoeHex,  P.footW*PS*0.5-PS*0.5, cy - P.footH*PS*0.5+PS*0.5, 0);
+  cy += P.footH * PS;
+
+  // 球袜
+  addVoxel(sockG, P.sockW, P.sockH, P.sockW, sockHex, -P.sockW*PS*0.5, cy+P.sockH*PS*0.5, 0);
+  addVoxel(sockG, P.sockW, P.sockH, P.sockW, sockHex,  P.sockW*PS*0.5, cy+P.sockH*PS*0.5, 0);
+  cy += P.sockH * PS;
+
+  // 小腿
+  addVoxel(shinG, P.shinW, P.shinH, P.shinW, skinHex, -P.shinW*PS*0.5, cy+P.shinH*PS*0.5, 0);
+  addVoxel(shinG, P.shinW, P.shinH, P.shinW, skinHex,  P.shinW*PS*0.5, cy+P.shinH*PS*0.5, 0);
+  cy += P.shinH * PS;
+
+  // 大腿
+  addVoxel(thighG, P.thighW, P.thighH, P.thighW, skinHex, -P.thighW*PS*0.5, cy+P.thighH*PS*0.5, 0);
+  addVoxel(thighG, P.thighW, P.thighH, P.thighW, skinHex,  P.thighW*PS*0.5, cy+P.thighH*PS*0.5, 0);
+  cy += P.thighH * PS;
+
+  // 短裤
+  var lshortX = -(P.shortW*0.5+PH(P.shortW*0.45))*PS*0.5;
+  var rshortX =  (P.shortW*0.5+PH(P.shortW*0.45))*PS*0.5;
+  addVoxel(shortG, PH(P.shortW*0.45), P.shortH, PH(P.shortW*0.5), shortHex, lshortX, cy+P.shortH*PS*0.5, 0);
+  addVoxel(shortG, PH(P.shortW*0.45), P.shortH, PH(P.shortW*0.5), shortHex, rshortX, cy+P.shortH*PS*0.5, 0);
+  addFlat(shortG, PH(P.shortW*0.8), P.shortH-1, teamHex, 0, cy+P.shortH*PS*0.5-PS*0.5, P.shortW*PS*0.3);
+  cy += P.shortH * PS;
+
+  // 躯干
+  addFlat(torsoG, P.torsoW-1, P.torsoH-1, teamHex, 0, cy+P.torsoH*PS*0.5, P.torsoW*PS*0.5);
+  addFlat(torsoG, P.torsoW-1, P.torsoH-1, shadeColor(teamHex,-20), 0, cy+P.torsoH*PS*0.5, -P.torsoW*PS*0.5);
+  addBorder(torsoG, P.torsoW, P.torsoH, teamHex, 0, cy+P.torsoH*PS*0.5, 0);
+  addFlat(torsoG, 3, 1, skinHex, 0, cy+P.torsoH*PS*0.5-PS*0.5, 0);
+
+  // ---- 号码（像素 3x5 点阵）----
+  var numStr = String(pNum);
+  var numY   = cy + P.torsoH*PS*0.4;
+  var numX0  = -(numStr.length-1) * PS * 1.8;
+  var dPat = {
+    '0':[[1,1,1],[1,0,1],[1,0,1],[1,0,1],[1,1,1]],
+    '1':[[0,1,0],[1,1,0],[0,1,0],[0,1,0],[1,1,1]],
+    '2':[[1,1,1],[0,0,1],[1,1,1],[1,0,0],[1,1,1]],
+    '3':[[1,1,1],[0,0,1],[1,1,1],[0,0,1],[1,1,1]],
+    '4':[[1,0,1],[1,0,1],[1,1,1],[0,0,1],[0,0,1]],
+    '5':[[1,1,1],[1,0,0],[1,1,1],[0,0,1],[1,1,1]],
+    '6':[[1,1,1],[1,0,0],[1,1,1],[1,0,1],[1,1,1]],
+    '7':[[1,1,1],[0,0,1],[0,0,1],[0,0,1],[0,0,1]],
+    '8':[[1,1,1],[1,0,1],[1,1,1],[1,0,1],[1,1,1]],
+    '9':[[1,1,1],[1,0,1],[1,1,1],[0,0,1],[1,1,1]],
+    '-':[[0,0,0],[0,0,0],[1,1,1],[0,0,0],[0,0,0]],
+  };
+  for(var ni=0; ni<numStr.length; ni++) {
+    var pat = dPat[numStr[ni]] || dPat['0'];
+    for(var dy=0; dy<5; dy++)
+    for(var dx=0; dx<3; dx++) {
+      if(pat[dy][dx]) {
+        var vox = new THREE.Mesh(
+          new THREE.BoxGeometry(PS, PS, PS),
+          new THREE.MeshLambertMaterial({color:'#ffffff'})
+        );
+        vox.position.set(numX0+ni*PS*3.6+dx*PS, numY+(2-dy)*PS, P.torsoW*PS*0.5+PS*0.6);
+        torsoG.add(vox);
       }
     }
   }
-  const faceTex = new THREE.CanvasTexture(fcvs);
-  faceTex.flipY = false;
-  const faceSpriteMat = new THREE.SpriteMaterial({
-    map: faceTex, depthTest: false, depthWrite: false, transparent: true
-  });
-  const faceSprite = new THREE.Sprite(faceSpriteMat);
-  faceSprite.scale.set(faceW, faceH, 1);
-  faceSprite.position.set(0, HEAD_CY, HEAD_R*1.02);
-  g.add(faceSprite);
 
-  // ---- 动画：站立呼吸 + Y轴360度旋转 ----
-  let t = 0;
+  cy += P.torsoH * PS;
+
+  // 肩部
+  addBorder(shldG, P.shldW, 2, teamHex, 0, cy+PS, 0);
+  cy += 2 * PS;
+
+  // 手臂
+  var armY = cy - P.armH*PS*0.45;
+  addVoxel(armG, P.armW, PH(P.armH*0.52), P.armW, skinHex, -ARM_X*PS, armY, P.torsoW*PS*0.6);
+  addVoxel(armG, P.armW, PH(P.armH*0.48), P.armW, skinHex, -ARM_X*PS, armY-P.armH*PS*0.52, P.torsoW*PS*0.6);
+  addVoxel(armG, P.armW, PH(P.armH*0.52), P.armW, skinHex,  ARM_X*PS, armY, P.torsoW*PS*0.6);
+  addVoxel(armG, P.armW, PH(P.armH*0.48), P.armW, skinHex,  ARM_X*PS, armY-P.armH*PS*0.52, P.torsoW*PS*0.6);
+  cy -= P.armH * PS * 0.9;
+
+  // 颈部
+  addVoxel(headG, P.neckW, P.neckH, P.neckW, skinHex, 0, cy+P.neckH*PS*0.5, 0);
+  cy += P.neckH * PS;
+
+  // ---- 头部 ----
+  var headCY = cy + P.headR*PS;
+  addVoxel(headG, P.headR*2, 2, P.headR*2, hairHex, 0, headCY+P.headR*PS*0.85, 0);
+  addVoxel(headG, P.headR*2-1, 3, P.headR*2-1, hairHex, 0, headCY+P.headR*PS*0.6, 0);
+  addBorder(headG, P.headR, P.headR*2, skinHex, -P.headR*PS, headCY, 0);
+  addBorder(headG, P.headR, P.headR*2, skinHex,  P.headR*PS, headCY, 0);
+  addFlat(headG, P.headR*2-1, P.headR*2-1, skinHex, 0, headCY, P.headR*PS);
+  addFlat(headG, P.headR*2-1, P.headR*2-1, skinHex, 0, headCY, -P.headR*PS);
+
+  // ---- 像素面孔 Canvas ----
+  var fS = P.headR * 4;
+  var fcvs = document.createElement('canvas');
+  fcvs.width = fS; fcvs.height = fS;
+  var fctx = fcvs.getContext('2d');
+  fctx.imageSmoothingEnabled = false;
+  fctx.fillStyle = skinHex;
+  fctx.fillRect(0, 0, fS, fS);
+
+  var hairY0 = fS * 0.18;
+
+  // 眉毛
+  fctx.fillStyle = hairHex;
+  var browY = fS * 0.28;
+  var browT = ovr > 80 ? 3 : ovr > 60 ? 2 : 1;
+  for(var bi=0;bi<4;bi++){
+    fctx.fillRect(fS*0.30+bi*2, browY-bi, 3, browT);
+    fctx.fillRect(fS*0.55+bi*2, browY-bi, 3, browT);
+  }
+
+  // 像素眼睛
+  var eyeY = fS * 0.36;
+  var eyeW = Math.max(3, PH(fS*0.05));
+  var eyeH = Math.max(3, PH(fS*0.07));
+  var eyeCol = ovr > 80 ? '#22aa44' : ovr > 60 ? '#3344cc' : '#333333';
+  fctx.fillStyle = eyeCol;
+  for(var dy=-eyeH;dy<=eyeH;dy++)
+  for(var dx=-eyeW;dx<=eyeW;dx++)
+    if(dx*dx/(eyeW*eyeW)+dy*dy/(eyeH*eyeH)<=1){
+      fctx.fillRect(fS*0.30+dx*2, eyeY+dy*2, 2, 2);
+      fctx.fillRect(fS*0.55+dx*2, eyeY+dy*2, 2, 2);
+    }
+  fctx.fillStyle = '#ffffff';
+  fctx.fillRect(fS*0.30+1, eyeY-2, 2, 2);
+  fctx.fillRect(fS*0.55+1, eyeY-2, 2, 2);
+
+  // 鼻子
+  fctx.fillStyle = shadeColor(skinHex, -15);
+  fctx.fillRect(fS*0.49, fS*0.50, 3, 3);
+  fctx.fillRect(fS*0.48, fS*0.53, 5, 2);
+
+  // 嘴巴
+  var expr = hInt(hash, 5, 0, 2);
+  fctx.fillStyle = shadeColor(skinHex, -25);
+  if(expr===0){
+    for(var mi=0;mi<5;mi++) fctx.fillRect(fS*0.40+mi*2, fS*0.63+Math.abs(mi-2), 2, 2);
+  } else if(expr===1){
+    fctx.fillStyle = '#cc4444';
+    fctx.fillRect(fS*0.41, fS*0.63, 5, 3);
+    fctx.fillStyle = shadeColor(skinHex,-25);
+    for(var mi=0;mi<5;mi++) fctx.fillRect(fS*0.40+mi*2, fS*0.63-2, 2, 2);
+  } else {
+    for(var mi=0;mi<5;mi++) fctx.fillRect(fS*0.40+mi*2, fS*0.63, 2, 2);
+  }
+
+  // 耳朵
+  fctx.fillStyle = skinHex;
+  fctx.fillRect(fS*0.17, fS*0.40, 3, 6);
+  fctx.fillRect(fS*0.78, fS*0.40, 3, 6);
+
+  // 头发覆盖
+  fctx.fillStyle = hairHex;
+  var hStyle = hInt(hash, 3, 0, 4);
+  if(hStyle===0){
+    fctx.fillRect(0, 0, fS, hairY0+2);
+  } else if(hStyle===1){
+    fctx.fillRect(0, 0, fS, hairY0);
+    fctx.fillRect(fS*0.15, hairY0, fS*0.7, fS*0.06);
+  } else if(hStyle===2){
+    for(var ci=0;ci<6;ci++){
+      fctx.beginPath();
+      fctx.arc(fS*0.15+ci*fS*0.12, hairY0, fS*0.09, 0, Math.PI*2);
+      fctx.fill();
+    }
+  } else if(hStyle===3){
+    fctx.fillStyle = shadeColor(skinHex, +12);
+    fctx.fillRect(fS*0.35, fS*0.05, fS*0.3, 2);
+  } else {
+    fctx.fillRect(0, hairY0*0.5, fS*0.18, fS*0.08);
+    fctx.fillRect(fS*0.82, hairY0*0.5, fS*0.18, fS*0.08);
+    fctx.fillRect(fS*0.25, 0, fS*0.5, hairY0*0.9);
+    fctx.fillRect(fS*0.35, hairY0*0.9, fS*0.3, hairY0*0.7);
+  }
+
+  // 面孔 Sprite
+  var faceTex = new THREE.CanvasTexture(fcvs);
+  faceTex.magFilter = THREE.NearestFilter;
+  faceTex.minFilter = THREE.NearestFilter;
+  var faceSpr = new THREE.Sprite(new THREE.SpriteMaterial({
+    map: faceTex, depthTest: false, depthWrite: false, transparent: true
+  }));
+  var faceW3 = P.headR*PS*1.7;
+  faceSpr.scale.set(faceW3, faceW3, 1);
+  faceSpr.position.set(0, headCY, P.headR*PS + 0.01);
+  scene.add(faceSpr);
+
+  // ---- 背景装饰 ----
+  for(var bi=0; bi<8; bi++) {
+    var bgV = new THREE.Mesh(
+      new THREE.BoxGeometry(PS*3, PS*3, PS*3),
+      new THREE.MeshLambertMaterial({
+        color: [teamHex, shadeColor(teamHex,25), shadeColor(teamHex,-25)][bi%3],
+        transparent: true, opacity: 0.12
+      })
+    );
+    bgV.position.set(
+      (playerHash(hash,bi*3)*2-1)*0.7,
+      (playerHash(hash,bi*3+1)*2-1)*0.4,
+      -1.2-playerHash(hash,bi*3+2)*0.4
+    );
+    bgG.add(bgV);
+  }
+
+  // ================================================================
+  // 动画
+  // ================================================================
+  var t = 0;
   function animate() {
-    requestAnimationFrame(animate);
-    t += 0.012;
-    g.rotation.y = t * 0.78;                    // 360度旋转
-    g.rotation.z = Math.sin(t * 0.8) * 0.025;  // 左右微晃
-    g.rotation.x = Math.sin(t * 1.5) * 0.006; // 呼吸起伏
+    window._reqAF = requestAnimationFrame(animate);
+    t += 0.018;
+
+    scene.rotation.y = t * 0.65;
+
+    var legSwing = Math.sin(t * 2.5) * 0.06;
+    thighG.rotation.x = legSwing;
+    shinG.rotation.x  = Math.max(0, legSwing) * 1.2;
+    footG.rotation.x  = Math.max(0, legSwing) * 0.5;
+    sockG.rotation.x  = Math.max(0, legSwing) * 0.5;
+    armG.rotation.x   = -legSwing * 0.4;
+    torsoG.position.y = Math.sin(t * 1.8) * PS * 1.5;
+    headG.rotation.z  = Math.sin(t * 0.7) * 0.03;
+    headG.rotation.x  = Math.sin(t * 1.2) * 0.02;
+
+    bgG.children.forEach(function(v, i) {
+      v.position.y += 0.0008;
+      if(v.position.y > 0.5) v.position.y = -0.5;
+      v.rotation.y += 0.004;
+    });
+
     renderer.render(scene, camera);
   }
   animate();
 
-  voxelScenes[containerId] = {renderer, scene, g};
-  console.log('[Voxel] Done. mesh count:', g.children.length, 'renderer:', !!renderer);
+  voxelScenes[containerId] = {renderer: renderer, scene: scene};
+  console.log('[Pixel] Done. groups:', scene.children.length);
 }
-
 // ---- 3D Player Body SVG (fallback) ----
 function getPlayerBody(player) {
   const h = player.height || 180;
