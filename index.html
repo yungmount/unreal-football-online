@@ -1087,315 +1087,301 @@ function _drawHair(ctx, W, H, hairIdx, hairColor, skin, faceWFactor, hash) {
 // ================================================================
 // 扁平球员 SVG 风格 - 简洁、专业、游戏感
 // ================================================================
+// ================================================================
+// 扁平卡通球员 v2 - 清晰专业，直接 Canvas 2D 绘制
+// ================================================================
 function initVoxelPlayer(player, containerId) {
   var container = document.getElementById(containerId);
   if(!container) return;
-  if(voxelScenes[containerId]) {
-    try{voxelScenes[containerId].renderer.dispose();}catch(e){}
-    container.innerHTML = '';
-  }
+  container.innerHTML = '';
 
   var hash = player.id || player.name || Math.random();
   var H = player.height || 180, W = player.weight || 75;
   var ovr = player.ovr || 70, isMy = !!player.isMy;
   var pNum = player.num || 10;
-  var S = H / 180;
 
+  // 肤色
   var SK = ['#FDBCB4','#F1C27D','#E0AC69','#C68642','#8D5524','#5C3317'];
-  var skinHex = SK[hInt(hash,1,0,5)] || '#FDBCB4';
-  var tRaw = isMy ? 0xCC2233 : 0x1133BB;
-  var tHex = '#'+tRaw.toString(16).padStart(6,'0');
-  var tR=(tRaw>>16)&0xFF, tG=(tRaw>>8)&0xFF, tB=tRaw&0xFF;
-  var HK = ['#1a1a1a','#4a3728','#8B6914','#8B0000','#888888','#3D1C02'];
-  var hairHex = HK[hInt(hash,2,0,5)] || '#1a1a1a';
-  var shortHex = '#1a1a2e';
+  var skin = SK[hInt(hash,1,0,5)] || '#FDBCB4';
+  // 球队色：己方=红，对方=蓝
+  var kitR = isMy ? 220 : 17, kitG = isMy ? 34 : 51, kitB = isMy ? 51 : 187;
+  var kit = `rgb(${kitR},${kitG},${kitB})`;
+  var kitD = `rgb(${kitR*0.7|0},${kitG*0.7|0},${kitB*0.7|0})`;  // 深色
+  var kitL = `rgb(${Math.min(255,kitR*1.2|0)},${Math.min(255,kitG*1.2|0)},${Math.min(255,kitB*1.2|0)})`; // 浅色
+  var short = '#111122';
+  // 发型
+  var HK=['#1a1a1a','#4a3020','#8B6914','#8B0000','#666666','#2C1A0E'];
+  var hair = HK[hInt(hash,2,0,5)] || '#1a1a1a';
+  var hairS = `rgb(${Math.min(255,(parseInt(hair.slice(1,3),16)*0.7)|0},${Math.min(255,(parseInt(hair.slice(3,5),16)*0.7)|0},${Math.min(255,(parseInt(hair.slice(5,7),16)*0.7)|0})`;
 
-  if(!window.THREE) {
-    container.innerHTML = '<div style="width:200px;height:320px;background:'+tHex+';display:flex;align-items:center;justify-content:center;color:#fff;font-size:12px">T.js Loading</div>';
-    return;
-  }
-  var scene = new THREE.Scene();
-  scene.background = new THREE.Color(tR/10, tG/10, tB/10);
-
-  var camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.01, 50);
-  camera.position.set(0, 0, 5);
-  camera.lookAt(0, 0, 0);
-
-  var renderer = new THREE.WebGLRenderer({antialias:true, alpha:true});
-  renderer.setSize(200, 320);
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-  renderer.setClearColor(0x000000, 0);
-  container.appendChild(renderer.domElement);
-
-  scene.add(new THREE.AmbientLight(0xffffff, 0.8));
-  var sun = new THREE.DirectionalLight(0xfff5e0, 1.4);
-  sun.position.set(2,4,5); scene.add(sun);
-  var fill = new THREE.DirectionalLight(0x8899cc, 0.3);
-  fill.position.set(-2,1,3); scene.add(fill);
-
-  // ---- Canvas 2D 绘制球员图 ----
-  var W2=200, H2=640;
-  var cvs = document.createElement('canvas');
-  cvs.width=W2; cvs.height=H2;
-  var ctx = cvs.getContext('2d');
+  // Canvas
+  var W2=200, H2=300;
+  var cv=document.createElement('canvas'); cv.width=W2; cv.height=H2;
+  var ctx=cv.getContext('2d'); ctx.imageSmoothingEnabled=true;
   ctx.clearRect(0,0,W2,H2);
 
-  // 坐标系统：中心在 (W2/2, H2*0.45)，脚底在 y=280
-  var cx = W2/2;       // 100
-  var footY = 290;    // 脚底（球员占85%高度）
-  var scale = S * 3.2; // 整体缩放
+  // 坐标常量
+  var cx=W2/2;   // 100
+  var pad=8;     // 边距
 
-  function sc(y) { return footY - y*scale; }  // canvas y from foot bottom
-  function sw(w) { return w*scale; }            // scaled width/height
-  function sx(x) { return cx + x*scale; }       // canvas x from center
+  // 头：半径 28，中心在 y=58
+  var hR=28, hX=cx, hY=58;
+  // 颈：宽12，高14，连接头和身体
+  var nW=12, nH=14, nX=cx, nY=hY+hR;  // nY=86
+  // 躯干：从颈底到 y=148，宽68
+  var tW=68, tH=62, tX=cx, tY=nY+nH;  // tY=100
+  // 短裤：从 y=148 到 y=178，宽64
+  var shW=64, shH=30, shX=cx, shY=tY+tH-4;  // shY=158
+  // 腿：左腿中心 x=86，右腿 x=114
+  var lCX1=86, lCX2=114, lW=24, lH=50;
+  // 袜子上沿 y=190，下沿 y=238
+  var skY=190, skH=48, skW=26;
+  // 鞋 y=252
+  var sY=252, sW=32, sH=18;
 
-  // ---- 草地/地面 ----
-  ctx.fillStyle = '#2d5a27';
-  ctx.fillRect(0, footY + sw(2), W2, H2 - footY - sw(2));
-  // 草地条纹
-  ctx.fillStyle = 'rgba(0,0,0,0.06)';
-  for(var si=0;si<10;si+=2) ctx.fillRect(si*20, footY+sw(2), 20, H2);
+  // ===================== 身体 =====================
 
-  // ---- 脚（鞋）----
-  var shoeW=sw(5), shoeH=sw(4), shoeD=sw(9);
-  var shoeY=footY;
-  // 左脚
-  ctx.fillStyle='#1a1a1a';
-  ctx.beginPath(); ctx.ellipse(xx(-sw(2.5)), shoeY-sw(2), shoeW/2, shoeH/2, 0, 0, Math.PI*2); ctx.fill();
-  // 鞋舌/鞋带区域
-  ctx.fillStyle='#333';
-  ctx.fillRect(xx(-sw(4)), shoeY-sw(3.5), sw(3), sw(2));
-  // 右脚
-  ctx.fillStyle='#1a1a1a';
-  ctx.beginPath(); ctx.ellipse(xx(sw(2.5)), shoeY-sw(2), shoeW/2, shoeH/2, 0, 0, Math.PI*2); ctx.fill();
-  ctx.fillStyle='#333';
-  ctx.fillRect(xx(sw(1.5)), shoeY-sw(3.5), sw(3), sw(2));
-
-  function xx(x) { return cx + x; }
-  function yy(y) { return sc(y); }
-
-  // ---- 球袜（白色+球队色条纹）----
-  var sockTop = sc(9+4); // 小腿+脚
-  var sockBot = sc(9);
-  var sockH = sockBot - sockTop;
-  var sockW = sw(4);
-  // 左袜
-  ctx.fillStyle='#ffffff';
-  ctx.fillRect(xx(-sw(2.5))-sockW/2, sockTop, sockW, sockH);
-  ctx.fillStyle=tHex;
-  for(var s=0;s<3;s++) ctx.fillRect(xx(-sw(2.5))-sockW/2, sockTop+sockH*s/3, sockW, sockH/4.5);
-  // 右袜
-  ctx.fillStyle='#ffffff';
-  ctx.fillRect(xx(sw(2.5))-sockW/2, sockTop, sockW, sockH);
-  ctx.fillStyle=tHex;
-  for(var s=0;s<3;s++) ctx.fillRect(xx(sw(2.5))-sockW/2, sockTop+sockH*s/3, sockW, sockH/4.5);
-
-  // ---- 小腿（肤色）----
-  var legTop = sc(9);
-  var legBot = sc(9+8);
-  var legW = sw(3.5);
-  ctx.fillStyle=skinHex;
-  ctx.fillRect(xx(-sw(2.5))-legW/2, legTop, legW, legBot-legTop);
-  ctx.fillRect(xx(sw(2.5))-legW/2, legTop, legW, legBot-legTop);
-  // 小腿肌肉阴影
-  ctx.fillStyle=shadeColor(skinHex,-10);
-  ctx.fillRect(xx(-sw(2.5))-legW/2, legTop+sw(1), legW/3, legBot-legTop-sw(1));
-  ctx.fillRect(xx(sw(2.5))-legW/2, legTop+sw(1), legW/3, legBot-legTop-sw(1));
-
-  // ---- 大腿（肤色）----
-  var thighTop = sc(9+8);
-  var thighBot = sc(9+8+9);
-  var thighW = sw(5);
-  ctx.fillStyle=skinHex;
-  ctx.fillRect(xx(-sw(2.5))-thighW/2, thighTop, thighW, thighBot-thighTop);
-  ctx.fillRect(xx(sw(2.5))-thighW/2, thighTop, thighW, thighBot-thighTop);
-  ctx.fillStyle=shadeColor(skinHex,-10);
-  ctx.fillRect(xx(-sw(2.5))-thighW/2, thighTop+sw(1), thighW/3, thighBot-thighTop-sw(1));
-  ctx.fillRect(xx(sw(2.5))-thighW/2, thighTop+sw(1), thighW/3, thighBot-thighTop-sw(1));
-
-  // ---- 短裤 ----
-  var shortTop = sc(9+8+9);
-  var shortBot = sc(9+8+9+6);
-  var shortH = shortBot - shortTop;
-  var shortW = sw(9);
-  // 左侧腿洞（肤色露出大腿）
-  ctx.fillStyle=skinHex;
-  ctx.beginPath(); ctx.ellipse(xx(-sw(2.5)), shortTop+sw(1.5), sw(2.8), sw(2.5), 0, 0, Math.PI*2); ctx.fill();
-  ctx.beginPath(); ctx.ellipse(xx(sw(2.5)), shortTop+sw(1.5), sw(2.8), sw(2.5), 0, 0, Math.PI*2); ctx.fill();
+  // --- 短裤（先画，在腿后面）---
+  // 左腿洞
+  ctx.fillStyle=skin;
+  ctx.beginPath(); ctx.ellipse(lCX1, shY+8, 14, 16, 0, 0, Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(lCX2, shY+8, 14, 16, 0, 0, Math.PI*2); ctx.fill();
   // 短裤主体
-  ctx.fillStyle=shortHex;
-  ctx.fillRect(xx(-sw(4.5)), shortTop-sw(0.5), sw(9), shortH+sw(1));
-  // 短裤侧面色块
-  ctx.fillStyle=shadeColor(shortHex,20);
-  ctx.fillRect(xx(-sw(4.5)), shortTop-sw(0.5), sw(1.5), shortH+sw(1));
-  ctx.fillRect(xx(sw(3)), shortTop-sw(0.5), sw(1.5), shortH+sw(1));
-  // 短裤底部白色边
-  ctx.fillStyle='#ffffff';
-  ctx.fillRect(xx(-sw(4.5)), shortBot, sw(9), sw(0.8));
-
-  // ---- 躯干（球衣）----
-  var torsoTop = sc(9+8+9+6);
-  var torsoBot = sc(9+8+9+6+11);
-  var torsoH = torsoBot - torsoTop;
-  var torsoW = sw(10);
-  // 球衣主体
-  ctx.fillStyle=tHex;
-  ctx.fillRect(xx(-torsoW/2), torsoTop, torsoW, torsoH);
-  // 球衣深色阴影（右侧）
-  ctx.fillStyle=shadeColor(tHex,-18);
-  ctx.fillRect(xx(torsoW/2)-sw(3), torsoTop, sw(3), torsoH);
-  // 球衣浅色（左侧）
-  ctx.fillStyle=shadeColor(tHex,12);
-  ctx.fillRect(xx(-torsoW/2), torsoTop, sw(2.5), torsoH);
-  // 领口（肤色）
-  ctx.fillStyle=skinHex;
+  ctx.fillStyle=short;
   ctx.beginPath();
-  ctx.ellipse(xx(0), torsoTop, sw(2.5), sw(1.2), 0, 0, Math.PI*2);
-  ctx.fill();
-  // 肩线
-  ctx.strokeStyle=shadeColor(tHex,-25);
-  ctx.lineWidth=sw(0.4);
-  ctx.beginPath(); ctx.moveTo(xx(-torsoW/2), torsoTop); ctx.lineTo(xx(-torsoW/2), torsoBot); ctx.stroke();
-  ctx.beginPath(); ctx.moveTo(xx(torsoW/2), torsoTop); ctx.lineTo(xx(torsoW/2), torsoBot); ctx.stroke();
+  ctx.moveTo(cx-shW/2, shY-10);
+  ctx.lineTo(cx+shW/2, shY-10);
+  ctx.lineTo(cx+shW/2+4, shY+shH);
+  ctx.lineTo(cx-shW/2-4, shY+shH);
+  ctx.closePath(); ctx.fill();
+  // 白边
+  ctx.fillStyle='#ddd';
+  ctx.fillRect(cx-shW/2-4, shY+shH-3, shW+8, 3);
 
-  // ---- 号码 ----
-  ctx.fillStyle='#ffffff';
-  ctx.font = 'bold '+sw(7)+'px Arial';
-  ctx.textAlign='center'; ctx.textBaseline='middle';
-  ctx.fillText(pNum, xx(0), torsoTop+torsoH*0.55);
-  // 号码阴影
-  ctx.fillStyle='rgba(0,0,0,0.2)';
-  ctx.fillText(pNum, xx(sw(0.4)), torsoTop+torsoH*0.55+sw(0.3));
-
-  // ---- 手臂（肤色）----
-  var armTop = torsoTop;
-  var armBot = torsoTop+sw(9);
-  var armW = sw(3);
-  // 左臂（略微张开）
-  ctx.fillStyle=skinHex;
-  // 上臂
-  ctx.fillRect(xx(-torsoW/2)-armW, armTop+sw(0.5), armW, sw(5));
-  // 前臂（向下）
-  ctx.fillRect(xx(-torsoW/2)-armW-sw(1.5), armTop+sw(5), armW, sw(5));
-  // 阴影
-  ctx.fillStyle=shadeColor(skinHex,-12);
-  ctx.fillRect(xx(-torsoW/2)-armW-sw(1.5), armTop+sw(5), armW/2, sw(5));
-  // 右臂
-  ctx.fillStyle=skinHex;
-  ctx.fillRect(xx(torsoW/2), armTop+sw(0.5), armW, sw(5));
-  ctx.fillRect(xx(torsoW/2)+sw(1.5), armTop+sw(5), armW, sw(5));
-  ctx.fillStyle=shadeColor(skinHex,-12);
-  ctx.fillRect(xx(torsoW/2)+sw(1.5), armTop+sw(5), armW/2, sw(5));
-  // 球衣袖口（球队色）
-  ctx.fillStyle=tHex;
-  ctx.fillRect(xx(-torsoW/2)-armW, armTop+sw(0.5), armW, sw(1));
-  ctx.fillRect(xx(torsoW/2), armTop+sw(0.5), armW, sw(1));
-
-  // ---- 颈部 ----
-  var neckTop = torsoTop;
-  var neckBot = torsoTop-sw(2.5);
-  ctx.fillStyle=skinHex;
-  ctx.fillRect(xx(-sw(1.8)), neckBot, sw(3.6), neckTop-neckBot);
-  // 颈部阴影
-  ctx.fillStyle=shadeColor(skinHex,-8);
-  ctx.fillRect(xx(-sw(1.8)), neckBot, sw(1.5), neckTop-neckBot);
-
-  // ---- 头部 ----
-  var headCY = torsoTop-sw(2.5)-sw(8.5);
-  var headW = sw(8), headH = sw(10);
-  var headX = xx(0), headY = headCY;
-
-  // 头发后部
-  var hSt = hInt(hash,3,0,4);
-  ctx.fillStyle=hairHex;
-  ctx.beginPath(); ctx.ellipse(headX, headY+sw(1), headW/2+sw(0.5), headH/2+sw(0.5), 0, 0, Math.PI*2); ctx.fill();
-  // 脸（肤色椭圆）
-  ctx.fillStyle=skinHex;
-  ctx.beginPath(); ctx.ellipse(headX, headY, headW/2, headH/2, 0, 0, Math.PI*2); ctx.fill();
-  // 耳朵
-  ctx.fillStyle=skinHex;
-  ctx.beginPath(); ctx.ellipse(headX-headW/2-sw(0.5), headY+sw(0.5), sw(1.2), sw(1.8), 0, 0, Math.PI*2); ctx.fill();
-  ctx.beginPath(); ctx.ellipse(headX+headW/2+sw(0.5), headY+sw(0.5), sw(1.2), sw(1.8), 0, 0, Math.PI*2); ctx.fill();
-  // 耳垂
-  ctx.fillStyle=shadeColor(skinHex,-5);
-  ctx.beginPath(); ctx.ellipse(headX-headW/2-sw(0.5), headY+sw(2), sw(1), sw(1.2), 0, 0, Math.PI*2); ctx.fill();
-  ctx.beginPath(); ctx.ellipse(headX+headW/2+sw(0.5), headY+sw(2), sw(1), sw(1.2), 0, 0, Math.PI*2); ctx.fill();
-
-  // ---- 像素面孔（Canvas 绘制）----
-  var fS=sw(7);
-  var fcvs=document.createElement('canvas'); fcvs.width=fS; fcvs.height=fS;
-  var fctx=fcvs.getContext('2d'); fctx.imageSmoothingEnabled=false;
-  fctx.fillStyle=skinHex; fctx.fillRect(0,0,fS,fS);
-
-  // 眉
-  fctx.fillStyle=hairHex;
-  var bY=fS*0.30, bT=ovr>80?3:ovr>60?2:1;
-  for(var bi=0;bi<4;bi++){
-    fctx.fillRect(fS*0.27+bi*2,bY-bi,3,bT); fctx.fillRect(fS*0.53+bi*2,bY-bi,3,bT);
-  }
-  // 眼白
-  fctx.fillStyle='#ffffff'; fctx.fillRect(fS*0.26,fS*0.38,fS*0.13,fS*0.11);
-  fctx.fillRect(fS*0.52,fS*0.38,fS*0.13,fS*0.11);
-  // 虹膜
-  var eCol=ovr>80?'#22aa44':ovr>60?'#3344cc':'#3a2a1a';
-  fctx.fillStyle=eCol;
-  var eW=Math.max(2,Math.round(fS*0.055)), eH=Math.max(2,Math.round(fS*0.07));
-  for(var dy=-eH;dy<=eH;dy++) for(var dx=-eW;dx<=eW;dx++)
-    if(dx*dx/(eW*eW)+dy*dy/(eH*eH)<=1){
-      fctx.fillRect(fS*0.28+dx*2,eYf(fS)+dy*2,2,2); fctx.fillRect(fS*0.54+dx*2,eYf(fS)+dy*2,2,2);
-    }
-  // 瞳孔
-  fctx.fillStyle='#111'; fctx.fillRect(fS*0.29,fS*0.41,fS*0.07,fS*0.07); fctx.fillRect(fS*0.55,fS*0.41,fS*0.07,fS*0.07);
-  // 高光
-  fctx.fillStyle='#fff'; fctx.fillRect(fS*0.29,fS*0.41,fS*0.03,fS*0.03); fctx.fillRect(fS*0.55,fS*0.41,fS*0.03,fS*0.03);
-  // 鼻
-  fctx.fillStyle=shadeColor(skinHex,-15);
-  fctx.fillRect(fS*0.49,fS*0.54,3,3); fctx.fillRect(fS*0.48,fS*0.57,5,2);
-  // 口
-  var expr=hInt(hash,5,0,2);
-  if(expr===0){ fctx.fillStyle=shadeColor(skinHex,-25); for(var mi=0;mi<5;mi++) fctx.fillRect(fS*0.40+mi*2,fS*0.66+Math.abs(mi-2),2,2); }
-  else if(expr===1){ fctx.fillStyle='#cc4444'; fctx.fillRect(fS*0.41,fS*0.66,5,3); fctx.fillStyle=shadeColor(skinHex,-25); for(var mi=0;mi<5;mi++) fctx.fillRect(fS*0.40+mi*2,fS*0.66-2,2,2); }
-  else { fctx.fillStyle=shadeColor(skinHex,-25); for(var mi=0;mi<5;mi++) fctx.fillRect(fS*0.40+mi*2,fS*0.66,2,2); }
-
-  // 发型覆盖
-  fctx.fillStyle=hairHex;
-  if(hSt===0){ fctx.fillRect(0,0,fS,fS*0.28); } // 平头
-  else if(hSt===1){ fctx.fillRect(0,0,fS,fS*0.22); fctx.fillRect(fS*0.15,fS*0.18,fS*0.7,fS*0.08); } // 短刘海
-  else if(hSt===2){ for(var ci=0;ci<6;ci++){fctx.beginPath();fctx.arc(fS*0.14+ci*fS*0.12,fS*0.20,fS*0.11,0,Math.PI*2);fctx.fill();} } // 卷发
-  else if(hSt===3){ fctx.fillStyle=shadeColor(skinHex,12); fctx.fillRect(fS*0.33,fS*0.04,fS*0.34,3); } // 光头+高光
-  else { // 长发/莫西干
-    fctx.fillRect(0,fS*0.18,fS*0.14,fS*0.10); fctx.fillRect(fS*0.86,fS*0.18,fS*0.14,fS*0.10);
-    fctx.fillRect(fS*0.25,0,fS*0.5,fS*0.26); fctx.fillRect(fS*0.35,fS*0.24,fS*0.30,fS*0.12);
-    // 两侧长发
-    fctx.fillRect(fS*0.10,fS*0.22,fS*0.10,fS*0.45); fctx.fillRect(fS*0.80,fS*0.22,fS*0.10,fS*0.45);
-  }
-
-  function eYf(fs){return fs*0.40;}
-
-  // 把面孔贴到头部
-  ctx.drawImage(fcvs, headX-fS/2, headY-fS/2, fS, fS);
-
-  // ---- 阴影 ----
-  // 头部阴影
+  // --- 左腿（肤色）---
+  ctx.fillStyle=skin;
+  ctx.fillRect(lCX1-lW/2, shY+10, lW, lH-10);
   ctx.fillStyle='rgba(0,0,0,0.08)';
-  ctx.beginPath(); ctx.ellipse(headX, headY+headH/2-sw(0.5), headW/2-sw(1), sw(1.5), 0, 0, Math.PI*2); ctx.fill();
-  // 身体阴影
-  ctx.fillStyle='rgba(0,0,0,0.05)';
-  ctx.fillRect(xx(-torsoW/2)+sw(1), torsoTop+sw(1), torsoW-sw(2), torsoH-sw(2));
+  ctx.fillRect(lCX1-lW/2, shY+10, lW/3, lH-10);  // 阴影
 
-  // ---- Three.js 纹理显示 ----
-  var tex = new THREE.CanvasTexture(cvs);
-  tex.minFilter = THREE.LinearFilter;
-  tex.magFilter = THREE.LinearFilter;
-  var mat = new THREE.MeshBasicMaterial({map:tex, transparent:true, depthWrite:false, side:THREE.DoubleSide});
-  var plane = new THREE.Mesh(new THREE.PlaneGeometry(2, 2*640/200), mat);
-  plane.position.z = 0.5;
-  scene.add(plane);
+  // --- 右腿（肤色）---
+  ctx.fillStyle=skin;
+  ctx.fillRect(lCX2-lW/2, shY+10, lW, lH-10);
+  ctx.fillStyle='rgba(0,0,0,0.08)';
+  ctx.fillRect(lCX2-lW/2, shY+10, lW/3, lH-10);
 
-  function animate(){ window._reqAF=requestAnimationFrame(animate); renderer.render(scene,camera); }
-  animate();
-  voxelScenes[containerId]={renderer:renderer, scene:scene};
-  console.log('[SVG Player] Done');
+  // --- 左袜子（白+球队色）---
+  ctx.fillStyle='#f8f8f8';
+  ctx.fillRect(lCX1-skW/2, skY, skW, skH);
+  // 竖条纹
+  ctx.fillStyle=kit;
+  ctx.fillRect(lCX1-skW/2+2, skY+4, skW/3-1, skH-8);
+  ctx.fillRect(lCX1+skW/6, skY+4, skW/3-1, skH-8);
+  ctx.fillRect(lCX1+skW/2-skW/3+1, skY+4, skW/3-1, skH-8);
+
+  // --- 右袜子---
+  ctx.fillStyle='#f8f8f8';
+  ctx.fillRect(lCX2-skW/2, skY, skW, skH);
+  ctx.fillStyle=kit;
+  ctx.fillRect(lCX2-skW/2+2, skY+4, skW/3-1, skH-8);
+  ctx.fillRect(lCX2+skW/6, skY+4, skW/3-1, skH-8);
+  ctx.fillRect(lCX2+skW/2-skW/3+1, skY+4, skW/3-1, skH-8);
+
+  // --- 左鞋（黑）---
+  ctx.fillStyle='#222';
+  ctx.beginPath(); ctx.ellipse(lCX1+1, sY+sH/2, sW/2+2, sH/2, 0, 0, Math.PI*2); ctx.fill();
+  ctx.fillStyle='#444';
+  ctx.fillRect(lCX1-sW/2+2, sY, sW-4, sH/2+1);  // 鞋面
+  ctx.fillStyle='#1a1a1a';
+  ctx.beginPath(); ctx.ellipse(lCX1+1, sY+sH/2, sW/2, sH/2, 0, 0, Math.PI*2); ctx.fill();
+
+  // --- 右鞋---
+  ctx.fillStyle='#222';
+  ctx.beginPath(); ctx.ellipse(lCX2+1, sY+sH/2, sW/2+2, sH/2, 0, 0, Math.PI*2); ctx.fill();
+  ctx.fillStyle='#444';
+  ctx.fillRect(lCX2-sW/2+2, sY, sW-4, sH/2+1);
+  ctx.fillStyle='#1a1a1a';
+  ctx.beginPath(); ctx.ellipse(lCX2+1, sY+sH/2, sW/2, sH/2, 0, 0, Math.PI*2); ctx.fill();
+
+  // ===================== 上身 =====================
+
+  // --- 躯干（球衣）---
+  // 底色
+  ctx.fillStyle=kit;
+  ctx.fillRect(tX-tW/2, tY, tW, tH);
+  // 右侧阴影
+  ctx.fillStyle=kitD;
+  ctx.fillRect(tX+tW/2-16, tY, 16, tH);
+  // 左侧高光
+  ctx.fillStyle=kitL;
+  ctx.fillRect(tX-tW/2, tY, 12, tH);
+  // 肩线
+  ctx.strokeStyle=kitD; ctx.lineWidth=1.5;
+  ctx.beginPath(); ctx.moveTo(tX-tW/2, tY); ctx.lineTo(tX+tW/2, tY); ctx.stroke();
+
+  // --- 领口（肤色）---
+  ctx.fillStyle=skin;
+  ctx.beginPath();
+  ctx.ellipse(cx, tY+2, 16, 10, 0, 0, Math.PI*2); ctx.fill();
+  // 领口内阴影
+  ctx.fillStyle='rgba(0,0,0,0.1)';
+  ctx.beginPath();
+  ctx.ellipse(cx, tY+4, 10, 6, 0, 0, Math.PI); ctx.fill();
+
+  // --- 袖子（接在躯干两侧）---
+  var armY=tY+6, armH=42, armW=18;
+  // 左臂
+  ctx.fillStyle=kit;
+  ctx.fillRect(tX-tW/2-armW, armY, armW, armH-10);
+  ctx.fillStyle=skin;
+  ctx.fillRect(tX-tW/2-armW+2, armY+armH-10, armW-4, 12);  // 手
+  // 阴影
+  ctx.fillStyle=kitD;
+  ctx.fillRect(tX-tW/2-armW, armY, 6, armH-10);
+  // 右臂
+  ctx.fillStyle=kit;
+  ctx.fillRect(tX+tW/2, armY, armW, armH-10);
+  ctx.fillStyle=skin;
+  ctx.fillRect(tX+tW/2+2, armY+armH-10, armW-4, 12);
+  ctx.fillStyle=kitD;
+  ctx.fillRect(tX+tW/2+armW-6, armY, 6, armH-10);
+
+  // --- 短裤腰部（在躯干下方）---
+  // 躯干下缘接短裤
+  ctx.fillStyle=short;
+  ctx.fillRect(cx-shW/2+2, shY-12, shW-4, 14);
+  ctx.fillStyle=kit;
+  ctx.fillRect(cx-shW/2+2, shY-12, shW-4, 4);  // 球队色腰带
+
+  // --- 号码 ---
+  ctx.fillStyle='rgba(0,0,0,0.18)';
+  ctx.font='bold 36px Arial'; ctx.textAlign='center'; ctx.textBaseline='middle';
+  ctx.fillText(pNum, cx+1.5, tY+tH*0.52+1.5);
+  ctx.fillStyle='#fff';
+  ctx.fillText(pNum, cx, tY+tH*0.52);
+
+  // --- 颈部 ---
+  ctx.fillStyle=skin;
+  ctx.fillRect(cx-nW/2, nY, nW, nH);
+  ctx.fillStyle='rgba(0,0,0,0.06)';
+  ctx.fillRect(cx-nW/2, nY, nW/3, nH);
+
+  // ===================== 头部 =====================
+
+  // --- 头发（底层，在脸后面）---
+  ctx.fillStyle=hair;
+  ctx.beginPath(); ctx.arc(hX, hY, hR+5, Math.PI, 0); ctx.fill();  // 头顶
+  // 两侧头发下垂
+  ctx.fillRect(hX-hR-2, hY-5, 8, hR+8);
+  ctx.fillRect(hX+hR-6, hY-5, 8, hR+8);
+
+  // --- 耳朵 ---
+  ctx.fillStyle=skin;
+  ctx.beginPath(); ctx.ellipse(hX-hR-4, hY+4, 6, 9, 0, 0, Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(hX+hR-2, hY+4, 6, 9, 0, 0, Math.PI*2); ctx.fill();
+
+  // --- 脸（肤色椭圆）---
+  ctx.fillStyle=skin;
+  ctx.beginPath(); ctx.ellipse(hX, hY, hR, hR+4, 0, 0, Math.PI*2); ctx.fill();
+  // 脸侧阴影
+  ctx.fillStyle='rgba(0,0,0,0.07)';
+  ctx.beginPath(); ctx.ellipse(hX-hR/2, hY+2, hR/2+2, hR+2, 0, 0, Math.PI*2); ctx.fill();
+
+  // --- 眉毛 ---
+  ctx.fillStyle=hair;
+  ctx.fillRect(hX-18, hY-16, 14, 3);
+  ctx.fillRect(hX+4, hY-16, 14, 3);
+
+  // --- 眼睛 ---
+  // 眼白
+  ctx.fillStyle='#fff';
+  ctx.beginPath(); ctx.ellipse(hX-11, hY-4, 9, 7, 0, 0, Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(hX+11, hY-4, 9, 7, 0, 0, Math.PI*2); ctx.fill();
+  // 虹膜
+  var eyeC = ovr>80?'#22aa44':ovr>60?'#2244cc':'#3a2a1a';
+  ctx.fillStyle=eyeC;
+  ctx.beginPath(); ctx.arc(hX-11, hY-3, 5, 0, Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.arc(hX+11, hY-3, 5, 0, Math.PI*2); ctx.fill();
+  // 瞳孔
+  ctx.fillStyle='#111';
+  ctx.beginPath(); ctx.arc(hX-11, hY-3, 2.5, 0, Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.arc(hX+11, hY-3, 2.5, 0, Math.PI*2); ctx.fill();
+  // 高光
+  ctx.fillStyle='rgba(255,255,255,0.9)';
+  ctx.beginPath(); ctx.arc(hX-13, hY-5, 2, 0, Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.arc(hX+9, hY-5, 2, 0, Math.PI*2); ctx.fill();
+
+  // --- 鼻子 ---
+  ctx.fillStyle='rgba(0,0,0,0.12)';
+  ctx.beginPath(); ctx.arc(hX, hY+12, 4, 0, Math.PI*2); ctx.fill();
+  ctx.fillRect(hX-2, hY+8, 4, 6);
+
+  // --- 嘴巴 ---
+  var expr=hInt(hash,5,0,2);
+  if(expr===0){  // 微笑
+    ctx.strokeStyle='rgba(0,0,0,0.25)'; ctx.lineWidth=2; ctx.lineCap='round';
+    ctx.beginPath(); ctx.arc(hX, hY+20, 9, 0.15, Math.PI-0.15); ctx.stroke();
+  } else if(expr===1){  // 张嘴
+    ctx.fillStyle='#cc4444';
+    ctx.beginPath(); ctx.ellipse(hX, hY+22, 8, 5, 0, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle='rgba(0,0,0,0.15)';
+    ctx.beginPath(); ctx.ellipse(hX, hY+20, 8, 3, 0, 0, Math.PI); ctx.fill();
+  } else {  // 闭嘴
+    ctx.fillStyle='rgba(0,0,0,0.2)';
+    ctx.fillRect(hX-8, hY+21, 16, 2.5);
+  }
+
+  // --- 发型覆盖（刘海等）---
+  var hSt=hInt(hash,3,0,4);
+  ctx.fillStyle=hair;
+  if(hSt===0){  // 平头
+    ctx.beginPath(); ctx.ellipse(hX, hY-hR*0.6, hR+3, hR*0.7, 0, Math.PI, 0); ctx.fill();
+  } else if(hSt===1){  // 刘海
+    ctx.beginPath(); ctx.ellipse(hX, hY-hR*0.5, hR+3, hR*0.65, 0, Math.PI, 0); ctx.fill();
+    ctx.fillRect(hX-hR, hY-hR*0.5, hR*2, 8);
+    ctx.fillRect(hX-hR+2, hY-hR*0.3, hR*0.5, 10);  // 侧刘海
+    ctx.fillRect(hX+hR*0.5-2, hY-hR*0.3, hR*0.5, 10);
+  } else if(hSt===2){  // 卷发
+    ctx.beginPath(); ctx.ellipse(hX, hY-hR*0.4, hR+5, hR*0.7, 0, Math.PI, 0); ctx.fill();
+    for(var ci=0;ci<6;ci++) ctx.beginPath();
+  } else if(hSt===3){  // 光头（只留发际线）
+    ctx.fillStyle=hair;
+    ctx.beginPath(); ctx.ellipse(hX, hY-hR*0.7, hR+2, hR*0.4, 0, Math.PI, 0); ctx.fill();
+    ctx.fillRect(hX-hR+2, hY-hR*0.4, 4, 8);
+    ctx.fillRect(hX+hR-6, hY-hR*0.4, 4, 8);
+  } else {  // 莫西干/长发
+    ctx.beginPath(); ctx.ellipse(hX, hY-hR*0.3, hR+4, hR*0.8, 0, Math.PI, 0); ctx.fill();
+    ctx.fillRect(hX-hR, hY-hR*0.2, hR*0.5, hR+10);
+    ctx.fillRect(hX+hR*0.5, hY-hR*0.2, hR*0.5, hR+10);
+    ctx.fillRect(hX-hR*0.3, hY-hR*0.6, hR*0.6, hR*0.8);
+  }
+
+  // ===================== 背景 =====================
+  // 球队色背景框
+  var grd=ctx.createLinearGradient(0,0,0,H2);
+  grd.addColorStop(0, `rgba(${kitR},${kitG},${kitB},0.08)`);
+  grd.addColorStop(1, `rgba(${kitR},${kitG},${kitB},0.02)`);
+  ctx.fillStyle=grd;
+  ctx.fillRect(0,0,W2,H2);
+
+  // 名字
+  ctx.fillStyle='rgba(0,0,0,0.45)';
+  ctx.font='bold 10px Arial'; ctx.textAlign='center'; ctx.textBaseline='bottom';
+  ctx.fillText(player.name||'', cx, H2-2);
+  // 能力值
+  ctx.fillStyle=ovr>80?'#ffd700':ovr>60?'#fff':'#aaa';
+  ctx.font='bold 11px Arial'; ctx.textAlign='right';
+  ctx.fillText(ovr, cx+28, H2-2);
+
+  // ===================== 放入容器 =====================
+  container.style.position='relative';
+  container.style.width=W2+'px';
+  container.style.height=H2+'px';
+  cv.style.position='absolute'; cv.style.top='0'; cv.style.left='0';
+  container.appendChild(cv);
+
+  // 也存一份给后续可能需要 Three.js 的地方
+  voxelScenes[containerId]={renderer:null, canvas:cv};
 }
 // ---- 3D Player Body SVG (fallback) ----
 function getPlayerBody(player) {
