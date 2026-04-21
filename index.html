@@ -1091,279 +1091,95 @@ function _drawHair(ctx, W, H, hairIdx, hairColor, skin, faceWFactor, hash) {
 // 扁平卡通球员 v2 - 清晰专业，直接 Canvas 2D 绘制
 // ================================================================
 // ================================================================
-// 扁平卡通球员 - 与 generatePixelAvatar 颜色/特征完全同步
-// 共享 skinMap、hairPalettes、eyeCol 逻辑
+// Kenney Sports Pack 球员渲染 (CC0 授权)
+// 使用像素精灵图替代手绘 Canvas
 // ================================================================
 function initVoxelPlayer(player, containerId) {
   var container = document.getElementById(containerId);
   if(!container) return;
   container.innerHTML = '';
 
-  // ---- 与 generatePixelAvatar 完全一致的随机种子 ----
-  var seed = 0;
-  var nm = player.name || '';
-  for(var si2=0; si2<nm.length; si2++) seed = (seed * 31 + nm.charCodeAt(si2)) >>> 0;
-  function rng() { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 0xFFFFFFFF; }
-  function ri(min, max) { return Math.floor(rng() * (max - min + 1)) + min; }
-  function pick(arr) { return arr[Math.floor(rng() * arr.length)]; }
-
-  // ---- 肤色（按国籍，完全复用 generatePixelAvatar 的 skinMap）----
-  var skinMap = {
-    England:()=>pick(['#F2D8B8','#EAC8A0','#F0D0A8']),
-    Germany:()=>pick(['#F0D8B8','#ECD0A4']),
-    Spain:()=>pick(['#D8A878','#C8906C']),
-    France:()=>pick(['#D8A870','#C48860']),
-    Brazil:()=>pick(['#B87040','#A06030']),
-    Argentina:()=>pick(['#D4A078','#C49068']),
-    Italy:()=>pick(['#D8B088','#C8A070']),
-    Nigeria:()=>pick(['#5C2C0C','#4A2008']),
-    Japan:()=>pick(['#E8D0A8','#D8C098']),
-    Korea:()=>pick(['#E4CC9A','#D4BC88']),
-    China:()=>pick(['#E0C8A0','#D0B888']),
-    USA:()=>pick(['#D0A078','#C09070']),
-  };
-  function adj(hex, amt) {
-    var n=parseInt(hex.slice(1),16);
-    var r=Math.min(255,Math.max(0,((n>>16)&0xff)+amt));
-    var g=Math.min(255,Math.max(0,((n>>8)&0xff)+amt));
-    var b=Math.min(255,Math.max(0,(n&0xff)+amt));
-    return '#'+[r,g,b].map(function(v){return v.toString(16).padStart(2,'0');}).join('');
-  }
-  var nat = player.nationality || player.nation || 'England';
-  var skinBase = (skinMap[nat] || skinMap.England)();
-  var skinHi=adj(skinBase,22), skinShd=adj(skinBase,-22), skinDk=adj(skinBase,-40), skinDK2=adj(skinBase,-58);
-
-  // ---- 发色（完全复用 generatePixelAvatar 的 hairPalettes）----
-  var hairPalettes=[
-    ['#100804','#281408','#3C2010'],
-    ['#281008','#4A2C14','#6A4020'],
-    ['#4A2C10','#6A4820','#8A6430'],
-    ['#6A4018','#907028','#B09040'],
-    ['#9A7830','#C8A050','#E0C070'],
-    ['#501408','#7A2818','#A04020'],
-    ['#3C3C3C','#606060','#888888'],
-  ];
-  var hairIdx = ri(0, hairPalettes.length-1);
-  var hairDrk=hairPalettes[hairIdx][0], hairMid=hairPalettes[hairIdx][1], hairLit=hairPalettes[hairIdx][2];
-  var hair = hairDrk;
-
-  // ---- 眼睛颜色（完全复用 generatePixelAvatar 的 eyeCol）----
-  var eyeCol=pick(['#2A4C8C','#1E5420','#6A3418','#404040','#3A6A8C','#8A5A18']);
-
-  // ---- 发型风格（与 avatar 一致：0-6 共7种）----
-  var hSt = ri(0, 6);
-  // 表情
-  var expr = ri(0, 2);
-
   // ---- 球员属性 ----
   var ovr = player.ovr || 70, isMy = !!player.isMy;
   var pNum = player.num || 10;
-  var kitR=isMy?220:17, kitG=isMy?34:51, kitB=isMy?51:187;
-  var kit='rgb('+kitR+','+kitG+','+kitB+')';
-  var kitD='rgb('+(kitR*0.7|0)+','+(kitG*0.7|0)+','+(kitB*0.7|0)+')';
-  var kitL='rgb('+Math.min(255,kitR*1.2|0)+','+Math.min(255,kitG*1.2|0)+','+Math.min(255,kitB*1.2|0)+')';
-  var short='#111122';
-  var jc=pick(['#CC1111','#1133BB','#118811','#CC8800','#881188','#008899','#CC4400']);
-  var jl=pick(['#EE3333','#2255DD','#22AA22','#EECC00','#AA22AA','#00AACC','#EE6600']);
+  var nm = player.name || 'Player';
 
-  // ---- Canvas ----
-  var W2=200, H2=320;
-  var cv=document.createElement('canvas'); cv.width=W2; cv.height=H2;
-  var pc=cv.getContext('2d'); pc.imageSmoothingEnabled=true;
-  pc.clearRect(0,0,W2,H2);
-  var cx=W2/2;
+  // ---- 颜色映射：主队 Red，客队 Blue ----
+  // Kenney 有 5 种颜色：Blue, Green, Red, White, Special
+  var colorFolder = isMy ? 'Red' : 'Blue';
+  
+  // ---- 随机帧数（1-10 站立/行走，11-14 头部特写）----
+  var seed = 0;
+  for(var si2=0; si2<nm.length; si2++) seed = (seed * 31 + nm.charCodeAt(si2)) >>> 0;
+  function rng() { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 0xFFFFFFFF; }
+  var frameNum = Math.floor(rng() * 10) + 1; // 1-10（站立/行走动画）
 
-  var hR=28, hX=cx, hY=52;
-  var nW=12, nH=12, nY=hY+hR;
-  var tW=68, tH=60, tX=cx, tY=nY+nH;
-  var shW=62, shH=28, shY=tY+tH-4;
-  var lCX1=84, lCX2=116, lW=24, lH=52;
-  var skY=190, skH=46, skW=26;
-  var sY=250, sW=30, sH=16;
+  // ---- Canvas 绘制 ----
+  var W2 = 200, H2 = 280;
+  var cv = document.createElement('canvas'); 
+  cv.width = W2; 
+  cv.height = H2;
+  var ctx = cv.getContext('2d');
+  ctx.imageSmoothingEnabled = false; // 像素风格
 
-  // ---- 肩膀 ----
-  for(var cy2=0;cy2<8;cy2++){
-    var x0=Math.max(4,20-cy2);
-    var x1=Math.min(60,44+cy2);
-    pc.fillStyle=cy2<4?jl:jc;
-    pc.fillRect(x0*4|0,(tY-28+cy2*4),((x1-x0)*4)|0,4);
-  }
+  // ---- 背景渐变 ----
+  var kitR = isMy ? 220 : 17;
+  var kitG = isMy ? 34 : 51;
+  var kitB = isMy ? 51 : 187;
+  var grd = ctx.createLinearGradient(0, 0, 0, H2);
+  grd.addColorStop(0, 'rgba(' + kitR + ',' + kitG + ',' + kitB + ', 0.12)');
+  grd.addColorStop(1, 'rgba(' + kitR + ',' + kitG + ',' + kitB + ', 0.03)');
+  ctx.fillStyle = grd;
+  ctx.fillRect(0, 0, W2, H2);
 
-  // ---- 短裤（腿洞）----
-  pc.fillStyle=skinBase;
-  pc.beginPath(); pc.ellipse(lCX1,shY+8,14,16,0,0,Math.PI*2); pc.fill();
-  pc.beginPath(); pc.ellipse(lCX2,shY+8,14,16,0,0,Math.PI*2); pc.fill();
-  pc.fillStyle=short;
-  pc.beginPath();
-  pc.moveTo(cx-shW/2,shY-10); pc.lineTo(cx+shW/2,shY-10);
-  pc.lineTo(cx+shW/2+4,shY+shH); pc.lineTo(cx-shW/2-4,shY+shH);
-  pc.closePath(); pc.fill();
-  pc.fillStyle='#ddd'; pc.fillRect(cx-shW/2-4,shY+shH-3,shW+8,3);
+  // ---- 加载精灵图（单独 PNG 文件）----
+  var img = new Image();
+  img.onload = function() {
+    // Kenney 角色 21x31 像素，放大显示
+    var scale = 5;
+    var sw = 21, sh = 31;
+    var dw = sw * scale, dh = sh * scale;
+    var dx = (W2 - dw) / 2;
+    var dy = (H2 - dh) / 2 - 20;
 
-  // ---- 双腿 ----
-  pc.fillStyle=skinBase;
-  pc.fillRect(lCX1-lW/2,shY+10,lW,lH-10); pc.fillRect(lCX2-lW/2,shY+10,lW,lH-10);
-  pc.fillStyle=skinShd;
-  pc.fillRect(lCX1-lW/2,shY+10,lW/3,lH-10); pc.fillRect(lCX2-lW/2,shY+10,lW/3,lH-10);
+    // 直接绘制完整图像
+    ctx.drawImage(img, 0, 0, sw, sh, dx, dy, dw, dh);
 
-  // ---- 袜子 ----
-  pc.fillStyle='#f8f8f8';
-  pc.fillRect(lCX1-skW/2,skY,skW,skH); pc.fillRect(lCX2-skW/2,skY,skW,skH);
-  pc.fillStyle=kit;
-  pc.fillRect(lCX1-skW/2+2,skY+4,skW/3-1,skH-8); pc.fillRect(lCX1+skW/6,skY+4,skW/3-1,skH-8);
-  pc.fillRect(lCX2-skW/2+2,skY+4,skW/3-1,skH-8); pc.fillRect(lCX2+skW/6,skY+4,skW/3-1,skH-8);
+    // ---- 球员名字 ----
+    ctx.fillStyle = 'rgba(0,0,0,0.6)';
+    ctx.font = 'bold 12px Arial';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'bottom';
+    ctx.fillText(nm, W2/2, H2 - 8);
 
-  // ---- 球鞋 ----
-  pc.fillStyle='#1a1a1a';
-  pc.beginPath(); pc.ellipse(lCX1,sY+sH/2,sW/2+2,sH/2,0,0,Math.PI*2); pc.fill();
-  pc.beginPath(); pc.ellipse(lCX2,sY+sH/2,sW/2+2,sH/2,0,0,Math.PI*2); pc.fill();
-  pc.fillStyle='#333';
-  pc.fillRect(lCX1-sW/2+2,sY,sW-4,sH/2+1); pc.fillRect(lCX2-sW/2+2,sY,sW-4,sH/2+1);
-  pc.fillStyle='#1a1a1a';
-  pc.beginPath(); pc.ellipse(lCX1,sY+sH/2,sW/2,sH/2,0,0,Math.PI*2); pc.fill();
-  pc.beginPath(); pc.ellipse(lCX2,sY+sH/2,sW/2,sH/2,0,0,Math.PI*2); pc.fill();
+    // ---- OVR 评分 ----
+    ctx.fillStyle = ovr > 80 ? '#ffd700' : ovr > 60 ? '#fff' : '#aaa';
+    ctx.font = 'bold 14px Arial';
+    ctx.textAlign = 'right';
+    ctx.fillText(ovr, W2 - 8, H2 - 8);
 
-  // ---- 躯干 ----
-  pc.fillStyle=kit; pc.fillRect(tX-tW/2,tY,tW,tH);
-  pc.fillStyle=kitD; pc.fillRect(tX+tW/2-14,tY,14,tH);
-  pc.fillStyle=kitL; pc.fillRect(tX-tW/2,tY,10,tH);
-  pc.strokeStyle=kitD; pc.lineWidth=1.5;
-  pc.beginPath(); pc.moveTo(tX-tW/2,tY); pc.lineTo(tX+tW/2,tY); pc.stroke();
+    // ---- 号码（叠加在球衣上）----
+    ctx.fillStyle = 'rgba(255,255,255,0.9)';
+    ctx.font = 'bold 16px Arial';
+    ctx.textAlign = 'center';
+    ctx.fillText(pNum, W2/2, dy + dh * 0.55);
+  };
+  
+  // 使用单独 PNG（文件名有空格，需编码）
+  var pngFile = 'character' + colorFolder + ' (' + frameNum + ').png';
+  img.src = 'assets/kenney/' + colorFolder + '/' + encodeURIComponent(pngFile);
 
-  // ---- 领口 ----
-  pc.fillStyle=skinBase;
-  pc.beginPath(); pc.ellipse(cx,tY+2,16,10,0,0,Math.PI*2); pc.fill();
-  pc.fillStyle='rgba(0,0,0,0.1)';
-  pc.beginPath(); pc.ellipse(cx,tY+4,10,6,0,0,Math.PI); pc.fill();
-
-  // ---- 袖子 ----
-  var armY=tY+6, armH=38, armW=16;
-  pc.fillStyle=kit;
-  pc.fillRect(tX-tW/2-armW,armY,armW,armH-10); pc.fillRect(tX+tW/2,armY,armW,armH-10);
-  pc.fillStyle=skinBase;
-  pc.fillRect(tX-tW/2-armW+2,armY+armH-10,armW-4,12);
-  pc.fillRect(tX+tW/2+2,armY+armH-10,armW-4,12);
-  pc.fillStyle=kitD;
-  pc.fillRect(tX-tW/2-armW,armY,5,armH-10); pc.fillRect(tX+tW/2+armW-5,armY,5,armH-10);
-
-  // ---- 短裤腰 ----
-  pc.fillStyle=short; pc.fillRect(cx-shW/2+2,shY-10,shW-4,12);
-  pc.fillStyle=kit; pc.fillRect(cx-shW/2+2,shY-10,shW-4,4);
-
-  // ---- 号码 ----
-  pc.fillStyle='rgba(0,0,0,0.18)'; pc.font='bold 34px Arial'; pc.textAlign='center'; pc.textBaseline='middle';
-  pc.fillText(pNum,cx+1.5,tY+tH*0.52+1.5);
-  pc.fillStyle='#fff'; pc.fillText(pNum,cx,tY+tH*0.52);
-
-  // ---- 颈部 ----
-  pc.fillStyle=skinBase; pc.fillRect(cx-nW/2,nY,nW,nH);
-  pc.fillStyle=skinShd; pc.fillRect(cx-nW/2,nY,nW/3,nH);
-
-  // ==================== 头部 ====================
-
-  // 头发底
-  pc.fillStyle=hair;
-  pc.beginPath(); pc.arc(hX,hY,hR+5,Math.PI,0); pc.fill();
-  pc.fillRect(hX-hR-3,hY-4,8,hR+10); pc.fillRect(hX+hR-5,hY-4,8,hR+10);
-
-  // 耳朵
-  pc.fillStyle=skinBase;
-  pc.beginPath(); pc.ellipse(hX-hR-4,hY+4,6,9,0,0,Math.PI*2); pc.fill();
-  pc.beginPath(); pc.ellipse(hX+hR-2,hY+4,6,9,0,0,Math.PI*2); pc.fill();
-
-  // 脸
-  pc.fillStyle=skinBase;
-  pc.beginPath(); pc.ellipse(hX,hY,hR,hR+4,0,0,Math.PI*2); pc.fill();
-  pc.fillStyle='rgba(0,0,0,0.07)';
-  pc.beginPath(); pc.ellipse(hX-hR/2,hY+2,hR/2+2,hR+2,0,0,Math.PI*2); pc.fill();
-
-  // 眉毛
-  pc.fillStyle=hair;
-  pc.fillRect(hX-18,hY-16,14,3); pc.fillRect(hX+4,hY-16,14,3);
-
-  // 眼睛
-  pc.fillStyle='#fff';
-  pc.beginPath(); pc.ellipse(hX-11,hY-4,9,7,0,0,Math.PI*2); pc.fill();
-  pc.beginPath(); pc.ellipse(hX+11,hY-4,9,7,0,0,Math.PI*2); pc.fill();
-  pc.fillStyle=eyeCol;
-  pc.beginPath(); pc.arc(hX-11,hY-3,5,0,Math.PI*2); pc.fill();
-  pc.beginPath(); pc.arc(hX+11,hY-3,5,0,Math.PI*2); pc.fill();
-  pc.fillStyle='#111';
-  pc.beginPath(); pc.arc(hX-11,hY-3,2.5,0,Math.PI*2); pc.fill();
-  pc.beginPath(); pc.arc(hX+11,hY-3,2.5,0,Math.PI*2); pc.fill();
-  pc.fillStyle='rgba(255,255,255,0.9)';
-  pc.beginPath(); pc.arc(hX-13,hY-5,2,0,Math.PI*2); pc.fill();
-  pc.beginPath(); pc.arc(hX+9,hY-5,2,0,Math.PI*2); pc.fill();
-
-  // 鼻子
-  pc.fillStyle=skinShd;
-  pc.beginPath(); pc.arc(hX,hY+12,4,0,Math.PI*2); pc.fill();
-  pc.fillRect(hX-2,hY+8,4,6);
-
-  // 嘴巴
-  if(expr===0){
-    pc.strokeStyle='rgba(0,0,0,0.25)'; pc.lineWidth=2; pc.lineCap='round';
-    pc.beginPath(); pc.arc(hX,hY+20,9,0.15,Math.PI-0.15); pc.stroke();
-  } else if(expr===1){
-    pc.fillStyle='#cc4444';
-    pc.beginPath(); pc.ellipse(hX,hY+22,8,5,0,0,Math.PI*2); pc.fill();
-    pc.fillStyle='rgba(0,0,0,0.15)';
-    pc.beginPath(); pc.ellipse(hX,hY+20,8,3,0,0,Math.PI); pc.fill();
-  } else {
-    pc.fillStyle='rgba(0,0,0,0.2)'; pc.fillRect(hX-8,hY+21,16,2.5);
-  }
-
-  // 发型（7种，与 avatar 对应）
-  pc.fillStyle=hair;
-  if(hSt===0){
-    pc.beginPath(); pc.ellipse(hX,hY-hR*0.6,hR+3,hR*0.65,0,Math.PI,0); pc.fill();
-  } else if(hSt===1){
-    pc.beginPath(); pc.ellipse(hX,hY-hR*0.5,hR+3,hR*0.62,0,Math.PI,0); pc.fill();
-    pc.fillRect(hX-hR,hY-hR*0.5,hR*2,9);
-    pc.fillRect(hX-hR+2,hY-hR*0.3,hR*0.5,12);
-    pc.fillRect(hX+hR*0.5-2,hY-hR*0.3,hR*0.5,12);
-  } else if(hSt===2){
-    pc.beginPath(); pc.ellipse(hX,hY-hR*0.3,hR+6,hR*0.72,0,Math.PI,0); pc.fill();
-    for(var ci=0;ci<8;ci++){
-      pc.beginPath(); pc.arc(hX+(ci-3.5)*8,hY-hR*0.4-rng()*8,5+rng()*4,0,Math.PI*2); pc.fill();
-    }
-  } else if(hSt===3){
-    pc.beginPath(); pc.ellipse(hX,hY-hR*0.7,hR+2,hR*0.38,0,Math.PI,0); pc.fill();
-    pc.fillRect(hX-hR+2,hY-hR*0.4,4,10); pc.fillRect(hX+hR-6,hY-hR*0.4,4,10);
-  } else if(hSt===4){
-    pc.beginPath(); pc.ellipse(hX,hY-hR*0.55,hR+4,hR*0.68,0,Math.PI,0); pc.fill();
-    pc.strokeStyle=hairMid; pc.lineWidth=1.5;
-    pc.beginPath(); pc.moveTo(cx+3,hY-hR*0.6); pc.lineTo(cx-5,hY+5); pc.stroke();
-  } else if(hSt===5){
-    pc.beginPath(); pc.ellipse(hX,hY-hR*0.58,hR+2,hR*0.62,0,Math.PI,0); pc.fill();
-    pc.fillRect(hX-hR+4,hY-hR*0.58,hR*2-8,6);
-  } else {
-    pc.beginPath(); pc.ellipse(hX,hY-hR*0.3,hR+4,hR*0.78,0,Math.PI,0); pc.fill();
-    pc.fillRect(hX-hR,hY-hR*0.1,hR*0.5,hR+14);
-    pc.fillRect(hX+hR*0.5,hY-hR*0.1,hR*0.5,hR+14);
-    pc.fillRect(hX-hR*0.3,hY-hR*0.7,hR*0.6,hR*0.9);
-  }
-
-  // 背景
-  var grd=pc.createLinearGradient(0,0,0,H2);
-  grd.addColorStop(0,'rgba('+kitR+','+kitG+','+kitB+',0.08)');
-  grd.addColorStop(1,'rgba('+kitR+','+kitG+','+kitB+',0.02)');
-  pc.fillStyle=grd; pc.fillRect(0,0,W2,H2);
-
-  // 名字 + 能力值
-  pc.fillStyle='rgba(0,0,0,0.45)';
-  pc.font='bold 10px Arial'; pc.textAlign='center'; pc.textBaseline='bottom';
-  pc.fillText(nm,cx,H2-2);
-  pc.fillStyle=ovr>80?'#ffd700':ovr>60?'#fff':'#aaa';
-  pc.font='bold 11px Arial'; pc.textAlign='right';
-  pc.fillText(ovr,cx+28,H2-2);
-
-  // 放入容器
-  container.style.position='relative';
-  container.style.width=W2+'px'; container.style.height=H2+'px';
-  cv.style.position='absolute'; cv.style.top='0'; cv.style.left='0';
+  // ---- 放入容器 ----
+  container.style.position = 'relative';
+  container.style.width = W2 + 'px';
+  container.style.height = H2 + 'px';
+  cv.style.position = 'absolute';
+  cv.style.top = '0';
+  cv.style.left = '0';
   container.appendChild(cv);
-  voxelScenes[containerId]={renderer:null, canvas:cv};
+  
+  if(!window.voxelScenes) window.voxelScenes = {};
+  voxelScenes[containerId] = { renderer: null, canvas: cv };
 }
 
 // ---- 3D Player Body SVG (fallback) ----
