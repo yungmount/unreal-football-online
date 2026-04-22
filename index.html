@@ -702,8 +702,6 @@ function generatePixelAvatar(player) {
   return canvas.toDataURL('image/png');
 }
 
-// ---- 3D Voxel Player (Three.js Minecraft style) ----
-let voxelScenes = {};
 function getVoxelPlayer(player, containerId) {
   return `<div id="${containerId}" data-player='${JSON.stringify(player).replace(/'/g,"&apos;")}' style="width:200px;height:300px;margin:0 auto;"></div>`;
 }
