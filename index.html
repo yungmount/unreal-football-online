@@ -4,9 +4,9 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>UFO - Unreal Football Online</title>
-<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/FBXLoader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.140.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.140.0/examples/js/loaders/GLTFLoader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.140.0/examples/js/loaders/FBXLoader.js"></script>
 <script>
 // ---- Utils (must be before engine) ----
 const rand=(a,b)=>Math.floor(Math.random()*(b-a+1))+a;
@@ -1236,10 +1236,35 @@ function initVoxelPlayer(player, containerId) {
   // ---- 回退：几何体球员 ----
   function createFallbackPlayer(group, kitColor) {
     var mat = new THREE.MeshStandardMaterial({ color: kitColor });
-    var body = new THREE.Mesh(new THREE.CapsuleGeometry(0.15, 0.5, 8, 16), mat);
-    body.position.y = 0.5;
-    body.castShadow = true;
-    group.add(body);
+    // 使用兼容所有版本的胶囊体（2个半球 + 1个圆柱）
+    var bodyMat = new THREE.MeshStandardMaterial({ color: kitColor });
+    var legMat  = new THREE.MeshStandardMaterial({ color: 0x222222 });
+    // 躯干（椭球形）
+    var torso = new THREE.Mesh(new THREE.SphereGeometry(0.18, 16, 12), bodyMat);
+    torso.scale.y = 1.5;
+    torso.position.y = 0.75;
+    torso.castShadow = true;
+    group.add(torso);
+    // 左腿
+    var legL = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 0.5, 8), legMat);
+    legL.position.set(-0.1, 0.3, 0);
+    legL.castShadow = true;
+    group.add(legL);
+    // 右腿
+    var legR = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 0.5, 8), legMat);
+    legR.position.set(0.1, 0.3, 0);
+    legR.castShadow = true;
+    group.add(legR);
+    // 左脚
+    var footL = new THREE.Mesh(new THREE.SphereGeometry(0.07, 8, 6), legMat);
+    footL.scale.set(1.2, 0.5, 1.5);
+    footL.position.set(-0.1, 0.02, 0.05);
+    group.add(footL);
+    // 右脚
+    var footR = new THREE.Mesh(new THREE.SphereGeometry(0.07, 8, 6), legMat);
+    footR.scale.set(1.2, 0.5, 1.5);
+    footR.position.set(0.1, 0.02, 0.05);
+    group.add(footR);
   }
 
   // ---- 动画循环 ----
