@@ -6,6 +6,7 @@
 <title>UFO - Unreal Football Online</title>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/FBXLoader.js"></script>
 <script>
 // ---- Utils (must be before engine) ----
 const rand=(a,b)=>Math.floor(Math.random()*(b-a+1))+a;
@@ -1089,10 +1090,12 @@ function _drawHair(ctx, W, H, hairIdx, hairColor, skin, faceWFactor, hash) {
 // 扁平球员 SVG 风格 - 简洁、专业、游戏感
 // ================================================================
 // ================================================================
-// Three.js 3D 球员渲染 - 高质量卡通风格
-// 支持加载 Mixamo GLTF 模型或使用程序化几何体
+// Three.js 3D 球员渲染 - 加载 Mixamo FBX 模型
 // ================================================================
 var voxelScenes = window.voxelScenes || {};
+
+// 模型缓存（避免重复加载）
+var modelCache = {};
 
 function initVoxelPlayer(player, containerId) {
   var container = document.getElementById(containerId);
@@ -1103,55 +1106,25 @@ function initVoxelPlayer(player, containerId) {
   var ovr = player.ovr || 70, isMy = !!player.isMy;
   var pNum = player.num || 10;
   var nm = player.name || 'Player';
-  var height = player.height || 180;
-  var weight = player.weight || 75;
 
-  // ---- 随机种子（与 avatar 同步）----
+  // ---- 随机种子 ----
   var seed = 0;
   for(var si=0; si<nm.length; si++) seed = (seed * 31 + nm.charCodeAt(si)) >>> 0;
   function rng() { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 0xFFFFFFFF; }
   function ri(min, max) { return Math.floor(rng() * (max - min + 1)) + min; }
-  function pick(arr) { return arr[Math.floor(rng() * arr.length)]; }
 
-  // ---- 肤色、发色（与 generatePixelAvatar 同步）----
-  var skinMap = {
-    England:()=>pick(['#F2D8B8','#EAC8A0','#F0D0A8']),
-    Germany:()=>pick(['#F0D8B8','#ECD0A4']),
-    Spain:()=>pick(['#D8A878','#C8906C']),
-    France:()=>pick(['#D8A870','#C48860']),
-    Brazil:()=>pick(['#B87040','#A06030']),
-    Argentina:()=>pick(['#D4A078','#C49068']),
-    Italy:()=>pick(['#D8B088','#C8A070']),
-    Nigeria:()=>pick(['#5C2C0C','#4A2008']),
-    Japan:()=>pick(['#E8D0A8','#D8C098']),
-    Korea:()=>pick(['#E4CC9A','#D4BC88']),
-    China:()=>pick(['#E0C8A0','#D0B888']),
-    USA:()=>pick(['#D0A078','#C09070']),
-  };
-  var nat = player.nationality || player.nation || 'England';
-  var skinHex = (skinMap[nat] || skinMap.England)();
-
-  var hairPalette = [
-    ['#100804','#281408','#3C2010'],
-    ['#281008','#4A2C14','#6A4020'],
-    ['#4A2C10','#6A4820','#8A6430'],
-    ['#6A4018','#907028','#B09040'],
-    ['#9A7830','#C8A050','#E0C070'],
-    ['#501408','#7A2818','#A04020'],
-    ['#3C3C3C','#606060','#888888'],
-  ];
-  var hairIdx = ri(0, hairPalette.length-1);
-  var hairHex = hairPalette[hairIdx][0];
-  var eyeCol = pick(['#2A4C8C','#1E5420','#6A3418','#404040','#3A6A8C','#8A5A18']);
+  // ---- 球衣颜色 ----
+  var kitColor = isMy ? 0xDC2233 : 0x1133BB;
+  var kitColorLight = isMy ? 0xFF4455 : 0x3366EE;
 
   // ---- Three.js 场景 ----
   var W = 200, H = 320;
   var scene = new THREE.Scene();
 
-  // ---- 相机（正视角）----
+  // ---- 相机 ----
   var camera = new THREE.PerspectiveCamera(35, W/H, 0.1, 100);
-  camera.position.set(0, 1.0, 4.2);
-  camera.lookAt(0, 0.9, 0);
+  camera.position.set(0, 0.5, 2.5);
+  camera.lookAt(0, 0.5, 0);
 
   // ---- 渲染器 ----
   var renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
@@ -1159,25 +1132,20 @@ function initVoxelPlayer(player, containerId) {
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-  renderer.outputEncoding = THREE.sRGBEncoding;
   container.appendChild(renderer.domElement);
 
-  // ---- 灯光（三点光照）----
-  var mainLight = new THREE.DirectionalLight(0xffffff, 1.0);
+  // ---- 灯光 ----
+  var mainLight = new THREE.DirectionalLight(0xffffff, 1.2);
   mainLight.position.set(3, 4, 2);
   mainLight.castShadow = true;
-  mainLight.shadow.mapSize.width = 512;
-  mainLight.shadow.mapSize.height = 512;
-  mainLight.shadow.camera.near = 0.1;
-  mainLight.shadow.camera.far = 20;
   scene.add(mainLight);
 
   var fillLight = new THREE.DirectionalLight(0xffffff, 0.5);
   fillLight.position.set(-2, 2, 1);
   scene.add(fillLight);
 
-  var rimLight = new THREE.DirectionalLight(0x88ccff, 0.3);
-  rimLight.position.set(0, 2, -2);
+  var rimLight = new THREE.DirectionalLight(0x88ccff, 0.4);
+  rimLight.position.set(0, 1, -2);
   scene.add(rimLight);
 
   var ambient = new THREE.AmbientLight(0xffffff, 0.4);
@@ -1187,173 +1155,109 @@ function initVoxelPlayer(player, containerId) {
   var playerGroup = new THREE.Group();
   scene.add(playerGroup);
 
-  // 颜色辅助函数
-  function hexToRgb(hex) {
-    var n = parseInt(hex.slice(1), 16);
-    return new THREE.Color((n>>16)/255, ((n>>8)&0xff)/255, (n&0xff)/255);
-  }
-
-  var skinColor = hexToRgb(skinHex);
-  var hairColor = hexToRgb(hairHex);
-  var kitColor = isMy ? new THREE.Color(0xDC2233) : new THREE.Color(0x1133BB);
-
-  // ---- 身体比例（基于身高体重）----
-  var hScale = height / 180;
-
-  // 材质
-  var skinMat = new THREE.MeshStandardMaterial({ color: skinColor, roughness: 0.7, metalness: 0 });
-  var hairMat = new THREE.MeshStandardMaterial({ color: hairColor, roughness: 0.9 });
-  var kitMat = new THREE.MeshStandardMaterial({ color: kitColor, roughness: 0.6 });
-  var shortMat = new THREE.MeshStandardMaterial({ color: 0x111122, roughness: 0.8 });
-  var sockMat = new THREE.MeshStandardMaterial({ color: 0xf8f8f8, roughness: 0.7 });
-  var shoeMat = new THREE.MeshStandardMaterial({ color: 0x1a1a1a, roughness: 0.5 });
-  var eyeWhiteMat = new THREE.MeshStandardMaterial({ color: 0xffffff });
-  var eyeIrisMat = new THREE.MeshStandardMaterial({ color: hexToRgb(eyeCol) });
-
-  // 头部
-  var headR = 0.13 * hScale;
-  var headGeo = new THREE.SphereGeometry(headR, 32, 32);
-  var head = new THREE.Mesh(headGeo, skinMat);
-  head.position.y = 1.48 * hScale;
-  head.castShadow = true;
-  playerGroup.add(head);
-
-  // 眼睛
-  var eyeGeo = new THREE.SphereGeometry(0.016, 16, 16);
-  var eyePupilGeo = new THREE.SphereGeometry(0.008, 12, 12);
-
-  [-1, 1].forEach(function(side) {
-    var eye = new THREE.Mesh(eyeGeo, eyeWhiteMat);
-    eye.position.set(side * 0.042 * hScale, 1.50 * hScale, headR - 0.01);
-    playerGroup.add(eye);
-
-    var iris = new THREE.Mesh(eyePupilGeo, eyeIrisMat);
-    iris.position.set(side * 0.042 * hScale, 1.50 * hScale, headR + 0.003);
-    playerGroup.add(iris);
-  });
-
-  // 发型
-  var hairStyle = ri(0, 3);
-  if(hairStyle <= 1) {
-    var hairGeo = new THREE.SphereGeometry(headR * 1.06, 32, 32, 0, Math.PI * 2, 0, Math.PI * 0.55);
-    var hair = new THREE.Mesh(hairGeo, hairMat);
-    hair.position.y = 1.48 * hScale;
-    playerGroup.add(hair);
-  } else if(hairStyle === 2) {
-    // 光头
-  } else {
-    // 马尾
-    var hairGeo = new THREE.SphereGeometry(headR * 1.08, 32, 32, 0, Math.PI * 2, 0, Math.PI * 0.6);
-    var hair = new THREE.Mesh(hairGeo, hairMat);
-    hair.position.y = 1.48 * hScale;
-    playerGroup.add(hair);
-
-    var tailGeo = new THREE.CapsuleGeometry(0.02, 0.15, 8, 16);
-    var tail = new THREE.Mesh(tailGeo, hairMat);
-    tail.position.set(0, 1.40 * hScale, -headR * 0.85);
-    tail.rotation.x = -Math.PI * 0.35;
-    playerGroup.add(tail);
-  }
-
-  // 脖子
-  var neckGeo = new THREE.CylinderGeometry(0.04 * hScale, 0.05 * hScale, 0.08 * hScale, 16);
-  var neck = new THREE.Mesh(neckGeo, skinMat);
-  neck.position.y = 1.33 * hScale;
-  playerGroup.add(neck);
-
-  // 躯干
-  var torsoW = 0.22, torsoH = 0.38 * hScale;
-  var torsoGeo = new THREE.BoxGeometry(torsoW, torsoH, 0.12);
-  var torso = new THREE.Mesh(torsoGeo, kitMat);
-  torso.position.y = 1.02 * hScale;
-  torso.castShadow = true;
-  playerGroup.add(torso);
-
-  // 球衣号码
-  var numCanvas = document.createElement('canvas');
-  numCanvas.width = 64;
-  numCanvas.height = 64;
-  var numCtx = numCanvas.getContext('2d');
-  numCtx.fillStyle = 'rgba(255,255,255,0.95)';
-  numCtx.font = 'bold 48px Arial';
-  numCtx.textAlign = 'center';
-  numCtx.textBaseline = 'middle';
-  numCtx.fillText(pNum.toString(), 32, 32);
-  var numTex = new THREE.CanvasTexture(numCanvas);
-
-  var numGeo = new THREE.PlaneGeometry(0.1, 0.1);
-  var numMat = new THREE.MeshBasicMaterial({ map: numTex, transparent: true });
-  var number = new THREE.Mesh(numGeo, numMat);
-  number.position.set(0, 1.05 * hScale, 0.062);
-  playerGroup.add(number);
-
-  // 短袖
-  var sleeveGeo = new THREE.BoxGeometry(0.06, 0.12, 0.06);
-  [-1, 1].forEach(function(side) {
-    var sleeve = new THREE.Mesh(sleeveGeo, kitMat);
-    sleeve.position.set(side * (torsoW/2 + 0.03), 1.16 * hScale, 0);
-    sleeve.rotation.z = side * Math.PI * 0.15;
-    playerGroup.add(sleeve);
-  });
-
-  // 上臂
-  var armGeo = new THREE.CapsuleGeometry(0.032, 0.14, 8, 16);
-  [-1, 1].forEach(function(side) {
-    var arm = new THREE.Mesh(armGeo, skinMat);
-    arm.position.set(side * (torsoW/2 + 0.05), 1.02 * hScale, 0);
-    arm.rotation.z = side * Math.PI * 0.1;
-    arm.castShadow = true;
-    playerGroup.add(arm);
-  });
-
-  // 短裤
-  var shortGeo = new THREE.BoxGeometry(0.18, 0.16 * hScale, 0.14);
-  var shorts = new THREE.Mesh(shortGeo, shortMat);
-  shorts.position.y = 0.75 * hScale;
-  shorts.castShadow = true;
-  playerGroup.add(shorts);
-
-  // 大腿
-  var thighGeo = new THREE.CapsuleGeometry(0.042, 0.18 * hScale, 8, 16);
-  [-1, 1].forEach(function(side) {
-    var thigh = new THREE.Mesh(thighGeo, skinMat);
-    thigh.position.set(side * 0.055, 0.55 * hScale, 0);
-    thigh.castShadow = true;
-    playerGroup.add(thigh);
-  });
-
-  // 袜子
-  var sockGeo = new THREE.CylinderGeometry(0.038, 0.032, 0.24 * hScale, 16);
-  var sockStripeGeo = new THREE.CylinderGeometry(0.039, 0.039, 0.025, 16);
-  [-1, 1].forEach(function(side) {
-    var sock = new THREE.Mesh(sockGeo, sockMat);
-    sock.position.set(side * 0.055, 0.22 * hScale, 0);
-    playerGroup.add(sock);
-
-    for(var i=0; i<3; i++) {
-      var stripe = new THREE.Mesh(sockStripeGeo, kitMat);
-      stripe.position.set(side * 0.055, 0.28 * hScale + i * 0.05, 0);
-      playerGroup.add(stripe);
-    }
-  });
-
-  // 球鞋
-  var shoeGeo = new THREE.BoxGeometry(0.08, 0.04, 0.14);
-  [-1, 1].forEach(function(side) {
-    var shoe = new THREE.Mesh(shoeGeo, shoeMat);
-    shoe.position.set(side * 0.055, 0.02, 0.03);
-    shoe.castShadow = true;
-    playerGroup.add(shoe);
-  });
-
-  // 地面
+  // ---- 地面阴影 ----
   var groundGeo = new THREE.PlaneGeometry(2, 2);
-  var groundMat = new THREE.ShadowMaterial({ opacity: 0.25 });
+  var groundMat = new THREE.ShadowMaterial({ opacity: 0.3 });
   var ground = new THREE.Mesh(groundGeo, groundMat);
   ground.rotation.x = -Math.PI / 2;
-  ground.position.y = 0;
   ground.receiveShadow = true;
   scene.add(ground);
+
+  // ---- 加载 FBX 模型 ----
+  var fbxLoader = new THREE.FBXLoader();
+  var MODEL_URL = 'models/player.fbx';
+
+  // 检查缓存
+  if(modelCache[MODEL_URL]) {
+    var clonedModel = modelCache[MODEL_URL].clone();
+    applyPlayerStyle(clonedModel, kitColor, kitColorLight);
+    playerGroup.add(clonedModel);
+    startAnimation(clonedModel);
+  } else {
+    fbxLoader.load(MODEL_URL, function(object) {
+      // 缓存模型
+      modelCache[MODEL_URL] = object.clone();
+      
+      // 应用样式
+      applyPlayerStyle(object, kitColor, kitColorLight);
+      playerGroup.add(object);
+      
+      // 开始动画
+      startAnimation(object);
+    }, undefined, function(error) {
+      console.error('FBX Load Error:', error);
+      // 回退到几何体
+      createFallbackPlayer(playerGroup, kitColor);
+    });
+  }
+
+  // ---- 应用球员样式 ----
+  function applyPlayerStyle(model, kitColor, kitColorLight) {
+    // 缩放
+    model.scale.setScalar(0.015);
+    
+    // 遍历所有网格应用材质
+    model.traverse(function(child) {
+      if(child.isMesh) {
+        child.castShadow = true;
+        child.receiveShadow = true;
+        
+        // 根据原始材质颜色区分不同部位
+        var color = child.material && child.material.color ? child.material.color.getHex() : null;
+        
+        if(color !== null) {
+          // 皮肤色（约 #CCA881 或类似）
+          if(color > 0x8B6914 && color < 0xFFDFBF) {
+            child.material = new THREE.MeshStandardMaterial({
+              color: 0xD4A574, roughness: 0.8, metalness: 0
+            });
+          }
+          // 衣服/短裤（深色）
+          else if(color < 0x444444) {
+            child.material = new THREE.MeshStandardMaterial({
+              color: kitColor, roughness: 0.6, metalness: 0
+            });
+          }
+          // 鞋子
+          else if(color < 0x222222) {
+            child.material = new THREE.MeshStandardMaterial({
+              color: 0x1a1a1a, roughness: 0.5, metalness: 0.1
+            });
+          }
+        }
+      }
+    });
+
+    // 居中模型
+    var box = new THREE.Box3().setFromObject(model);
+    var center = box.getCenter(new THREE.Vector3());
+    model.position.sub(center);
+    model.position.y += 0.3; // 稍微抬高
+  }
+
+  // ---- 回退：几何体球员 ----
+  function createFallbackPlayer(group, kitColor) {
+    var mat = new THREE.MeshStandardMaterial({ color: kitColor });
+    var body = new THREE.Mesh(new THREE.CapsuleGeometry(0.15, 0.5, 8, 16), mat);
+    body.position.y = 0.5;
+    body.castShadow = true;
+    group.add(body);
+  }
+
+  // ---- 动画循环 ----
+  var animAngle = 0;
+  function startAnimation(model) {
+    function animate() {
+      requestAnimationFrame(animate);
+      
+      // 轻微旋转
+      animAngle += 0.003;
+      playerGroup.rotation.y = Math.sin(animAngle) * 0.2;
+      
+      renderer.render(scene, camera);
+    }
+    animate();
+  }
 
   // ---- 信息面板 ----
   var infoCanvas = document.createElement('canvas');
@@ -1375,26 +1279,6 @@ function initVoxelPlayer(player, containerId) {
   ctx.font = 'bold 18px Arial';
   ctx.textAlign = 'right';
   ctx.fillText(ovr, W - 12, H - 22);
-
-  // ---- 动画 ----
-  var animAngle = 0;
-  var breathPhase = 0;
-
-  function animate() {
-    requestAnimationFrame(animate);
-
-    // 轻微旋转
-    animAngle += 0.004;
-    playerGroup.rotation.y = Math.sin(animAngle) * 0.25;
-
-    // 呼吸
-    breathPhase += 0.02 + rng() * 0.005;
-    var breathScale = 1 + Math.sin(breathPhase) * 0.008;
-    torso.scale.y = breathScale;
-
-    renderer.render(scene, camera);
-  }
-  animate();
 
   voxelScenes[containerId] = { scene: scene, camera: camera, renderer: renderer, group: playerGroup };
 }
