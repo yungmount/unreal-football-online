@@ -828,26 +828,6 @@ class LPCPlayerGenerator {
     // 合成
     return this.composer.compose(layers);
   }
-      sprite: `feet__boots__basic__male__${animation}.png`,
-      z: LPC.Z_LAYERS.FEET,
-      palette: LPC_PALETTES.cloth[appearance.bootsColor] || LPC_PALETTES.cloth.black,
-      sourcePalette: LPC_PALETTES.cloth.black,
-      row: direction,
-      frame: 0,
-    });
-    
-    // 7. 球衣 (球队颜色)
-    // 使用简单的矩形绘制 + 号码
-    layers.push({
-      type: 'jersey',
-      z: LPC.Z_LAYERS.TORSO,
-      color: appearance.jerseyColor,
-      number: appearance.jerseyNumber,
-    });
-    
-    // 合成
-    return this.composer.compose(layers);
-  }
   
   /**
    * 生成球员卡片 (用于显示)
