@@ -47,6 +47,96 @@ const LPC = {
     WEAPON: 140,
   },
   
+  // ============================================================
+  // 足球运动员专用配置
+  // ============================================================
+  FOOTBALL: {
+    // 可用体型 (排除 child, pregnant)
+    BODY_TYPES: ['male', 'muscular', 'teen'],
+    
+    // 可用头部变体
+    HEAD_TYPES: ['male', 'male_elderly', 'male_gaunt', 'male_plump', 'male_small'],
+    
+    // 可用发型 (排除过于奇幻的风格)
+    HAIR_STYLES: [
+      // 短发 (足球常见)
+      'buzzcut', 'short', 'plain', 'cowlick', 'parted', 'parted2', 'parted3',
+      // 中等长度
+      'curtains', 'curtains_long', 'swoop', 'swoop_side', 'mop', 'messy1', 'messy2', 'messy3',
+      'bedhead', 'unkempt', 'natural', 'relm_short',
+      // 卷发
+      'curly_short', 'curly_short2', 'afro', 'jewfro', 'curls_large',
+      // 长发 (扎起来)
+      'ponytail', 'ponytail2', 'high_ponytail', 'braid', 'braid2',
+      'half_up', 'long_tied', 'topknot_long', 'topknot_short',
+      // 特殊风格
+      'dreadlocks_short', 'dreadlocks_long', 'cornrows', 'twists_fade',
+      // 莫霍克 (个性球员)
+      'shorthawk', 'longhawk', 'spiked', 'spiked2', 'flat_top_fade', 'high_and_tight',
+      // 秃头
+      'balding',
+    ],
+    
+    // 可用胡须风格
+    BEARD_STYLES: [
+      '5oclock_shadow', // 五点阴影 (轻度胡茬)
+      'basic',          // 基础胡须
+      'trimmed',        // 修剪整齐
+      'medium',         // 中等长度
+      'winter',         // 冬季大胡子
+    ],
+    
+    // 可用小胡子风格
+    MUSTACHE_STYLES: [
+      'basic',      // 基础小胡子
+      'chevron',    // 雪佛龙式
+      'handlebar',  // 八字胡
+      'horseshoe',  // 马蹄形
+      'lampshade',  // 灯罩式
+      'walrus',     // 海象式
+    ],
+    
+    // 可用短裤 (足球)
+    SHORTS_STYLES: ['shorts', 'short_shorts'],
+    
+    // 可用鞋子 (足球)
+    BOOTS_STYLES: ['basic', 'revised', 'rimmed'],
+    
+    // 可用球衣
+    JERSEY_STYLES: ['shortsleeve', 'longsleeve'],
+    
+    // 守门员手套
+    GLOVES_STYLES: ['gloves'],
+    
+    // 不可用组件 (排除)
+    EXCLUDED: {
+      // 盔甲
+      armour: true,
+      plate: true,
+      bracers: true,
+      // 奇幻
+      cape: true,
+      dress: true,
+      skirt: true,
+      wings: true,
+      tail: true,
+      horn: true,
+      halo: true,
+      // 武器
+      weapon: true,
+      shield: true,
+      // 过于正式
+      formal: true,
+      // 不适合足球的服装
+      jacket: true,
+      robe: true,
+      vest: true,
+      // 饰品
+      necklace: true,
+      earrings: true,
+    },
+  },
+  
   // 资源路径
   ASSET_BASE: 'lpc-assets/',
   
@@ -163,22 +253,35 @@ class LPCSpriteLoader {
   constructor() {
     this.cache = new Map();
     this.loading = new Map();
+    this.failedAssets = new Set(); // 记录失败的资源
   }
   
   /**
    * 加载精灵图
    * @param {string} path - 精灵图路径 (相对于 lpc-assets/)
-   * @returns {Promise<Image>}
+   * @param {boolean} silent - 是否静默失败 (不打印错误)
+   * @returns {Promise<Image|null>}
    */
-  async load(path) {
+  async load(path, silent = false) {
     const cacheKey = path;
     
+    // 检查缓存
     if (this.cache.has(cacheKey)) {
       return this.cache.get(cacheKey);
     }
     
+    // 检查是否已知失败
+    if (this.failedAssets.has(cacheKey)) {
+      return null;
+    }
+    
+    // 检查是否正在加载
     if (this.loading.has(cacheKey)) {
-      return this.loading.get(cacheKey);
+      try {
+        return await this.loading.get(cacheKey);
+      } catch {
+        return null;
+      }
     }
     
     const loadPromise = new Promise((resolve, reject) => {
@@ -193,6 +296,7 @@ class LPCSpriteLoader {
       
       img.onerror = () => {
         this.loading.delete(cacheKey);
+        this.failedAssets.add(cacheKey);
         reject(new Error(`Failed to load sprite: ${path}`));
       };
       
@@ -200,7 +304,15 @@ class LPCSpriteLoader {
     });
     
     this.loading.set(cacheKey, loadPromise);
-    return loadPromise;
+    
+    try {
+      return await loadPromise;
+    } catch (e) {
+      if (!silent) {
+        console.debug(`精灵加载失败: ${path}`);
+      }
+      return null;
+    }
   }
   
   /**
@@ -212,10 +324,12 @@ class LPCSpriteLoader {
     const results = new Map();
     await Promise.all(paths.map(async (path) => {
       try {
-        const img = await this.load(path);
-        results.set(path, img);
+        const img = await this.load(path, true);
+        if (img) {
+          results.set(path, img);
+        }
       } catch (e) {
-        console.warn(`Failed to load ${path}:`, e);
+        // 静默失败
       }
     }));
     return results;
@@ -422,6 +536,18 @@ class LPCComposer {
           imageData = layer.imageData;
         } else if (layer.sprite) {
           const img = await this.loader.load(layer.sprite);
+          
+          // 可选层加载失败时跳过
+          if (!img && layer.optional) {
+            console.debug(`可选层加载失败，跳过: ${layer.sprite}`);
+            continue;
+          }
+          
+          if (!img) {
+            console.warn(`必需层加载失败: ${layer.sprite}`);
+            continue;
+          }
+          
           imageData = this.loader.extractFrame(img, layer.frame || 0, layer.row || 0);
         } else {
           continue;
@@ -442,7 +568,9 @@ class LPCComposer {
         // 绘制到 canvas
         ctx.putImageData(imageData, layer.offsetX || 0, layer.offsetY || 0);
       } catch (e) {
-        console.warn(`Failed to compose layer:`, layer, e);
+        if (!layer.optional) {
+          console.warn(`Failed to compose layer:`, layer, e);
+        }
       }
     }
     
@@ -470,22 +598,6 @@ class LPCPlayerGenerator {
     this.composer = new LPCComposer();
     this.loader = new LPCSpriteLoader();
     this.remapper = new LPCColorRemapper();
-    
-    // 发型选项
-    this.hairstyles = [
-      'afro', 'balding', 'bangs', 'bangslong', 'bedhead', 'bob',
-      'bowl', 'braids', 'buzzcut', 'cornrows', 'curly', 'dreadlocks',
-      'emo', 'fauxhawk', 'fringestreaks', 'halfshaved', 'long',
-      'mohawk', 'messy', 'page', 'parted', 'pigtails', 'ponytail',
-      'rattail', 'shaved', 'spiky', 'swept', 'undercut', 'wavy'
-    ];
-    
-    // 胡须选项
-    this.beardStyles = [
-      '5oclock_shadow', 'basic', 'medium', 'trimmed', 'winter',
-      // 小胡子
-      'basic_mustache', 'bigstache', 'chevron', 'french'
-    ];
   }
   
   /**
@@ -498,25 +610,45 @@ class LPCPlayerGenerator {
     const seed = this.hashString(playerData.name || String(playerData.id));
     const rng = this.seededRandom(seed);
     
-    // 肤色
-    const skinTones = Object.keys(LPC_PALETTES.skin);
+    // 使用足球运动员配置
+    const config = LPC.FOOTBALL;
+    
+    // 体型 (随机选择男性体型)
+    const bodyTypes = config.BODY_TYPES;
+    const bodyType = playerData.bodyType || bodyTypes[Math.floor(rng() * bodyTypes.length)];
+    
+    // 头部变体
+    const headTypes = config.HEAD_TYPES;
+    const headType = playerData.headType || headTypes[Math.floor(rng() * headTypes.length)];
+    
+    // 肤色 (标准肤色为主)
+    const skinTones = ['light', 'amber', 'olive', 'taupe', 'bronze', 'brown', 'black'];
     const skinTone = playerData.skinTone || skinTones[Math.floor(rng() * skinTones.length)];
     
-    // 发型
-    const hairstyle = playerData.hairstyle || this.hairstyles[Math.floor(rng() * this.hairstyles.length)];
+    // 发型 (足球常见)
+    const hairstyles = config.HAIR_STYLES;
+    const hairstyle = playerData.hairstyle || hairstyles[Math.floor(rng() * hairstyles.length)];
     
-    // 发色
-    const hairColors = Object.keys(LPC_PALETTES.hair);
+    // 发色 (自然色为主)
+    const hairColors = ['black', 'dark_brown', 'brown', 'light_brown', 'chestnut', 'blonde', 'sandy', 'red', 'ginger', 'gray', 'white'];
     const hairColor = playerData.hairColor || hairColors[Math.floor(rng() * hairColors.length)];
     
-    // 胡须 (30% 概率)
-    const hasBeard = playerData.hasBeard !== undefined ? playerData.hasBeard : (rng() < 0.3);
+    // 胡须 (25% 概率)
+    const hasBeard = playerData.hasBeard !== undefined ? playerData.hasBeard : (rng() < 0.25);
+    const beardStyles = config.BEARD_STYLES;
     const beardStyle = hasBeard 
-      ? (playerData.beardStyle || this.beardStyles[Math.floor(rng() * this.beardStyles.length)])
+      ? (playerData.beardStyle || beardStyles[Math.floor(rng() * beardStyles.length)])
+      : null;
+    
+    // 小胡子 (额外 15% 概率，独立于胡须)
+    const hasMustache = !hasBeard && (playerData.hasMustache !== undefined ? playerData.hasMustache : (rng() < 0.15));
+    const mustacheStyles = config.MUSTACHE_STYLES;
+    const mustacheStyle = hasMustache 
+      ? (playerData.mustacheStyle || mustacheStyles[Math.floor(rng() * mustacheStyles.length)])
       : null;
     
     // 眼睛颜色
-    const eyeColors = Object.keys(LPC_PALETTES.eyes);
+    const eyeColors = ['brown', 'blue', 'green', 'gray'];
     const eyeColor = playerData.eyeColor || eyeColors[Math.floor(rng() * eyeColors.length)];
     
     // 球队颜色
@@ -524,33 +656,71 @@ class LPCPlayerGenerator {
     const shortsColor = teamData.secondaryColor || 'white';
     const bootsColor = teamData.bootsColor || 'black';
     
+    // 短裤风格
+    const shortsStyles = config.SHORTS_STYLES;
+    const shortsStyle = playerData.shortsStyle || shortsStyles[Math.floor(rng() * shortsStyles.length)];
+    
+    // 球鞋风格
+    const bootsStyles = config.BOOTS_STYLES;
+    const bootsStyle = playerData.bootsStyle || bootsStyles[Math.floor(rng() * bootsStyles.length)];
+    
+    // 球衣风格 (短袖为主)
+    const jerseyStyles = config.JERSEY_STYLES;
+    const jerseyStyle = playerData.jerseyStyle || jerseyStyles[Math.floor(rng() * jerseyStyles.length)];
+    
     return {
+      bodyType,
+      headType,
       skinTone,
       hairstyle,
       hairColor,
       beardStyle,
+      mustacheStyle,
       eyeColor,
       jerseyColor,
       shortsColor,
       bootsColor,
+      shortsStyle,
+      bootsStyle,
+      jerseyStyle,
       // 球衣号码
       jerseyNumber: playerData.jerseyNumber || Math.floor(rng() * 99) + 1,
+      // 守门员
+      isGoalkeeper: playerData.position === 'GK',
     };
   }
   
   /**
    * 根据外观配置生成球员精灵 Canvas
    * @param {Object} appearance - 外观配置
-   * @param {string} animation - 动画类型 ('idle' | 'walk' | 'run' | 'kick')
+   * @param {string} animation - 动画类型 ('idle' | 'walk')
    * @param {number} direction - 方向 (0=下, 1=左, 2=右, 3=上)
    * @returns {Promise<HTMLCanvasElement>}
    */
   async generatePlayerSprite(appearance, animation = 'idle', direction = 0) {
     const layers = [];
     
+    // 体型映射
+    const bodyTypeMap = {
+      'male': 'male',
+      'muscular': 'muscular',
+      'teen': 'thin',
+    };
+    const bodySuffix = bodyTypeMap[appearance.bodyType] || 'male';
+    
+    // 头部映射
+    const headTypeMap = {
+      'male': 'male',
+      'male_elderly': 'male_elderly',
+      'male_gaunt': 'male_gaunt',
+      'male_plump': 'male_plump',
+      'male_small': 'male_small',
+    };
+    const headSuffix = headTypeMap[appearance.headType] || 'male';
+    
     // 1. 身体 (基础肤色)
     layers.push({
-      sprite: `body__bodies__male__${animation}.png`,
+      sprite: `body__bodies__${bodySuffix}__${animation}.png`,
       z: LPC.Z_LAYERS.BODY,
       palette: LPC_PALETTES.skin[appearance.skinTone] || LPC_PALETTES.skin.light,
       sourcePalette: LPC_PALETTES.skin.light,
@@ -560,7 +730,7 @@ class LPCPlayerGenerator {
     
     // 2. 头部
     layers.push({
-      sprite: `head__heads__human__male__${animation}.png`,
+      sprite: `head__heads__human__${headSuffix}__${animation}.png`,
       z: LPC.Z_LAYERS.HEAD,
       palette: LPC_PALETTES.skin[appearance.skinTone] || LPC_PALETTES.skin.light,
       sourcePalette: LPC_PALETTES.skin.light,
@@ -568,36 +738,55 @@ class LPCPlayerGenerator {
       frame: 0,
     });
     
-    // 3. 头发 (后层 - 部分发型需要)
-    const hairSprite = `hair__${appearance.hairstyle}__adult__${animation}.png`;
+    // 3. 头发 (需要检查文件是否存在)
+    // 某些发型有 bg/fg 两层，需要特殊处理
+    const hairBase = `hair__${appearance.hairstyle}__adult`;
+    
+    // 检查是否有 bg 层
+    const hairBgPath = `${hairBase}__bg__${animation}.png`;
+    const hairFgPath = `${hairBase}__fg__${animation}.png`;
+    const hairSimplePath = `${hairBase}__${animation}.png`;
+    
+    // 尝试加载简单发型 (先尝试，失败则跳过)
     layers.push({
-      sprite: hairSprite,
-      z: LPC.Z_LAYERS.HAIR_BACK,
+      sprite: hairSimplePath,
+      z: LPC.Z_LAYERS.HAIR_FRONT,
       palette: LPC_PALETTES.hair[appearance.hairColor] || LPC_PALETTES.hair.brown,
-      sourcePalette: LPC_PALETTES.hair.blonde, // 默认调色板
+      sourcePalette: LPC_PALETTES.hair.blonde,
       row: direction,
       frame: 0,
+      optional: true, // 标记为可选
     });
     
     // 4. 胡须
     if (appearance.beardStyle) {
-      const beardSprite = appearance.beardStyle.includes('mustache')
-        ? `beards__mustache__${appearance.beardStyle.split('_')[0]}__${animation}.png`
-        : `beards__beard__${appearance.beardStyle}__${animation}.png`;
-      
       layers.push({
-        sprite: beardSprite,
+        sprite: `beards__beard__${appearance.beardStyle}__male__${animation}.png`,
         z: LPC.Z_LAYERS.BEARD,
         palette: LPC_PALETTES.hair[appearance.hairColor] || LPC_PALETTES.hair.brown,
         sourcePalette: LPC_PALETTES.hair.brown,
         row: direction,
         frame: 0,
+        optional: true,
       });
     }
     
-    // 5. 短裤 (球队颜色)
+    // 5. 小胡子
+    if (appearance.mustacheStyle) {
+      layers.push({
+        sprite: `beards__mustache__${appearance.mustacheStyle}__${animation}.png`,
+        z: LPC.Z_LAYERS.BEARD,
+        palette: LPC_PALETTES.hair[appearance.hairColor] || LPC_PALETTES.hair.brown,
+        sourcePalette: LPC_PALETTES.hair.brown,
+        row: direction,
+        frame: 0,
+        optional: true,
+      });
+    }
+    
+    // 6. 短裤 (球队颜色)
     layers.push({
-      sprite: `legs__shorts__shorts__male__${animation}.png`,
+      sprite: `legs__shorts__${appearance.shortsStyle}__${bodySuffix}__${animation}.png`,
       z: LPC.Z_LAYERS.LEGS,
       palette: LPC_PALETTES.cloth[appearance.shortsColor] || LPC_PALETTES.cloth.white,
       sourcePalette: LPC_PALETTES.cloth.white,
@@ -605,8 +794,40 @@ class LPCPlayerGenerator {
       frame: 0,
     });
     
-    // 6. 球鞋
+    // 7. 球鞋
     layers.push({
+      sprite: `feet__boots__${appearance.bootsStyle}__${bodySuffix}__${animation}.png`,
+      z: LPC.Z_LAYERS.FEET,
+      palette: LPC_PALETTES.cloth[appearance.bootsColor] || LPC_PALETTES.cloth.black,
+      sourcePalette: LPC_PALETTES.cloth.black,
+      row: direction,
+      frame: 0,
+    });
+    
+    // 8. 球衣 (球队颜色) - 使用短袖
+    layers.push({
+      sprite: `torso__clothes__${appearance.jerseyStyle}__${appearance.jerseyStyle}__${bodySuffix === 'thin' ? 'teen' : bodySuffix}__${animation}.png`,
+      z: LPC.Z_LAYERS.TORSO,
+      palette: LPC_PALETTES.cloth[appearance.jerseyColor] || LPC_PALETTES.cloth.red,
+      sourcePalette: LPC_PALETTES.cloth.white,
+      row: direction,
+      frame: 0,
+    });
+    
+    // 9. 守门员手套
+    if (appearance.isGoalkeeper) {
+      layers.push({
+        sprite: `arms__hands__gloves__${bodySuffix}__${animation}.png`,
+        z: LPC.Z_LAYERS.ARMS,
+        row: direction,
+        frame: 0,
+        optional: true,
+      });
+    }
+    
+    // 合成
+    return this.composer.compose(layers);
+  }
       sprite: `feet__boots__basic__male__${animation}.png`,
       z: LPC.Z_LAYERS.FEET,
       palette: LPC_PALETTES.cloth[appearance.bootsColor] || LPC_PALETTES.cloth.black,

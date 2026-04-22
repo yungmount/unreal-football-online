@@ -113,6 +113,14 @@ const errorDiv = document.getElementById('error');
 const firstNames = ['Messi', 'Ronaldo', 'Neymar', 'Mbappé', 'Haaland', 'Salah', 'Kane', 'De Bruyne', 'Lewandowski', 'Benzema', 'Modrić', 'Vinicius', 'Bellingham', 'Saka', 'Foden', 'Gavi', 'Pedri', 'Rodri', 'Rice', 'Kane'];
 const lastNames = ['Jr', 'Sr', 'II', 'III', '', '', '', ''];
 
+// 调试日志
+const debugLog = [];
+function log(msg) {
+  const time = new Date().toLocaleTimeString();
+  debugLog.push(`[${time}] ${msg}`);
+  console.log(msg);
+}
+
 // 检查 LPC 渲染器是否加载
 async function checkReady() {
   if (typeof LPCPlayerGenerator === 'undefined') {
@@ -121,6 +129,9 @@ async function checkReady() {
     loadingDiv.style.display = 'none';
     return false;
   }
+  
+  log('LPC 渲染器已加载');
+  log(`足球运动员配置: ${LPC.FOOTBALL.HAIR_STYLES.length} 种发型, ${LPC.FOOTBALL.BEARD_STYLES.length} 种胡须`);
   return true;
 }
 
@@ -129,23 +140,48 @@ async function generatePlayerCard(playerData, teamData) {
   const generator = new LPCPlayerGenerator();
   
   try {
-    const canvas = await generator.generatePlayerCard(playerData, teamData);
+    const appearance = generator.generateAppearance(playerData, teamData);
+    log(`生成外观: ${appearance.hairstyle}, 肤色: ${appearance.skinTone}, 发色: ${appearance.hairColor}`);
     
-    const card = document.createElement('div');
-    card.className = 'player-card';
-    card.appendChild(canvas);
+    const canvas = await generator.generatePlayerSprite(appearance, 'idle', 0);
     
-    const nameDiv = document.createElement('div');
-    nameDiv.className = 'name';
-    nameDiv.textContent = playerData.name || 'Player';
-    card.appendChild(nameDiv);
+    // 放大到卡片尺寸
+    const cardCanvas = document.createElement('canvas');
+    cardCanvas.width = 200;
+    cardCanvas.height = 260;
+    const ctx = cardCanvas.getContext('2d');
     
-    const infoDiv = document.createElement('div');
-    infoDiv.className = 'info';
-    infoDiv.textContent = `${playerData.position || 'MID'} • ${playerData.rating || 75} • #${playerData.jerseyNumber || '?'}`;
-    card.appendChild(infoDiv);
+    // 背景
+    const teamColor = generator.hexToTeamColor(teamData.primaryColor);
+    ctx.fillStyle = '#1a1a2e';
+    ctx.fillRect(0, 0, 200, 260);
     
-    return card;
+    // 边框
+    ctx.strokeStyle = teamColor;
+    ctx.lineWidth = 3;
+    ctx.strokeRect(2, 2, 196, 256);
+    
+    // 绘制球员精灵 (放大 2x)
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(canvas, 68, 40, 64 * 2, 64 * 2);
+    
+    // 球员名字
+    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold 14px Arial';
+    ctx.textAlign = 'center';
+    ctx.fillText(playerData.name || 'Player', 100, 200);
+    
+    // 位置/评分
+    ctx.font = '12px Arial';
+    ctx.fillStyle = '#aaaaaa';
+    ctx.fillText(`${playerData.position || 'MID'} • ${playerData.rating || 75}`, 100, 220);
+    
+    // 球衣号码
+    ctx.font = 'bold 16px Arial';
+    ctx.fillStyle = teamColor;
+    ctx.fillText(`#${appearance.jerseyNumber}`, 170, 30);
+    
+    return cardCanvas;
   } catch (e) {
     console.error('生成球员失败:', e);
     const errorCard = document.createElement('div');
