@@ -1120,9 +1120,9 @@ function initVoxelPlayer(player, containerId) {
   var scene = new THREE.Scene();
 
   // ---- 相机 ----
-  var camera = new THREE.PerspectiveCamera(35, W/H, 0.1, 100);
-  camera.position.set(0, 0.5, 2.5);
-  camera.lookAt(0, 0.5, 0);
+  var camera = new THREE.PerspectiveCamera(45, W/H, 0.01, 100);
+  camera.position.set(0, 0.3, 1.8);
+  camera.lookAt(0, 0.15, 0);
 
   // ---- 渲染器 ----
   var renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
@@ -1191,8 +1191,8 @@ function initVoxelPlayer(player, containerId) {
 
   // ---- 应用球员样式 ----
   function applyPlayerStyle(model, kitColor, kitColorLight) {
-    // 缩放
-    model.scale.setScalar(0.015);
+    // 缩放（Mixamo 模型以 cm 为单位，缩小到 ~175cm 实际身高）
+    model.scale.setScalar(0.025);
     
     // 遍历所有网格应用材质
     model.traverse(function(child) {
