@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LPC Character Generator Test</title>
+<style>
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: #1a1a2e;
+  color: #eee;
+  padding: 20px;
+}
+h1 { color: #61A0EF; }
+h2 { color: #ccc; font-size: 1.2em; margin-top: 30px; }
+.container { display: flex; flex-wrap: wrap; gap: 20px; }
+.player-card {
+  background: #252540;
+  border-radius: 12px;
+  padding: 15px;
+  text-align: center;
+  width: 220px;
+}
+.player-card canvas {
+  border-radius: 8px;
+  margin-bottom: 10px;
+  image-rendering: pixelated;
+}
+.player-card .name { font-weight: bold; font-size: 1.1em; color: #fff; }
+.player-card .info { font-size: 0.9em; color: #aaa; margin-top: 5px; }
+.controls {
+  background: #252540;
+  padding: 20px;
+  border-radius: 12px;
+  margin-bottom: 20px;
+}
+.controls label { margin-right: 10px; }
+.controls select, .controls button {
+  padding: 8px 16px;
+  border-radius: 6px;
+  border: none;
+  margin: 5px;
+}
+.controls button { background: #61A0EF; color: white; cursor: pointer; }
+.controls button:hover { background: #466AC9; }
+.loading { color: #f80; padding: 20px; }
+.error { color: #f44; padding: 20px; }
+</style>
+</head>
+<body>
+<h1>🎭 LPC Character Generator - 千人千面测试</h1>
+
+<div class="controls">
+  <h2>生成控制</h2>
+  <label>皮肤:
+    <select id="skinTone">
+      <option value="random">随机</option>
+      <option value="light">浅色</option>
+      <option value="amber">琥珀</option>
+      <option value="olive">橄榄</option>
+      <option value="bronze">青铜</option>
+      <option value="brown">棕色</option>
+      <option value="black">黑色</option>
+      <option value="blue">蓝色(幻想)</option>
+      <option value="green">绿色(幻想)</option>
+    </select>
+  </label>
+  <label>发色:
+    <select id="hairColor">
+      <option value="random">随机</option>
+      <option value="black">黑色</option>
+      <option value="brown">棕色</option>
+      <option value="blonde">金色</option>
+      <option value="red">红色</option>
+      <option value="ginger">橘红</option>
+      <option value="white">白色</option>
+      <option value="gray">灰色</option>
+      <option value="blue">蓝色</option>
+      <option value="purple">紫色</option>
+    </select>
+  </label>
+  <label>球衣:
+    <select id="jerseyColor">
+      <option value="red">红色</option>
+      <option value="blue">蓝色</option>
+      <option value="white">白色</option>
+      <option value="black">黑色</option>
+      <option value="yellow">黄色</option>
+      <option value="green">绿色</option>
+      <option value="orange">橙色</option>
+      <option value="purple">紫色</option>
+    </select>
+  </label>
+  <button onclick="generateTeam()">生成球队</button>
+  <button onclick="generateRandomPlayers()">生成随机球员</button>
+</div>
+
+<div id="loading" class="loading">正在加载 LPC 精灵...</div>
+<div id="error" class="error" style="display:none;"></div>
+<div id="players" class="container"></div>
+
+<script src="lpc-renderer.js"></script>
+<script>
+// ============================================================
+// LPC 测试脚本
+// ============================================================
+
+const playersDiv = document.getElementById('players');
+const loadingDiv = document.getElementById('loading');
+const errorDiv = document.getElementById('error');
+
+// 球员名字池
+const firstNames = ['Messi', 'Ronaldo', 'Neymar', 'Mbappé', 'Haaland', 'Salah', 'Kane', 'De Bruyne', 'Lewandowski', 'Benzema', 'Modrić', 'Vinicius', 'Bellingham', 'Saka', 'Foden', 'Gavi', 'Pedri', 'Rodri', 'Rice', 'Kane'];
+const lastNames = ['Jr', 'Sr', 'II', 'III', '', '', '', ''];
+
+// 检查 LPC 渲染器是否加载
+async function checkReady() {
+  if (typeof LPCPlayerGenerator === 'undefined') {
+    errorDiv.textContent = 'LPC 渲染器未加载！请确保 lpc-renderer.js 存在';
+    errorDiv.style.display = 'block';
+    loadingDiv.style.display = 'none';
+    return false;
+  }
+  return true;
+}
+
+// 生成单个球员
+async function generatePlayerCard(playerData, teamData) {
+  const generator = new LPCPlayerGenerator();
+  
+  try {
+    const canvas = await generator.generatePlayerCard(playerData, teamData);
+    
+    const card = document.createElement('div');
+    card.className = 'player-card';
+    card.appendChild(canvas);
+    
+    const nameDiv = document.createElement('div');
+    nameDiv.className = 'name';
+    nameDiv.textContent = playerData.name || 'Player';
+    card.appendChild(nameDiv);
+    
+    const infoDiv = document.createElement('div');
+    infoDiv.className = 'info';
+    infoDiv.textContent = `${playerData.position || 'MID'} • ${playerData.rating || 75} • #${playerData.jerseyNumber || '?'}`;
+    card.appendChild(infoDiv);
+    
+    return card;
+  } catch (e) {
+    console.error('生成球员失败:', e);
+    const errorCard = document.createElement('div');
+    errorCard.className = 'player-card';
+    errorCard.innerHTML = `<div style="color:#f44;padding:20px;">生成失败: ${e.message}</div>`;
+    return errorCard;
+  }
+}
+
+// 生成球队（11人）
+async function generateTeam() {
+  if (!await checkReady()) return;
+  
+  playersDiv.innerHTML = '<div class="loading">生成中...</div>';
+  
+  const jerseyColor = document.getElementById('jerseyColor').value;
+  const teamData = { primaryColor: jerseyColor, secondaryColor: 'white' };
+  
+  const positions = ['GK', 'CB', 'CB', 'LB', 'RB', 'CDM', 'CM', 'CM', 'LW', 'RW', 'ST'];
+  const cards = [];
+  
+  for (let i = 0; i < 11; i++) {
+    const playerData = {
+      id: i + 1,
+      name: firstNames[Math.floor(Math.random() * firstNames.length)] + ' ' + lastNames[Math.floor(Math.random() * lastNames.length)],
+      position: positions[i],
+      rating: 70 + Math.floor(Math.random() * 25),
+      jerseyNumber: i + 1,
+    };
+    
+    const card = await generatePlayerCard(playerData, teamData);
+    cards.push(card);
+  }
+  
+  playersDiv.innerHTML = '';
+  cards.forEach(card => playersDiv.appendChild(card));
+}
+
+// 生成随机球员
+async function generateRandomPlayers() {
+  if (!await checkReady()) return;
+  
+  playersDiv.innerHTML = '<div class="loading">生成中...</div>';
+  
+  const skinTone = document.getElementById('skinTone').value;
+  const hairColor = document.getElementById('hairColor').value;
+  const jerseyColor = document.getElementById('jerseyColor').value;
+  
+  const cards = [];
+  
+  for (let i = 0; i < 10; i++) {
+    const playerData = {
+      id: i + 1,
+      name: firstNames[Math.floor(Math.random() * firstNames.length)] + ' ' + lastNames[Math.floor(Math.random() * lastNames.length)],
+      position: ['GK', 'CB', 'CM', 'LW', 'ST'][Math.floor(Math.random() * 5)],
+      rating: 60 + Math.floor(Math.random() * 35),
+      jerseyNumber: Math.floor(Math.random() * 99) + 1,
+      skinTone: skinTone === 'random' ? undefined : skinTone,
+      hairColor: hairColor === 'random' ? undefined : hairColor,
+    };
+    
+    const teamData = {
+      primaryColor: jerseyColor,
+      secondaryColor: 'white',
+    };
+    
+    const card = await generatePlayerCard(playerData, teamData);
+    cards.push(card);
+  }
+  
+  playersDiv.innerHTML = '';
+  cards.forEach(card => playersDiv.appendChild(card));
+}
+
+// 初始化
+async function init() {
+  if (!await checkReady()) return;
+  
+  loadingDiv.style.display = 'none';
+  
+  // 自动生成初始球队
+  await generateTeam();
+}
+
+// 页面加载后初始化
+window.addEventListener('load', () => {
+  setTimeout(init, 100);
+});
+</script>
+</body>
+</html>
