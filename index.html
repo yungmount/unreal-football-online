@@ -7,6 +7,8 @@
 <script src="https://cdn.jsdelivr.net/npm/three@0.140.0/build/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/fflate@0.8.2/umd/index.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.140.0/examples/js/loaders/FBXLoader.js"></script>
+<!-- LPC 千人千面球员渲染器 -->
+<script src="lpc-renderer.js"></script>
 <script>
 // ---- Utils (must be before engine) ----
 const rand=(a,b)=>Math.floor(Math.random()*(b-a+1))+a;
@@ -702,8 +704,143 @@ function generatePixelAvatar(player) {
   return canvas.toDataURL('image/png');
 }
 
+// ============================================================
+// LPC 千人千面球员渲染器 - 主游戏集成
+// 使用 LPC Spritesheet Character Generator
+// ============================================================
+
+// 全局 LPC 生成器实例
+let lpcGenerator = null;
+
+/**
+ * 初始化 LPC 球员渲染
+ * @param {Object} player - 球员数据
+ * @param {string} containerId - 容器元素 ID
+ */
+async function initLPCPlayer(player, containerId) {
+  const container = document.getElementById(containerId);
+  if (!container) return;
+  
+  container.innerHTML = '';
+  
+  // 检查 LPC 渲染器是否可用
+  if (typeof LPCPlayerGenerator === 'undefined') {
+    console.warn('[LPC] 渲染器未加载，回退到 Three.js');
+    initVoxelPlayer(player, containerId);
+    return;
+  }
+  
+  // 初始化生成器
+  if (!lpcGenerator) {
+    lpcGenerator = new LPCPlayerGenerator();
+  }
+  
+  // 球队颜色（根据球员所属球队）
+  const isMy = !!player.isMy;
+  const teamData = {
+    primaryColor: isMy ? 'red' : 'blue',
+    secondaryColor: 'white',
+    bootsColor: 'black'
+  };
+  
+  // 球员数据转换
+  const playerData = {
+    id: player.id || player.name,
+    name: player.name || 'Player',
+    position: player.position || 'MID',
+    jerseyNumber: player.num || player.shirtNumber || 10,
+    // 根据国籍决定肤色倾向
+    nationality: player.nationality || player.region || 'England',
+    // 体型（根据身高体重）
+    bodyType: (player.height > 185 && player.weight > 80) ? 'muscular' : 
+              (player.height < 175) ? 'teen' : 'male'
+  };
+  
+  try {
+    // 生成外观配置
+    const appearance = lpcGenerator.generateAppearance(playerData, teamData);
+    
+    // 生成精灵 Canvas (idle 动画, 正面)
+    const spriteCanvas = await lpcGenerator.generatePlayerSprite(appearance, 'idle', 0);
+    
+    // 创建球员卡片
+    const cardCanvas = document.createElement('canvas');
+    cardCanvas.width = 200;
+    cardCanvas.height = 320;
+    const ctx = cardCanvas.getContext('2d');
+    
+    // 背景（球队颜色渐变）
+    const teamColor = lpcGenerator.hexToTeamColor(teamData.primaryColor);
+    const gradient = ctx.createLinearGradient(0, 0, 0, cardCanvas.height);
+    gradient.addColorStop(0, '#1a1a2e');
+    gradient.addColorStop(1, '#0f0f1a');
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, cardCanvas.width, cardCanvas.height);
+    
+    // 球队颜色边框
+    ctx.strokeStyle = teamColor;
+    ctx.lineWidth = 3;
+    ctx.strokeRect(2, 2, cardCanvas.width - 4, cardCanvas.height - 4);
+    
+    // 绘制球员精灵 (放大 3x)
+    ctx.imageSmoothingEnabled = false; // 像素风格
+    const scale = 3;
+    const spriteWidth = 64 * scale;
+    const spriteHeight = 64 * scale;
+    const spriteX = (cardCanvas.width - spriteWidth) / 2;
+    const spriteY = 60;
+    ctx.drawImage(spriteCanvas, spriteX, spriteY, spriteWidth, spriteHeight);
+    
+    // 球员名字
+    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold 16px Arial';
+    ctx.textAlign = 'center';
+    ctx.fillText(playerData.name, cardCanvas.width / 2, cardCanvas.height - 80);
+    
+    // 位置
+    ctx.font = '13px Arial';
+    ctx.fillStyle = '#94a3b8';
+    ctx.fillText(playerData.position, cardCanvas.width / 2, cardCanvas.height - 60);
+    
+    // OVR 评分
+    const ovr = player.ovr || 70;
+    ctx.font = 'bold 28px Arial';
+    ctx.fillStyle = ovr >= 80 ? '#00d4ff' : ovr >= 70 ? '#22c55e' : '#fbbf24';
+    ctx.fillText(String(ovr), cardCanvas.width / 2, cardCanvas.height - 30);
+    
+    // 球衣号码
+    ctx.font = 'bold 18px Arial';
+    ctx.fillStyle = teamColor;
+    ctx.textAlign = 'right';
+    ctx.fillText(`#${playerData.jerseyNumber}`, cardCanvas.width - 15, 30);
+    
+    // 添加到容器
+    container.appendChild(cardCanvas);
+    
+    // 添加轻微呼吸动画
+    let breathOffset = 0;
+    function animate() {
+      breathOffset += 0.05;
+      const bounce = Math.sin(breathOffset) * 2;
+      
+      // 重绘精灵
+      ctx.fillStyle = gradient;
+      ctx.fillRect(spriteX, spriteY - 5, spriteWidth, spriteHeight + 10);
+      ctx.drawImage(spriteCanvas, spriteX, spriteY + bounce, spriteWidth, spriteHeight);
+      
+      requestAnimationFrame(animate);
+    }
+    animate();
+    
+  } catch (e) {
+    console.error('[LPC] 渲染失败:', e);
+    // 回退到 Three.js
+    initVoxelPlayer(player, containerId);
+  }
+}
+
 function getVoxelPlayer(player, containerId) {
-  return `<div id="${containerId}" data-player='${JSON.stringify(player).replace(/'/g,"&apos;")}' style="width:200px;height:300px;margin:0 auto;"></div>`;
+  return `<div id="${containerId}" data-player='${JSON.stringify(player).replace(/'/g,"&apos;")}' style="width:200px;height:320px;margin:0 auto;"></div>`;
 }
 
 // ============================================================
@@ -1610,9 +1747,14 @@ function render(){
       try{
         const raw=el.dataset.player.replace(/&apos;/g,"'");
         const p=JSON.parse(raw);
-        console.log('[Voxel] Init player:', p.name, 'container:', el.id, 'THREE:', !!window.THREE);
-        initVoxelPlayer(p,el.id);
-      }catch(e){ console.error('[Voxel] Error:', e); }
+        console.log('[LPC] Init player:', p.name, 'container:', el.id);
+        // 优先使用 LPC 渲染器，失败时回退到 Three.js
+        if(typeof LPCPlayerGenerator !== 'undefined') {
+          initLPCPlayer(p, el.id);
+        } else {
+          initVoxelPlayer(p, el.id);
+        }
+      }catch(e){ console.error('[LPC] Error:', e); }
     });
   });
 }
