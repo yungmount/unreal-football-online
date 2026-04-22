@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>UFO - Unreal Football Online</title>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
 <script>
 // ---- Utils (must be before engine) ----
 const rand=(a,b)=>Math.floor(Math.random()*(b-a+1))+a;
@@ -1088,26 +1089,31 @@ function _drawHair(ctx, W, H, hairIdx, hairColor, skin, faceWFactor, hash) {
 // 扁平球员 SVG 风格 - 简洁、专业、游戏感
 // ================================================================
 // ================================================================
-// 扁平卡通球员 v2 - 清晰专业，直接 Canvas 2D 绘制
+// Three.js 3D 球员渲染 - 高质量卡通风格
+// 支持加载 Mixamo GLTF 模型或使用程序化几何体
 // ================================================================
-// ================================================================
-// 扁平卡通球员 - 与 generatePixelAvatar 颜色/特征完全同步
-// 共享 skinMap、hairPalettes、eyeCol 逻辑
-// ================================================================
+var voxelScenes = window.voxelScenes || {};
+
 function initVoxelPlayer(player, containerId) {
   var container = document.getElementById(containerId);
   if(!container) return;
   container.innerHTML = '';
 
-  // ---- 与 generatePixelAvatar 完全一致的随机种子 ----
+  // ---- 球员属性 ----
+  var ovr = player.ovr || 70, isMy = !!player.isMy;
+  var pNum = player.num || 10;
+  var nm = player.name || 'Player';
+  var height = player.height || 180;
+  var weight = player.weight || 75;
+
+  // ---- 随机种子（与 avatar 同步）----
   var seed = 0;
-  var nm = player.name || '';
-  for(var si2=0; si2<nm.length; si2++) seed = (seed * 31 + nm.charCodeAt(si2)) >>> 0;
+  for(var si=0; si<nm.length; si++) seed = (seed * 31 + nm.charCodeAt(si)) >>> 0;
   function rng() { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 0xFFFFFFFF; }
   function ri(min, max) { return Math.floor(rng() * (max - min + 1)) + min; }
   function pick(arr) { return arr[Math.floor(rng() * arr.length)]; }
 
-  // ---- 肤色（按国籍，完全复用 generatePixelAvatar 的 skinMap）----
+  // ---- 肤色、发色（与 generatePixelAvatar 同步）----
   var skinMap = {
     England:()=>pick(['#F2D8B8','#EAC8A0','#F0D0A8']),
     Germany:()=>pick(['#F0D8B8','#ECD0A4']),
@@ -1122,19 +1128,10 @@ function initVoxelPlayer(player, containerId) {
     China:()=>pick(['#E0C8A0','#D0B888']),
     USA:()=>pick(['#D0A078','#C09070']),
   };
-  function adj(hex, amt) {
-    var n=parseInt(hex.slice(1),16);
-    var r=Math.min(255,Math.max(0,((n>>16)&0xff)+amt));
-    var g=Math.min(255,Math.max(0,((n>>8)&0xff)+amt));
-    var b=Math.min(255,Math.max(0,(n&0xff)+amt));
-    return '#'+[r,g,b].map(function(v){return v.toString(16).padStart(2,'0');}).join('');
-  }
   var nat = player.nationality || player.nation || 'England';
-  var skinBase = (skinMap[nat] || skinMap.England)();
-  var skinHi=adj(skinBase,22), skinShd=adj(skinBase,-22), skinDk=adj(skinBase,-40), skinDK2=adj(skinBase,-58);
+  var skinHex = (skinMap[nat] || skinMap.England)();
 
-  // ---- 发色（完全复用 generatePixelAvatar 的 hairPalettes）----
-  var hairPalettes=[
+  var hairPalette = [
     ['#100804','#281408','#3C2010'],
     ['#281008','#4A2C14','#6A4020'],
     ['#4A2C10','#6A4820','#8A6430'],
@@ -1143,610 +1140,265 @@ function initVoxelPlayer(player, containerId) {
     ['#501408','#7A2818','#A04020'],
     ['#3C3C3C','#606060','#888888'],
   ];
-  var hairIdx = ri(0, hairPalettes.length-1);
-  var hairDrk=hairPalettes[hairIdx][0], hairMid=hairPalettes[hairIdx][1], hairLit=hairPalettes[hairIdx][2];
-  var hair = hairDrk;
+  var hairIdx = ri(0, hairPalette.length-1);
+  var hairHex = hairPalette[hairIdx][0];
+  var eyeCol = pick(['#2A4C8C','#1E5420','#6A3418','#404040','#3A6A8C','#8A5A18']);
 
-  // ---- 眼睛颜色（完全复用 generatePixelAvatar 的 eyeCol）----
-  var eyeCol=pick(['#2A4C8C','#1E5420','#6A3418','#404040','#3A6A8C','#8A5A18']);
+  // ---- Three.js 场景 ----
+  var W = 200, H = 320;
+  var scene = new THREE.Scene();
 
-  // ---- 发型风格（与 avatar 一致：0-6 共7种）----
-  var hSt = ri(0, 6);
-  // 表情
-  var expr = ri(0, 2);
+  // ---- 相机（正视角）----
+  var camera = new THREE.PerspectiveCamera(35, W/H, 0.1, 100);
+  camera.position.set(0, 1.0, 4.2);
+  camera.lookAt(0, 0.9, 0);
 
-  // ---- 球员属性 ----
-  var ovr = player.ovr || 70, isMy = !!player.isMy;
-  var pNum = player.num || 10;
-  var kitR=isMy?220:17, kitG=isMy?34:51, kitB=isMy?51:187;
-  var kit='rgb('+kitR+','+kitG+','+kitB+')';
-  var kitD='rgb('+(kitR*0.7|0)+','+(kitG*0.7|0)+','+(kitB*0.7|0)+')';
-  var kitL='rgb('+Math.min(255,kitR*1.2|0)+','+Math.min(255,kitG*1.2|0)+','+Math.min(255,kitB*1.2|0)+')';
-  var short='#111122';
-  var jc=pick(['#CC1111','#1133BB','#118811','#CC8800','#881188','#008899','#CC4400']);
-  var jl=pick(['#EE3333','#2255DD','#22AA22','#EECC00','#AA22AA','#00AACC','#EE6600']);
+  // ---- 渲染器 ----
+  var renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+  renderer.setSize(W, H);
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  renderer.outputEncoding = THREE.sRGBEncoding;
+  container.appendChild(renderer.domElement);
 
-  // ---- Canvas ----
-  var W2=200, H2=320;
-  var cv=document.createElement('canvas'); cv.width=W2; cv.height=H2;
-  var pc=cv.getContext('2d'); pc.imageSmoothingEnabled=true;
-  pc.clearRect(0,0,W2,H2);
-  var cx=W2/2;
+  // ---- 灯光（三点光照）----
+  var mainLight = new THREE.DirectionalLight(0xffffff, 1.0);
+  mainLight.position.set(3, 4, 2);
+  mainLight.castShadow = true;
+  mainLight.shadow.mapSize.width = 512;
+  mainLight.shadow.mapSize.height = 512;
+  mainLight.shadow.camera.near = 0.1;
+  mainLight.shadow.camera.far = 20;
+  scene.add(mainLight);
 
-  var hR=28, hX=cx, hY=52;
-  var nW=12, nH=12, nY=hY+hR;
-  var tW=68, tH=60, tX=cx, tY=nY+nH;
-  var shW=62, shH=28, shY=tY+tH-4;
-  var lCX1=84, lCX2=116, lW=24, lH=52;
-  var skY=190, skH=46, skW=26;
-  var sY=250, sW=30, sH=16;
+  var fillLight = new THREE.DirectionalLight(0xffffff, 0.5);
+  fillLight.position.set(-2, 2, 1);
+  scene.add(fillLight);
 
-  // ---- 肩膀 ----
-  for(var cy2=0;cy2<8;cy2++){
-    var x0=Math.max(4,20-cy2);
-    var x1=Math.min(60,44+cy2);
-    pc.fillStyle=cy2<4?jl:jc;
-    pc.fillRect(x0*4|0,(tY-28+cy2*4),((x1-x0)*4)|0,4);
+  var rimLight = new THREE.DirectionalLight(0x88ccff, 0.3);
+  rimLight.position.set(0, 2, -2);
+  scene.add(rimLight);
+
+  var ambient = new THREE.AmbientLight(0xffffff, 0.4);
+  scene.add(ambient);
+
+  // ---- 球员组 ----
+  var playerGroup = new THREE.Group();
+  scene.add(playerGroup);
+
+  // 颜色辅助函数
+  function hexToRgb(hex) {
+    var n = parseInt(hex.slice(1), 16);
+    return new THREE.Color((n>>16)/255, ((n>>8)&0xff)/255, (n&0xff)/255);
   }
 
-  // ---- 短裤（腿洞）----
-  pc.fillStyle=skinBase;
-  pc.beginPath(); pc.ellipse(lCX1,shY+8,14,16,0,0,Math.PI*2); pc.fill();
-  pc.beginPath(); pc.ellipse(lCX2,shY+8,14,16,0,0,Math.PI*2); pc.fill();
-  pc.fillStyle=short;
-  pc.beginPath();
-  pc.moveTo(cx-shW/2,shY-10); pc.lineTo(cx+shW/2,shY-10);
-  pc.lineTo(cx+shW/2+4,shY+shH); pc.lineTo(cx-shW/2-4,shY+shH);
-  pc.closePath(); pc.fill();
-  pc.fillStyle='#ddd'; pc.fillRect(cx-shW/2-4,shY+shH-3,shW+8,3);
+  var skinColor = hexToRgb(skinHex);
+  var hairColor = hexToRgb(hairHex);
+  var kitColor = isMy ? new THREE.Color(0xDC2233) : new THREE.Color(0x1133BB);
 
-  // ---- 双腿 ----
-  pc.fillStyle=skinBase;
-  pc.fillRect(lCX1-lW/2,shY+10,lW,lH-10); pc.fillRect(lCX2-lW/2,shY+10,lW,lH-10);
-  pc.fillStyle=skinShd;
-  pc.fillRect(lCX1-lW/2,shY+10,lW/3,lH-10); pc.fillRect(lCX2-lW/2,shY+10,lW/3,lH-10);
+  // ---- 身体比例（基于身高体重）----
+  var hScale = height / 180;
 
-  // ---- 袜子 ----
-  pc.fillStyle='#f8f8f8';
-  pc.fillRect(lCX1-skW/2,skY,skW,skH); pc.fillRect(lCX2-skW/2,skY,skW,skH);
-  pc.fillStyle=kit;
-  pc.fillRect(lCX1-skW/2+2,skY+4,skW/3-1,skH-8); pc.fillRect(lCX1+skW/6,skY+4,skW/3-1,skH-8);
-  pc.fillRect(lCX2-skW/2+2,skY+4,skW/3-1,skH-8); pc.fillRect(lCX2+skW/6,skY+4,skW/3-1,skH-8);
+  // 材质
+  var skinMat = new THREE.MeshStandardMaterial({ color: skinColor, roughness: 0.7, metalness: 0 });
+  var hairMat = new THREE.MeshStandardMaterial({ color: hairColor, roughness: 0.9 });
+  var kitMat = new THREE.MeshStandardMaterial({ color: kitColor, roughness: 0.6 });
+  var shortMat = new THREE.MeshStandardMaterial({ color: 0x111122, roughness: 0.8 });
+  var sockMat = new THREE.MeshStandardMaterial({ color: 0xf8f8f8, roughness: 0.7 });
+  var shoeMat = new THREE.MeshStandardMaterial({ color: 0x1a1a1a, roughness: 0.5 });
+  var eyeWhiteMat = new THREE.MeshStandardMaterial({ color: 0xffffff });
+  var eyeIrisMat = new THREE.MeshStandardMaterial({ color: hexToRgb(eyeCol) });
 
-  // ---- 球鞋 ----
-  pc.fillStyle='#1a1a1a';
-  pc.beginPath(); pc.ellipse(lCX1,sY+sH/2,sW/2+2,sH/2,0,0,Math.PI*2); pc.fill();
-  pc.beginPath(); pc.ellipse(lCX2,sY+sH/2,sW/2+2,sH/2,0,0,Math.PI*2); pc.fill();
-  pc.fillStyle='#333';
-  pc.fillRect(lCX1-sW/2+2,sY,sW-4,sH/2+1); pc.fillRect(lCX2-sW/2+2,sY,sW-4,sH/2+1);
-  pc.fillStyle='#1a1a1a';
-  pc.beginPath(); pc.ellipse(lCX1,sY+sH/2,sW/2,sH/2,0,0,Math.PI*2); pc.fill();
-  pc.beginPath(); pc.ellipse(lCX2,sY+sH/2,sW/2,sH/2,0,0,Math.PI*2); pc.fill();
-
-  // ---- 躯干 ----
-  pc.fillStyle=kit; pc.fillRect(tX-tW/2,tY,tW,tH);
-  pc.fillStyle=kitD; pc.fillRect(tX+tW/2-14,tY,14,tH);
-  pc.fillStyle=kitL; pc.fillRect(tX-tW/2,tY,10,tH);
-  pc.strokeStyle=kitD; pc.lineWidth=1.5;
-  pc.beginPath(); pc.moveTo(tX-tW/2,tY); pc.lineTo(tX+tW/2,tY); pc.stroke();
-
-  // ---- 领口 ----
-  pc.fillStyle=skinBase;
-  pc.beginPath(); pc.ellipse(cx,tY+2,16,10,0,0,Math.PI*2); pc.fill();
-  pc.fillStyle='rgba(0,0,0,0.1)';
-  pc.beginPath(); pc.ellipse(cx,tY+4,10,6,0,0,Math.PI); pc.fill();
-
-  // ---- 袖子 ----
-  var armY=tY+6, armH=38, armW=16;
-  pc.fillStyle=kit;
-  pc.fillRect(tX-tW/2-armW,armY,armW,armH-10); pc.fillRect(tX+tW/2,armY,armW,armH-10);
-  pc.fillStyle=skinBase;
-  pc.fillRect(tX-tW/2-armW+2,armY+armH-10,armW-4,12);
-  pc.fillRect(tX+tW/2+2,armY+armH-10,armW-4,12);
-  pc.fillStyle=kitD;
-  pc.fillRect(tX-tW/2-armW,armY,5,armH-10); pc.fillRect(tX+tW/2+armW-5,armY,5,armH-10);
-
-  // ---- 短裤腰 ----
-  pc.fillStyle=short; pc.fillRect(cx-shW/2+2,shY-10,shW-4,12);
-  pc.fillStyle=kit; pc.fillRect(cx-shW/2+2,shY-10,shW-4,4);
-
-  // ---- 号码 ----
-  pc.fillStyle='rgba(0,0,0,0.18)'; pc.font='bold 34px Arial'; pc.textAlign='center'; pc.textBaseline='middle';
-  pc.fillText(pNum,cx+1.5,tY+tH*0.52+1.5);
-  pc.fillStyle='#fff'; pc.fillText(pNum,cx,tY+tH*0.52);
-
-  // ---- 颈部 ----
-  pc.fillStyle=skinBase; pc.fillRect(cx-nW/2,nY,nW,nH);
-  pc.fillStyle=skinShd; pc.fillRect(cx-nW/2,nY,nW/3,nH);
-
-  // ==================== 头部 ====================
-
-  // 头发底
-  pc.fillStyle=hair;
-  pc.beginPath(); pc.arc(hX,hY,hR+5,Math.PI,0); pc.fill();
-  pc.fillRect(hX-hR-3,hY-4,8,hR+10); pc.fillRect(hX+hR-5,hY-4,8,hR+10);
-
-  // 耳朵
-  pc.fillStyle=skinBase;
-  pc.beginPath(); pc.ellipse(hX-hR-4,hY+4,6,9,0,0,Math.PI*2); pc.fill();
-  pc.beginPath(); pc.ellipse(hX+hR-2,hY+4,6,9,0,0,Math.PI*2); pc.fill();
-
-  // 脸
-  pc.fillStyle=skinBase;
-  pc.beginPath(); pc.ellipse(hX,hY,hR,hR+4,0,0,Math.PI*2); pc.fill();
-  pc.fillStyle='rgba(0,0,0,0.07)';
-  pc.beginPath(); pc.ellipse(hX-hR/2,hY+2,hR/2+2,hR+2,0,0,Math.PI*2); pc.fill();
-
-  // 眉毛
-  pc.fillStyle=hair;
-  pc.fillRect(hX-18,hY-16,14,3); pc.fillRect(hX+4,hY-16,14,3);
+  // 头部
+  var headR = 0.13 * hScale;
+  var headGeo = new THREE.SphereGeometry(headR, 32, 32);
+  var head = new THREE.Mesh(headGeo, skinMat);
+  head.position.y = 1.48 * hScale;
+  head.castShadow = true;
+  playerGroup.add(head);
 
   // 眼睛
-  pc.fillStyle='#fff';
-  pc.beginPath(); pc.ellipse(hX-11,hY-4,9,7,0,0,Math.PI*2); pc.fill();
-  pc.beginPath(); pc.ellipse(hX+11,hY-4,9,7,0,0,Math.PI*2); pc.fill();
-  pc.fillStyle=eyeCol;
-  pc.beginPath(); pc.arc(hX-11,hY-3,5,0,Math.PI*2); pc.fill();
-  pc.beginPath(); pc.arc(hX+11,hY-3,5,0,Math.PI*2); pc.fill();
-  pc.fillStyle='#111';
-  pc.beginPath(); pc.arc(hX-11,hY-3,2.5,0,Math.PI*2); pc.fill();
-  pc.beginPath(); pc.arc(hX+11,hY-3,2.5,0,Math.PI*2); pc.fill();
-  pc.fillStyle='rgba(255,255,255,0.9)';
-  pc.beginPath(); pc.arc(hX-13,hY-5,2,0,Math.PI*2); pc.fill();
-  pc.beginPath(); pc.arc(hX+9,hY-5,2,0,Math.PI*2); pc.fill();
+  var eyeGeo = new THREE.SphereGeometry(0.016, 16, 16);
+  var eyePupilGeo = new THREE.SphereGeometry(0.008, 12, 12);
 
-  // 鼻子
-  pc.fillStyle=skinShd;
-  pc.beginPath(); pc.arc(hX,hY+12,4,0,Math.PI*2); pc.fill();
-  pc.fillRect(hX-2,hY+8,4,6);
+  [-1, 1].forEach(function(side) {
+    var eye = new THREE.Mesh(eyeGeo, eyeWhiteMat);
+    eye.position.set(side * 0.042 * hScale, 1.50 * hScale, headR - 0.01);
+    playerGroup.add(eye);
 
-  // 嘴巴
-  if(expr===0){
-    pc.strokeStyle='rgba(0,0,0,0.25)'; pc.lineWidth=2; pc.lineCap='round';
-    pc.beginPath(); pc.arc(hX,hY+20,9,0.15,Math.PI-0.15); pc.stroke();
-  } else if(expr===1){
-    pc.fillStyle='#cc4444';
-    pc.beginPath(); pc.ellipse(hX,hY+22,8,5,0,0,Math.PI*2); pc.fill();
-    pc.fillStyle='rgba(0,0,0,0.15)';
-    pc.beginPath(); pc.ellipse(hX,hY+20,8,3,0,0,Math.PI); pc.fill();
+    var iris = new THREE.Mesh(eyePupilGeo, eyeIrisMat);
+    iris.position.set(side * 0.042 * hScale, 1.50 * hScale, headR + 0.003);
+    playerGroup.add(iris);
+  });
+
+  // 发型
+  var hairStyle = ri(0, 3);
+  if(hairStyle <= 1) {
+    var hairGeo = new THREE.SphereGeometry(headR * 1.06, 32, 32, 0, Math.PI * 2, 0, Math.PI * 0.55);
+    var hair = new THREE.Mesh(hairGeo, hairMat);
+    hair.position.y = 1.48 * hScale;
+    playerGroup.add(hair);
+  } else if(hairStyle === 2) {
+    // 光头
   } else {
-    pc.fillStyle='rgba(0,0,0,0.2)'; pc.fillRect(hX-8,hY+21,16,2.5);
+    // 马尾
+    var hairGeo = new THREE.SphereGeometry(headR * 1.08, 32, 32, 0, Math.PI * 2, 0, Math.PI * 0.6);
+    var hair = new THREE.Mesh(hairGeo, hairMat);
+    hair.position.y = 1.48 * hScale;
+    playerGroup.add(hair);
+
+    var tailGeo = new THREE.CapsuleGeometry(0.02, 0.15, 8, 16);
+    var tail = new THREE.Mesh(tailGeo, hairMat);
+    tail.position.set(0, 1.40 * hScale, -headR * 0.85);
+    tail.rotation.x = -Math.PI * 0.35;
+    playerGroup.add(tail);
   }
 
-  // 发型（7种，与 avatar 对应）
-  pc.fillStyle=hair;
-  if(hSt===0){
-    pc.beginPath(); pc.ellipse(hX,hY-hR*0.6,hR+3,hR*0.65,0,Math.PI,0); pc.fill();
-  } else if(hSt===1){
-    pc.beginPath(); pc.ellipse(hX,hY-hR*0.5,hR+3,hR*0.62,0,Math.PI,0); pc.fill();
-    pc.fillRect(hX-hR,hY-hR*0.5,hR*2,9);
-    pc.fillRect(hX-hR+2,hY-hR*0.3,hR*0.5,12);
-    pc.fillRect(hX+hR*0.5-2,hY-hR*0.3,hR*0.5,12);
-  } else if(hSt===2){
-    pc.beginPath(); pc.ellipse(hX,hY-hR*0.3,hR+6,hR*0.72,0,Math.PI,0); pc.fill();
-    for(var ci=0;ci<8;ci++){
-      pc.beginPath(); pc.arc(hX+(ci-3.5)*8,hY-hR*0.4-rng()*8,5+rng()*4,0,Math.PI*2); pc.fill();
+  // 脖子
+  var neckGeo = new THREE.CylinderGeometry(0.04 * hScale, 0.05 * hScale, 0.08 * hScale, 16);
+  var neck = new THREE.Mesh(neckGeo, skinMat);
+  neck.position.y = 1.33 * hScale;
+  playerGroup.add(neck);
+
+  // 躯干
+  var torsoW = 0.22, torsoH = 0.38 * hScale;
+  var torsoGeo = new THREE.BoxGeometry(torsoW, torsoH, 0.12);
+  var torso = new THREE.Mesh(torsoGeo, kitMat);
+  torso.position.y = 1.02 * hScale;
+  torso.castShadow = true;
+  playerGroup.add(torso);
+
+  // 球衣号码
+  var numCanvas = document.createElement('canvas');
+  numCanvas.width = 64;
+  numCanvas.height = 64;
+  var numCtx = numCanvas.getContext('2d');
+  numCtx.fillStyle = 'rgba(255,255,255,0.95)';
+  numCtx.font = 'bold 48px Arial';
+  numCtx.textAlign = 'center';
+  numCtx.textBaseline = 'middle';
+  numCtx.fillText(pNum.toString(), 32, 32);
+  var numTex = new THREE.CanvasTexture(numCanvas);
+
+  var numGeo = new THREE.PlaneGeometry(0.1, 0.1);
+  var numMat = new THREE.MeshBasicMaterial({ map: numTex, transparent: true });
+  var number = new THREE.Mesh(numGeo, numMat);
+  number.position.set(0, 1.05 * hScale, 0.062);
+  playerGroup.add(number);
+
+  // 短袖
+  var sleeveGeo = new THREE.BoxGeometry(0.06, 0.12, 0.06);
+  [-1, 1].forEach(function(side) {
+    var sleeve = new THREE.Mesh(sleeveGeo, kitMat);
+    sleeve.position.set(side * (torsoW/2 + 0.03), 1.16 * hScale, 0);
+    sleeve.rotation.z = side * Math.PI * 0.15;
+    playerGroup.add(sleeve);
+  });
+
+  // 上臂
+  var armGeo = new THREE.CapsuleGeometry(0.032, 0.14, 8, 16);
+  [-1, 1].forEach(function(side) {
+    var arm = new THREE.Mesh(armGeo, skinMat);
+    arm.position.set(side * (torsoW/2 + 0.05), 1.02 * hScale, 0);
+    arm.rotation.z = side * Math.PI * 0.1;
+    arm.castShadow = true;
+    playerGroup.add(arm);
+  });
+
+  // 短裤
+  var shortGeo = new THREE.BoxGeometry(0.18, 0.16 * hScale, 0.14);
+  var shorts = new THREE.Mesh(shortGeo, shortMat);
+  shorts.position.y = 0.75 * hScale;
+  shorts.castShadow = true;
+  playerGroup.add(shorts);
+
+  // 大腿
+  var thighGeo = new THREE.CapsuleGeometry(0.042, 0.18 * hScale, 8, 16);
+  [-1, 1].forEach(function(side) {
+    var thigh = new THREE.Mesh(thighGeo, skinMat);
+    thigh.position.set(side * 0.055, 0.55 * hScale, 0);
+    thigh.castShadow = true;
+    playerGroup.add(thigh);
+  });
+
+  // 袜子
+  var sockGeo = new THREE.CylinderGeometry(0.038, 0.032, 0.24 * hScale, 16);
+  var sockStripeGeo = new THREE.CylinderGeometry(0.039, 0.039, 0.025, 16);
+  [-1, 1].forEach(function(side) {
+    var sock = new THREE.Mesh(sockGeo, sockMat);
+    sock.position.set(side * 0.055, 0.22 * hScale, 0);
+    playerGroup.add(sock);
+
+    for(var i=0; i<3; i++) {
+      var stripe = new THREE.Mesh(sockStripeGeo, kitMat);
+      stripe.position.set(side * 0.055, 0.28 * hScale + i * 0.05, 0);
+      playerGroup.add(stripe);
     }
-  } else if(hSt===3){
-    pc.beginPath(); pc.ellipse(hX,hY-hR*0.7,hR+2,hR*0.38,0,Math.PI,0); pc.fill();
-    pc.fillRect(hX-hR+2,hY-hR*0.4,4,10); pc.fillRect(hX+hR-6,hY-hR*0.4,4,10);
-  } else if(hSt===4){
-    pc.beginPath(); pc.ellipse(hX,hY-hR*0.55,hR+4,hR*0.68,0,Math.PI,0); pc.fill();
-    pc.strokeStyle=hairMid; pc.lineWidth=1.5;
-    pc.beginPath(); pc.moveTo(cx+3,hY-hR*0.6); pc.lineTo(cx-5,hY+5); pc.stroke();
-  } else if(hSt===5){
-    pc.beginPath(); pc.ellipse(hX,hY-hR*0.58,hR+2,hR*0.62,0,Math.PI,0); pc.fill();
-    pc.fillRect(hX-hR+4,hY-hR*0.58,hR*2-8,6);
-  } else {
-    pc.beginPath(); pc.ellipse(hX,hY-hR*0.3,hR+4,hR*0.78,0,Math.PI,0); pc.fill();
-    pc.fillRect(hX-hR,hY-hR*0.1,hR*0.5,hR+14);
-    pc.fillRect(hX+hR*0.5,hY-hR*0.1,hR*0.5,hR+14);
-    pc.fillRect(hX-hR*0.3,hY-hR*0.7,hR*0.6,hR*0.9);
-  }
-
-  // 背景
-  var grd=pc.createLinearGradient(0,0,0,H2);
-  grd.addColorStop(0,'rgba('+kitR+','+kitG+','+kitB+',0.08)');
-  grd.addColorStop(1,'rgba('+kitR+','+kitG+','+kitB+',0.02)');
-  pc.fillStyle=grd; pc.fillRect(0,0,W2,H2);
-
-  // 名字 + 能力值
-  pc.fillStyle='rgba(0,0,0,0.45)';
-  pc.font='bold 10px Arial'; pc.textAlign='center'; pc.textBaseline='bottom';
-  pc.fillText(nm,cx,H2-2);
-  pc.fillStyle=ovr>80?'#ffd700':ovr>60?'#fff':'#aaa';
-  pc.font='bold 11px Arial'; pc.textAlign='right';
-  pc.fillText(ovr,cx+28,H2-2);
-
-  // 放入容器
-  container.style.position='relative';
-  container.style.width=W2+'px'; container.style.height=H2+'px';
-  cv.style.position='absolute'; cv.style.top='0'; cv.style.left='0';
-  container.appendChild(cv);
-  voxelScenes[containerId]={renderer:null, canvas:cv};
-}
-
-// ---- 3D Player Body SVG (fallback) ----
-function getPlayerBody(player) {
-  const h = player.height || 180;
-  const w = player.weight || 75;
-  // Body proportions based on height/weight
-  const bodyW = 28 + (w - 70) * 0.3;
-  const bodyH = 35 + (h - 175) * 0.2;
-  const legLen = 55 + (h - 175) * 0.4;
-  const skinColors = {
-    England:'#FFDFC4',Spain:'#F0C8A0',Germany:'#FFE0BD',France:'#FFDFC4',
-    Brazil:'#C4956A',Argentina:'#F0C8A0',Italy:'#FFDFC4',Nigeria:'#704214',
-    Japan:'#FFE4C4',Korea:'#FFE4C4',China:'#FFE4C4',USA:'#E8B796'
-  };
-  const skin = skinColors[player.region] || '#FFDFC4';
-  const jerseyColors = ['#00d4ff','#ff4444','#22c55e','#ffd700','#9333ea','#f97316','#ec4899','#06b6d4'];
-  const jc = jerseyColors[(player.name.charCodeAt(0)+player.name.charCodeAt(1))%jerseyColors.length];
-  const num = ((player.name.charCodeAt(0)*3+player.name.charCodeAt(2))%99)+1;
-  const cx = 60;
-  const headY = 20;
-  const neckY = headY + 22;
-  const shoulderY = neckY + 8;
-  const waistY = shoulderY + bodyH;
-  const kneeY = waistY + legLen * 0.55;
-  const footY = waistY + legLen;
-  const lx = cx - bodyW/2;
-  const rx = cx + bodyW/2;
-
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 ${footY+15}" width="120" height="${footY+15}">
-    <defs>
-      <linearGradient id="jg" x1="0%" y1="0%" x2="0%" y2="100%">
-        <stop offset="0%" style="stop-color:${jc}"/>
-        <stop offset="100%" style="stop-color:${jc}99"/>
-      </linearGradient>
-      <linearGradient id="sg" x1="0%" y1="0%" x2="100%" y2="100%">
-        <stop offset="0%" style="stop-color:${skin}"/>
-        <stop offset="100%" style="stop-color:${skin}cc"/>
-      </linearGradient>
-    </defs>
-    <!-- Shadow -->
-    <ellipse cx="${cx}" cy="${footY+10}" rx="25" ry="6" fill="rgba(0,0,0,0.3)"/>
-    <!-- Left leg -->
-    <path d="M${cx-bodyW*0.35} ${waistY} L${cx-bodyW*0.3} ${kneeY} L${cx-bodyW*0.28} ${footY}" stroke="${skin}" stroke-width="${bodyW*0.28}" stroke-linecap="round" fill="none"/>
-    <!-- Right leg -->
-    <path d="M${cx+bodyW*0.35} ${waistY} L${cx+bodyW*0.3} ${kneeY} L${cx+bodyW*0.28} ${footY}" stroke="${skin}" stroke-width="${bodyW*0.28}" stroke-linecap="round" fill="none"/>
-    <!-- Socks -->
-    <path d="M${cx-bodyW*0.3} ${kneeY+5} L${cx-bodyW*0.28} ${footY}" stroke="${jc}" stroke-width="${bodyW*0.26}" stroke-linecap="round" fill="none" opacity="0.8"/>
-    <path d="M${cx+bodyW*0.3} ${kneeY+5} L${cx+bodyW*0.28} ${footY}" stroke="${jc}" stroke-width="${bodyW*0.26}" stroke-linecap="round" fill="none" opacity="0.8"/>
-    <!-- Shoes -->
-    <ellipse cx="${cx-bodyW*0.28}" cy="${footY+3}" rx="${bodyW*0.22}" ry="5" fill="#1a1a1a"/>
-    <ellipse cx="${cx+bodyW*0.28}" cy="${footY+3}" rx="${bodyW*0.22}" ry="5" fill="#1a1a1a"/>
-    <!-- Shorts -->
-    <path d="M${lx+2} ${waistY-2} L${lx} ${waistY+18} L${cx-2} ${waistY+20} L${cx+2} ${waistY+20} L${rx} ${waistY+18} L${rx-2} ${waistY-2} Z" fill="#1a1a1a"/>
-    <!-- Jersey body -->
-    <path d="M${lx} ${shoulderY} L${lx-8} ${shoulderY+5} L${lx-10} ${waistY} L${rx+10} ${waistY} L${rx+8} ${shoulderY+5} L${rx} ${shoulderY} Z" fill="url(#jg)"/>
-    <!-- Jersey number -->
-    <text x="${cx}" y="${shoulderY+bodyH*0.55}" font-family="Arial Black" font-size="${bodyW*0.45}" font-weight="900" fill="white" text-anchor="middle" opacity="0.9">${num}</text>
-    <!-- Left arm -->
-    <path d="M${lx} ${shoulderY+3} L${lx-14} ${shoulderY+bodyH*0.7}" stroke="url(#jg)" stroke-width="${bodyW*0.28}" stroke-linecap="round" fill="none"/>
-    <!-- Right arm -->
-    <path d="M${rx} ${shoulderY+3} L${rx+14} ${shoulderY+bodyH*0.7}" stroke="url(#jg)" stroke-width="${bodyW*0.28}" stroke-linecap="round" fill="none"/>
-    <!-- Hands -->
-    <circle cx="${lx-14}" cy="${shoulderY+bodyH*0.7+5}" r="${bodyW*0.14}" fill="${skin}"/>
-    <circle cx="${rx+14}" cy="${shoulderY+bodyH*0.7+5}" r="${bodyW*0.14}" fill="${skin}"/>
-    <!-- Neck -->
-    <rect x="${cx-5}" y="${neckY}" width="10" height="10" fill="${skin}" rx="2"/>
-    <!-- Head placeholder (avatar shown separately) -->
-    <circle cx="${cx}" cy="${headY}" r="18" fill="${skin}" opacity="0.3" stroke="${skin}" stroke-width="1"/>
-    <text x="${cx}" y="${headY+5}" font-size="10" text-anchor="middle" fill="${skin}" opacity="0.6">👤</text>
-  </svg>`;
-}
-
-// ---- Player Creation ----
-function createPlayer(region, position, quality=60, ageRange=[14,20]) {
-  const age = rand(ageRange[0], ageRange[1]);
-  const names = NAMES[region] || NAMES.England;
-  const name = names[rand(0,names.length-1)];
-  const pb = {GK:{pac:-20,sho:-25,def:20},CB:{pac:-5,sho:-15,def:25,phy:20},LB:{pac:15,def:10,pas:10},RB:{pac:15,def:10,pas:10},CDM:{def:15,pas:15},CM:{sho:10,def:5,pas:18},CAM:{pac:10,sho:18,def:-5,pas:15},LW:{pac:22,sho:18,def:-10},RW:{pac:22,sho:18,def:-10},ST:{pac:12,sho:25,def:-15,phy:15}};
-  const b = pb[position]||{};
-  const ovr = Math.max(30,Math.min(99,quality+rand(-8,8)));
-  const pot = Math.min(99,quality+rand(5,22));
-  const hBase = {GK:192,CB:188,LB:181,RB:181,CDM:184,CM:181,CAM:178,LW:176,RW:176,ST:185}[position]||180;
-  const height = Math.round(hBase + rand(-4,4) - (age<20?(20-age)*0.08:0));
-  const weight = Math.round(height*0.65+rand(-5,5));
-  const val = Math.floor(ovr*8000*(age<22?1.6:age<26?1.2:age<30?0.8:0.35)*rand(80,120)/100);
-  return {
-    id:uid(), name, region, position, age, ovr, potential:pot,
-    pace:Math.max(30,Math.min(99,rand(50,85)+(b.pac||0))),
-    shooting:Math.max(30,Math.min(99,rand(40,80)+(b.sho||0))),
-    passing:Math.max(30,Math.min(99,rand(45,85)+(b.pas||0))),
-    defending:Math.max(30,Math.min(99,rand(40,80)+(b.def||0))),
-    physical:Math.max(30,Math.min(99,rand(50,85)+(b.phy||0))),
-    fitness:rand(75,100), morale:rand(60,100),
-    value:val, wage:Math.floor(ovr*80*rand(80,120)/100),
-    goals:0, assists:0, matches:0, height, weight
-  };
-}
-
-// ---- Game State ----
-let G = null;
-let tab = 'home';
-let filterPos = 'all';
-let toast = null;
-let MS = null; // match state
-let selPlayer = null;
-let cvs = null, ctx = null;
-let rafId = null;
-let lastT = 0;
-
-function initGame() {
-  const saved = localStorage.getItem(SAVE_KEY);
-  if (saved) { try { G = JSON.parse(saved); return; } catch(e){} }
-  G = {
-    budget:5000000, team:[], league:[], season:1, week:1, day:0,
-    formation:'4-4-2', tactic:'balance',
-    facilities:{training:1,academy:1,stadium:1},
-    market:[], prospects:[], news:[]
-  };
-  const pos = ['GK','CB','CB','LB','RB','CDM','CM','CM','LW','RW','ST','ST','CB','CM','CDM','LB','RB','GK','CAM','ST','CM','CB'];
-  const reg = ['England','Spain','Brazil','Germany','France','Italy','Argentina','Portugal','Nigeria','Japan','Korea','China','USA','England','Spain','Brazil','Germany','France','Italy','Argentina','Portugal','England'];
-  for(let i=0;i<22;i++) G.team.push(createPlayer(reg[i],pos[i],rand(58,72)));
-  const tns = {en:['FC United','Athletic Club','Dragon FC','Lion SC','Red Stars','Blue Moon','Green FC','Phoenix FC','Silver Eagles','Golden Snakes','Violets','Panthers'],zh:['FC联','竞技俱乐部','龙之队','雄狮SC','红星队','蓝月亮','绿茵FC','凤凰FC','银鹰SC','金蛇队','紫百合','黑豹FC']};
-  G.league = tns.en.map((n,i)=>({name:n,index:i,strength:rand(40,88),played:0,won:0,drawn:0,lost:0,gf:0,ga:0,pts:0}));
-  G.leagueNames = tns;
-}
-function save(){localStorage.setItem(SAVE_KEY,JSON.stringify(G))}
-function getLN(i){return LANG==='zh'?G.leagueNames.zh[i]:G.leagueNames.en[i]}
-function addNews(txt){G.news.unshift({txt,t:Date.now()});if(G.news.length>20)G.news.pop()}
-
-function refreshMarket(){
-  const q=55+G.facilities.academy*3;
-  const regs=['England','Spain','Brazil','Germany','France','Italy','Argentina'];
-  G.market=[];
-  for(let i=0;i<6;i++){
-    const p=createPlayer(regs[rand(0,regs.length-1)],['GK','CB','LB','RB','CDM','CM','CAM','LW','RW','ST'][rand(0,9)],rand(q-10,q+15));
-    p.askPrice=Math.floor(p.value*rand(75,125)/100);
-    G.market.push(p);
-  }
-  save();
-}
-function scoutAcademy(){
-  const cnt=2+Math.floor(G.facilities.academy/2);
-  const q=42+G.facilities.academy*4;
-  G.prospects=[];
-  for(let i=0;i<Math.min(cnt,4);i++) G.prospects.push(createPlayer('China',['GK','CB','CM','ST'][rand(0,3)],rand(q-12,q+12),[14,20]));
-  addNews('🌟 青训发现'+G.prospects.length+'名人才!');
-}
-function trainTeam(){
-  const bonus=1+G.facilities.training*0.18;
-  G.team.forEach(p=>{
-    if(p.age<29&&p.ovr<p.potential){const g=Math.floor(rand(0,2)*bonus);if(g>0){p.ovr=Math.min(p.potential,p.ovr+g);if(rand(1,100)<=25){const s=['pace','shooting','passing','defending','physical'];p[s[rand(0,4)]]=Math.min(99,p[s[rand(0,4)]]+1)}}}
-    p.fitness=Math.min(100,p.fitness+rand(8,18));
-  });
-  addNews(t('trained'));
-  save();
-}
-
-// ---- Formation Positions ----
-const FP = {
-  '4-4-2':[[.08,.5],[.22,.15],[.22,.4],[.22,.6],[.22,.85],[.38,.2],[.38,.45],[.38,.75],[.52,.15],[.52,.5],[.52,.85]],
-  '4-3-3':[[.08,.5],[.22,.15],[.22,.4],[.22,.6],[.22,.85],[.38,.3],[.38,.5],[.38,.7],[.55,.2],[.55,.5],[.55,.8]],
-  '4-2-3-1':[[.08,.5],[.22,.15],[.22,.4],[.22,.6],[.22,.85],[.35,.35],[.35,.65],[.48,.2],[.48,.5],[.48,.8],[.58,.5]],
-  '3-5-2':[[.08,.5],[.22,.25],[.22,.5],[.22,.75],[.38,.1],[.38,.35],[.38,.5],[.38,.65],[.38,.9],[.52,.35],[.52,.65]]
-};
-
-// ---- Match Engine v3.0 ----
-function startMatch() {
-  if(rafId){cancelAnimationFrame(rafId);rafId=null}
-  MS = null; tab = 'match'; render();
-
-  setTimeout(()=>{
-    const fp = FP[G.formation]||FP['4-4-2'];
-    const myTeam = G.team.slice(0,11).map((p,i)=>{
-      const pos = fp[i]||[.25,.5];
-      return {...p, hx:pos[0], hy:pos[1], role:i===0?'GK':i<3?'DEF':i<7?'MID':'ATT', isMy:true};
-    });
-    const oppIdx = rand(1,G.league.length-1);
-    const oppStr = G.league[oppIdx].strength;
-    const oppPos = ['GK','CB','CB','LB','RB','CDM','CM','CM','LW','RW','ST'];
-    const oppTeam = oppPos.map((pos,i)=>{
-      const p = createPlayer(['England','Spain','Brazil','Germany','France'][rand(0,4)],pos,oppStr);
-      return {...p, role:pos, isMy:false};
-    });
-
-    // v4: 预计算引擎 — 赛前一次性生成，播放零计算
-    MS = new MatchEngine(myTeam, oppTeam, getLN(oppIdx), Tactics.TIKITAKA, Tactics.COUNTER);
-    MS.oppName = getLN(oppIdx);
-    // 兼容别名
-    Object.defineProperty(MS, 'myScore', { get() { return this.score.my; } });
-    Object.defineProperty(MS, 'oppScore', { get() { return this.score.opp; } });
-    Object.defineProperty(MS, 'finished', { get() { return !this.playing; } });
-    MS.start();
-
-    render();
-    setTimeout(()=>{rafId=requestAnimationFrame(matchLoopV3)},100);
-  },100);
-}
-
-function matchLoopV3() {
-  if(!MS||!MS.playing){rafId=null;return}
-  drawMatchV3();
-  const evts=(MS.events||[]).length;
-  if(evts!==_lastEvtLen){
-    const evtEl=document.getElementById('evts');
-    if(evtEl)evtEl.innerHTML=evtHTML();
-    _lastEvtLen=evts;
-  }
-  // 更新 HUD 分数/分钟
-  const f=MS.getCurrentFrame();
-  if(f){
-    const sEl=document.getElementById('scr-my');
-    const oEl=document.getElementById('scr-opp');
-    const mEl=document.getElementById('scr-min');
-    if(sEl)sEl.textContent=f.score.my;
-    if(oEl)oEl.textContent=f.score.opp;
-    if(mEl)mEl.textContent=f.min+"'";
-  }
-  if(MS.isFinished()){
-    endMatchV3();
-    rafId=null;
-    return;
-  }
-  rafId=requestAnimationFrame(matchLoopV3);
-}
-
-function evtHTML(){
-  if(!MS)return'';
-  const colors={goal:'#22c55e',shot:'#f59e0b',foul:'#ef4444',pass:'#3b82f6',info:'#94a3b8',defense:'#a855f7',red:'#dc2626',miss:'#6b7280',save:'#f59e0b',end:'#10b981'};
-  return MS.events.slice(0,15).map(e=>`<div style="padding:6px 8px;border-radius:6px;font-size:11px;border-left:3px solid ${colors[e.type]||'#94a3b8'};background:${colors[e.type]||'#94a3b8'}18;margin-bottom:4px"><span style="color:#94a3b8;margin-right:6px">${e.min}</span>${e.txt}</div>`).join('');
-}
-
-function endMatchV3(){
-  if(!MS||MS.finished===false)return;
-  if(rafId){cancelAnimationFrame(rafId);rafId=null}
-  
-  const myL=G.league.find(l=>l.name==='FC United');
-  const oppL=G.league.find(l=>l.name===MS.oppName);
-  
-  myL.played++;oppL.played++;
-  myL.gf+=MS.score.my;myL.ga+=MS.score.opp;
-  oppL.gf+=MS.score.opp;oppL.ga+=MS.score.my;
-  
-  if(MS.score.my>MS.score.opp){myL.won++;myL.pts+=3;oppL.lost++}
-  else if(MS.score.my===MS.score.opp){myL.drawn++;myL.pts++;oppL.drawn++;oppL.pts++}
-  else{myL.lost++;oppL.won++;oppL.pts+=3}
-  
-  G.budget+=120000*G.facilities.stadium;
-  G.team.slice(0,11).forEach(p=>{
-    p.matches++;
-    p.fitness=Math.max(45,p.fitness-rand(10,20));
-    p.morale=Math.min(100,p.morale+(MS.score.my>MS.score.opp?6:-4));
-  });
-  
-  G.week++;
-  const res=MS.score.my>MS.score.opp?t('win'):MS.score.my===MS.score.opp?t('draw'):t('lose');
-  addNews(`${res} FC联 ${MS.score.my}-${MS.score.opp} vs ${MS.oppName}`);
-  
-  if(G.week>38){
-    G.season++;G.week=1;
-    G.league.sort((a,b)=>b.pts-a.pts);
-    const pos=G.league.findIndex(l=>l.name==='FC United')+1;
-    addNews(`🏆 第${G.season-1}赛季结束! 排名#${pos}`);
-    G.league.forEach(l=>{
-      if(l.name!=='FC United')l.strength=Math.max(35,Math.min(95,l.strength+rand(-6,6)));
-      l.played=l.won=l.drawn=l.lost=l.gf=l.ga=l.pts=0
-    });
-    G.budget+=2500000;
-  }
-  
-  save();
-  render();
-}
-
-let _mcCtx=null;
-
-function drawMatchV3(){
-  const cvs=document.getElementById('mc');
-  if(!cvs||!MS)return;
-  const W=480,H=270;
-  if(cvs.width!==W||cvs.height!==H){cvs.width=W;cvs.height=H;_mcCtx=null;}
-  if(!_mcCtx||_mcCtx.canvas!==cvs){_mcCtx=cvs.getContext('2d');}
-  const c=_mcCtx;
-
-  const data=MS.getRenderData();
-  if(!data)return;
-
-  // Grass
-  c.fillStyle='#2d8a2d';c.fillRect(0,0,W,H);
-
-  // Simple stripes (fewer iterations)
-  for(let i=0;i<10;i+=2){c.fillStyle='rgba(0,0,0,0.03)';c.fillRect(i*(W/10),0,W/10,H);}
-
-  // Lines (simplified)
-  c.strokeStyle='rgba(255,255,255,0.5)';c.lineWidth=1;
-  c.strokeRect(12,12,W-24,H-24);
-  c.strokeRect(12,H/2-45,35,90);
-  c.strokeRect(W-47,H/2-45,35,90);
-  c.beginPath();c.moveTo(W/2,12);c.lineTo(W/2,H-12);c.stroke();
-  c.beginPath();c.arc(W/2,H/2,30,0,Math.PI*2);c.stroke();
-
-  // Players (simplified - no shadows, fewer state colors)
-  c.font='7px Arial';c.textAlign='center';
-  data.players.forEach(p=>{
-    const bx=p.x*W, by=p.y*H;
-    const col=p.isMy?'#0ea5e9':'#ef4444';
-    c.fillStyle=col;c.beginPath();c.arc(bx,by,7,0,Math.PI*2);c.fill();
-    c.strokeStyle='#fff';c.lineWidth=1;c.stroke();
-    c.fillStyle='#fff';c.fillText((p.name||'').split(' ').pop().substr(0,6),bx,by-10);
   });
 
-  // Ball
-  const bx=data.ball.x*W, by=data.ball.y*H;
-  c.fillStyle='#fff';c.beginPath();c.arc(bx,by,4,0,Math.PI*2);c.fill();
-
-  // Score HUD (HTML overlay is faster, but keep simple)
-  c.fillStyle='rgba(0,0,0,0.7)';c.fillRect(W/2-50,4,100,20);
-  c.fillStyle='#0ea5e9';c.font='bold 14px Arial';c.textAlign='right';c.fillText(data.score.my,W/2-6,18);
-  c.fillStyle='#fff';c.font='12px Arial';c.textAlign='center';c.fillText('-',W/2,18);
-  c.fillStyle='#ef4444';c.font='bold 14px Arial';c.textAlign='left';c.fillText(data.score.opp,W/2+6,18);
-  c.fillStyle='#94a3b8';c.font='bold 9px Arial';c.textAlign='right';c.fillText(data.min+"'",W/2+44,18);
-}
-
-function roundRect(ctx,x,y,w,h,r){ctx.beginPath();ctx.moveTo(x+r,y);ctx.lineTo(x+w-r,y);ctx.quadraticCurveTo(x+w,y,x+w,y+r);ctx.lineTo(x+w,y+h-r);ctx.quadraticCurveTo(x+w,y+h,x+w-r,y+h);ctx.lineTo(x+r,y+h);ctx.quadraticCurveTo(x,y+h,x,y+h-r);ctx.lineTo(x,y+r);ctx.quadraticCurveTo(x,y,x+r,y);ctx.closePath()}
-
-// ---- Render ----
-function render(){
-  const myL=G.league.find(l=>l.name==='FC United')||{won:0,drawn:0,lost:0,gf:0,ga:0,pts:0};
-  const sorted=[...G.league].sort((a,b)=>b.pts-a.pts);
-  const myPos=sorted.findIndex(l=>l.name==='FC United')+1;
-  let main='';
-  if(tab==='playerDetail')main=renderDetail();
-  else if(tab==='home')main=renderHome(myL,sorted,myPos);
-  else if(tab==='team')main=renderTeam();
-  else if(tab==='tactics')main=renderTactics();
-  else if(tab==='facility')main=renderFacility();
-  else if(tab==='match')main=renderMatch();
-
-  document.getElementById('app').innerHTML=`
-    <header style="position:sticky;top:0;z-index:20;background:linear-gradient(to bottom,#0f172a,rgba(15,23,42,.95));border-bottom:1px solid rgba(0,212,255,.3);padding:12px 16px">
-      <div style="max-width:480px;margin:0 auto;display:flex;justify-content:space-between;align-items:center">
-        <div>
-          <div class="gt" style="color:#00d4ff;font-weight:900;font-size:18px;letter-spacing:2px">UFO ⚽</div>
-          <div style="color:#fbbf24;font-size:13px;font-weight:600">${fmt(G.budget)}</div>
-        </div>
-        <div style="text-align:right">
-          <div style="display:flex;gap:4px;justify-content:flex-end;margin-bottom:4px">
-            <button onclick="LANG='zh';render()" style="padding:4px 10px;border-radius:20px;font-size:11px;font-weight:600;border:1px solid rgba(255,255,255,.3);background:${LANG==='zh'?'#00d4ff':'rgba(255,255,255,.1)'};color:${LANG==='zh'?'#000':'#fff'};cursor:pointer">中文</button>
-            <button onclick="LANG='en';render()" style="padding:4px 10px;border-radius:20px;font-size:11px;font-weight:600;border:1px solid rgba(255,255,255,.3);background:${LANG==='en'?'#00d4ff':'rgba(255,255,255,.1)'};color:${LANG==='en'?'#000':'#fff'};cursor:pointer">EN</button>
-          </div>
-          <div style="font-size:11px;color:#94a3b8">第${G.week}轮 · 赛季${G.season}</div>
-        </div>
-      </div>
-    </header>
-    <main style="max-width:480px;margin:0 auto;padding:12px 12px 100px">${main}</main>
-    <nav style="position:fixed;bottom:0;left:0;right:0;background:linear-gradient(to top,#0f172a,rgba(15,23,42,.95));border-top:1px solid rgba(0,212,255,.3);padding:8px;z-index:30">
-      <div style="max-width:480px;margin:0 auto;display:flex;justify-content:space-around">
-        ${tab!=='playerDetail'?['home','match','team','tactics','facility'].map(tb=>`
-          <button onclick="tab='${tb}';selPlayer=null;render()" class="nav-btn ${tab===tb?'on':''}">
-            <span style="font-size:18px">${tb==='home'?'🏠':tb==='match'?'⚽':tb==='team'?'👥':tb==='tactics'?'⚙️':'🏟️'}</span>
-            <span style="font-size:9px;margin-top:2px">${t(tb)}</span>
-          </button>`).join(''):''}
-      </div>
-    </nav>
-    ${toast?`<div class="toast">${toast}</div>`:''}
-  `;
-  if(toast)setTimeout(()=>{toast=null;render()},2000);
-  
-  // Init 3D voxel player after DOM update
-  requestAnimationFrame(()=>{
-    if(!window.THREE)return;
-    document.querySelectorAll('[data-player]').forEach(el=>{
-      if(el.dataset.voxelInited)return;
-      el.dataset.voxelInited='1';
-      try{
-        const raw=el.dataset.player.replace(/&apos;/g,"'");
-        const p=JSON.parse(raw);
-        console.log('[Voxel] Init player:', p.name, 'container:', el.id, 'THREE:', !!window.THREE);
-        initVoxelPlayer(p,el.id);
-      }catch(e){ console.error('[Voxel] Error:', e); }
-    });
+  // 球鞋
+  var shoeGeo = new THREE.BoxGeometry(0.08, 0.04, 0.14);
+  [-1, 1].forEach(function(side) {
+    var shoe = new THREE.Mesh(shoeGeo, shoeMat);
+    shoe.position.set(side * 0.055, 0.02, 0.03);
+    shoe.castShadow = true;
+    playerGroup.add(shoe);
   });
+
+  // 地面
+  var groundGeo = new THREE.PlaneGeometry(2, 2);
+  var groundMat = new THREE.ShadowMaterial({ opacity: 0.25 });
+  var ground = new THREE.Mesh(groundGeo, groundMat);
+  ground.rotation.x = -Math.PI / 2;
+  ground.position.y = 0;
+  ground.receiveShadow = true;
+  scene.add(ground);
+
+  // ---- 信息面板 ----
+  var infoCanvas = document.createElement('canvas');
+  infoCanvas.width = W;
+  infoCanvas.height = H;
+  infoCanvas.style.position = 'absolute';
+  infoCanvas.style.top = '0';
+  infoCanvas.style.left = '0';
+  infoCanvas.style.pointerEvents = 'none';
+  container.appendChild(infoCanvas);
+
+  var ctx = infoCanvas.getContext('2d');
+  ctx.fillStyle = 'rgba(0,0,0,0.65)';
+  ctx.font = 'bold 14px Arial';
+  ctx.textAlign = 'center';
+  ctx.fillText(nm, W/2, H - 22);
+
+  ctx.fillStyle = ovr > 80 ? '#ffd700' : ovr > 60 ? '#fff' : '#aaa';
+  ctx.font = 'bold 18px Arial';
+  ctx.textAlign = 'right';
+  ctx.fillText(ovr, W - 12, H - 22);
+
+  // ---- 动画 ----
+  var animAngle = 0;
+  var breathPhase = 0;
+
+  function animate() {
+    requestAnimationFrame(animate);
+
+    // 轻微旋转
+    animAngle += 0.004;
+    playerGroup.rotation.y = Math.sin(animAngle) * 0.25;
+
+    // 呼吸
+    breathPhase += 0.02 + rng() * 0.005;
+    var breathScale = 1 + Math.sin(breathPhase) * 0.008;
+    torso.scale.y = breathScale;
+
+    renderer.render(scene, camera);
+  }
+  animate();
+
+  voxelScenes[containerId] = { scene: scene, camera: camera, renderer: renderer, group: playerGroup };
 }
+
 
 function renderHome(myL,sorted,myPos){
   return `
