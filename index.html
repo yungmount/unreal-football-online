@@ -1282,6 +1282,318 @@ function initVoxelPlayer(player, containerId) {
 }
 
 
+function createPlayer(region, position, quality=60, ageRange=[14,20]) {
+  const age = rand(ageRange[0], ageRange[1]);
+  const names = NAMES[region] || NAMES.England;
+  const name = names[rand(0,names.length-1)];
+  const pb = {GK:{pac:-20,sho:-25,def:20},CB:{pac:-5,sho:-15,def:25,phy:20},LB:{pac:15,def:10,pas:10},RB:{pac:15,def:10,pas:10},CDM:{def:15,pas:15},CM:{sho:10,def:5,pas:18},CAM:{pac:10,sho:18,def:-5,pas:15},LW:{pac:22,sho:18,def:-10},RW:{pac:22,sho:18,def:-10},ST:{pac:12,sho:25,def:-15,phy:15}};
+  const b = pb[position]||{};
+  const ovr = Math.max(30,Math.min(99,quality+rand(-8,8)));
+  const pot = Math.min(99,quality+rand(5,22));
+  const hBase = {GK:192,CB:188,LB:181,RB:181,CDM:184,CM:181,CAM:178,LW:176,RW:176,ST:185}[position]||180;
+  const height = Math.round(hBase + rand(-4,4) - (age<20?(20-age)*0.08:0));
+  const weight = Math.round(height*0.65+rand(-5,5));
+  const val = Math.floor(ovr*8000*(age<22?1.6:age<26?1.2:age<30?0.8:0.35)*rand(80,120)/100);
+  return {
+    id:uid(), name, region, position, age, ovr, potential:pot,
+    pace:Math.max(30,Math.min(99,rand(50,85)+(b.pac||0))),
+    shooting:Math.max(30,Math.min(99,rand(40,80)+(b.sho||0))),
+    passing:Math.max(30,Math.min(99,rand(45,85)+(b.pas||0))),
+    defending:Math.max(30,Math.min(99,rand(40,80)+(b.def||0))),
+    physical:Math.max(30,Math.min(99,rand(50,85)+(b.phy||0))),
+    fitness:rand(75,100), morale:rand(60,100),
+    value:val, wage:Math.floor(ovr*80*rand(80,120)/100),
+    goals:0, assists:0, matches:0, height, weight
+  };
+}
+
+// ---- Game State ----
+let G = null;
+let tab = 'home';
+let filterPos = 'all';
+let toast = null;
+let MS = null; // match state
+let selPlayer = null;
+let cvs = null, ctx = null;
+let rafId = null;
+let lastT = 0;
+
+function initGame() {
+  const saved = localStorage.getItem(SAVE_KEY);
+  if (saved) { try { G = JSON.parse(saved); return; } catch(e){} }
+  G = {
+    budget:5000000, team:[], league:[], season:1, week:1, day:0,
+    formation:'4-4-2', tactic:'balance',
+    facilities:{training:1,academy:1,stadium:1},
+    market:[], prospects:[], news:[]
+  };
+  const pos = ['GK','CB','CB','LB','RB','CDM','CM','CM','LW','RW','ST','ST','CB','CM','CDM','LB','RB','GK','CAM','ST','CM','CB'];
+  const reg = ['England','Spain','Brazil','Germany','France','Italy','Argentina','Portugal','Nigeria','Japan','Korea','China','USA','England','Spain','Brazil','Germany','France','Italy','Argentina','Portugal','England'];
+  for(let i=0;i<22;i++) G.team.push(createPlayer(reg[i],pos[i],rand(58,72)));
+  const tns = {en:['FC United','Athletic Club','Dragon FC','Lion SC','Red Stars','Blue Moon','Green FC','Phoenix FC','Silver Eagles','Golden Snakes','Violets','Panthers'],zh:['FC联','竞技俱乐部','龙之队','雄狮SC','红星队','蓝月亮','绿茵FC','凤凰FC','银鹰SC','金蛇队','紫百合','黑豹FC']};
+  G.league = tns.en.map((n,i)=>({name:n,index:i,strength:rand(40,88),played:0,won:0,drawn:0,lost:0,gf:0,ga:0,pts:0}));
+  G.leagueNames = tns;
+}
+function save(){localStorage.setItem(SAVE_KEY,JSON.stringify(G))}
+function getLN(i){return LANG==='zh'?G.leagueNames.zh[i]:G.leagueNames.en[i]}
+function addNews(txt){G.news.unshift({txt,t:Date.now()});if(G.news.length>20)G.news.pop()}
+
+function refreshMarket(){
+  const q=55+G.facilities.academy*3;
+  const regs=['England','Spain','Brazil','Germany','France','Italy','Argentina'];
+  G.market=[];
+  for(let i=0;i<6;i++){
+    const p=createPlayer(regs[rand(0,regs.length-1)],['GK','CB','LB','RB','CDM','CM','CAM','LW','RW','ST'][rand(0,9)],rand(q-10,q+15));
+    p.askPrice=Math.floor(p.value*rand(75,125)/100);
+    G.market.push(p);
+  }
+  save();
+}
+function scoutAcademy(){
+  const cnt=2+Math.floor(G.facilities.academy/2);
+  const q=42+G.facilities.academy*4;
+  G.prospects=[];
+  for(let i=0;i<Math.min(cnt,4);i++) G.prospects.push(createPlayer('China',['GK','CB','CM','ST'][rand(0,3)],rand(q-12,q+12),[14,20]));
+  addNews('🌟 青训发现'+G.prospects.length+'名人才!');
+}
+function trainTeam(){
+  const bonus=1+G.facilities.training*0.18;
+  G.team.forEach(p=>{
+    if(p.age<29&&p.ovr<p.potential){const g=Math.floor(rand(0,2)*bonus);if(g>0){p.ovr=Math.min(p.potential,p.ovr+g);if(rand(1,100)<=25){const s=['pace','shooting','passing','defending','physical'];p[s[rand(0,4)]]=Math.min(99,p[s[rand(0,4)]]+1)}}}
+    p.fitness=Math.min(100,p.fitness+rand(8,18));
+  });
+  addNews(t('trained'));
+  save();
+}
+
+// ---- Formation Positions ----
+const FP = {
+  '4-4-2':[[.08,.5],[.22,.15],[.22,.4],[.22,.6],[.22,.85],[.38,.2],[.38,.45],[.38,.75],[.52,.15],[.52,.5],[.52,.85]],
+  '4-3-3':[[.08,.5],[.22,.15],[.22,.4],[.22,.6],[.22,.85],[.38,.3],[.38,.5],[.38,.7],[.55,.2],[.55,.5],[.55,.8]],
+  '4-2-3-1':[[.08,.5],[.22,.15],[.22,.4],[.22,.6],[.22,.85],[.35,.35],[.35,.65],[.48,.2],[.48,.5],[.48,.8],[.58,.5]],
+  '3-5-2':[[.08,.5],[.22,.25],[.22,.5],[.22,.75],[.38,.1],[.38,.35],[.38,.5],[.38,.65],[.38,.9],[.52,.35],[.52,.65]]
+};
+
+// ---- Match Engine v3.0 ----
+function startMatch() {
+  if(rafId){cancelAnimationFrame(rafId);rafId=null}
+  MS = null; tab = 'match'; render();
+
+  setTimeout(()=>{
+    const fp = FP[G.formation]||FP['4-4-2'];
+    const myTeam = G.team.slice(0,11).map((p,i)=>{
+      const pos = fp[i]||[.25,.5];
+      return {...p, hx:pos[0], hy:pos[1], role:i===0?'GK':i<3?'DEF':i<7?'MID':'ATT', isMy:true};
+    });
+    const oppIdx = rand(1,G.league.length-1);
+    const oppStr = G.league[oppIdx].strength;
+    const oppPos = ['GK','CB','CB','LB','RB','CDM','CM','CM','LW','RW','ST'];
+    const oppTeam = oppPos.map((pos,i)=>{
+      const p = createPlayer(['England','Spain','Brazil','Germany','France'][rand(0,4)],pos,oppStr);
+      return {...p, role:pos, isMy:false};
+    });
+
+    // v4: 预计算引擎 — 赛前一次性生成，播放零计算
+    MS = new MatchEngine(myTeam, oppTeam, getLN(oppIdx), Tactics.TIKITAKA, Tactics.COUNTER);
+    MS.oppName = getLN(oppIdx);
+    // 兼容别名
+    Object.defineProperty(MS, 'myScore', { get() { return this.score.my; } });
+    Object.defineProperty(MS, 'oppScore', { get() { return this.score.opp; } });
+    Object.defineProperty(MS, 'finished', { get() { return !this.playing; } });
+    MS.start();
+
+    render();
+    setTimeout(()=>{rafId=requestAnimationFrame(matchLoopV3)},100);
+  },100);
+}
+
+function matchLoopV3() {
+  if(!MS||!MS.playing){rafId=null;return}
+  drawMatchV3();
+  const evts=(MS.events||[]).length;
+  if(evts!==_lastEvtLen){
+    const evtEl=document.getElementById('evts');
+    if(evtEl)evtEl.innerHTML=evtHTML();
+    _lastEvtLen=evts;
+  }
+  // 更新 HUD 分数/分钟
+  const f=MS.getCurrentFrame();
+  if(f){
+    const sEl=document.getElementById('scr-my');
+    const oEl=document.getElementById('scr-opp');
+    const mEl=document.getElementById('scr-min');
+    if(sEl)sEl.textContent=f.score.my;
+    if(oEl)oEl.textContent=f.score.opp;
+    if(mEl)mEl.textContent=f.min+"'";
+  }
+  if(MS.isFinished()){
+    endMatchV3();
+    rafId=null;
+    return;
+  }
+  rafId=requestAnimationFrame(matchLoopV3);
+}
+
+function evtHTML(){
+  if(!MS)return'';
+  const colors={goal:'#22c55e',shot:'#f59e0b',foul:'#ef4444',pass:'#3b82f6',info:'#94a3b8',defense:'#a855f7',red:'#dc2626',miss:'#6b7280',save:'#f59e0b',end:'#10b981'};
+  return MS.events.slice(0,15).map(e=>`<div style="padding:6px 8px;border-radius:6px;font-size:11px;border-left:3px solid ${colors[e.type]||'#94a3b8'};background:${colors[e.type]||'#94a3b8'}18;margin-bottom:4px"><span style="color:#94a3b8;margin-right:6px">${e.min}</span>${e.txt}</div>`).join('');
+}
+
+function endMatchV3(){
+  if(!MS||MS.finished===false)return;
+  if(rafId){cancelAnimationFrame(rafId);rafId=null}
+  
+  const myL=G.league.find(l=>l.name==='FC United');
+  const oppL=G.league.find(l=>l.name===MS.oppName);
+  
+  myL.played++;oppL.played++;
+  myL.gf+=MS.score.my;myL.ga+=MS.score.opp;
+  oppL.gf+=MS.score.opp;oppL.ga+=MS.score.my;
+  
+  if(MS.score.my>MS.score.opp){myL.won++;myL.pts+=3;oppL.lost++}
+  else if(MS.score.my===MS.score.opp){myL.drawn++;myL.pts++;oppL.drawn++;oppL.pts++}
+  else{myL.lost++;oppL.won++;oppL.pts+=3}
+  
+  G.budget+=120000*G.facilities.stadium;
+  G.team.slice(0,11).forEach(p=>{
+    p.matches++;
+    p.fitness=Math.max(45,p.fitness-rand(10,20));
+    p.morale=Math.min(100,p.morale+(MS.score.my>MS.score.opp?6:-4));
+  });
+  
+  G.week++;
+  const res=MS.score.my>MS.score.opp?t('win'):MS.score.my===MS.score.opp?t('draw'):t('lose');
+  addNews(`${res} FC联 ${MS.score.my}-${MS.score.opp} vs ${MS.oppName}`);
+  
+  if(G.week>38){
+    G.season++;G.week=1;
+    G.league.sort((a,b)=>b.pts-a.pts);
+    const pos=G.league.findIndex(l=>l.name==='FC United')+1;
+    addNews(`🏆 第${G.season-1}赛季结束! 排名#${pos}`);
+    G.league.forEach(l=>{
+      if(l.name!=='FC United')l.strength=Math.max(35,Math.min(95,l.strength+rand(-6,6)));
+      l.played=l.won=l.drawn=l.lost=l.gf=l.ga=l.pts=0
+    });
+    G.budget+=2500000;
+  }
+  
+  save();
+  render();
+}
+
+let _mcCtx=null;
+
+function drawMatchV3(){
+  const cvs=document.getElementById('mc');
+  if(!cvs||!MS)return;
+  const W=480,H=270;
+  if(cvs.width!==W||cvs.height!==H){cvs.width=W;cvs.height=H;_mcCtx=null;}
+  if(!_mcCtx||_mcCtx.canvas!==cvs){_mcCtx=cvs.getContext('2d');}
+  const c=_mcCtx;
+
+  const data=MS.getRenderData();
+  if(!data)return;
+
+  // Grass
+  c.fillStyle='#2d8a2d';c.fillRect(0,0,W,H);
+
+  // Simple stripes (fewer iterations)
+  for(let i=0;i<10;i+=2){c.fillStyle='rgba(0,0,0,0.03)';c.fillRect(i*(W/10),0,W/10,H);}
+
+  // Lines (simplified)
+  c.strokeStyle='rgba(255,255,255,0.5)';c.lineWidth=1;
+  c.strokeRect(12,12,W-24,H-24);
+  c.strokeRect(12,H/2-45,35,90);
+  c.strokeRect(W-47,H/2-45,35,90);
+  c.beginPath();c.moveTo(W/2,12);c.lineTo(W/2,H-12);c.stroke();
+  c.beginPath();c.arc(W/2,H/2,30,0,Math.PI*2);c.stroke();
+
+  // Players (simplified - no shadows, fewer state colors)
+  c.font='7px Arial';c.textAlign='center';
+  data.players.forEach(p=>{
+    const bx=p.x*W, by=p.y*H;
+    const col=p.isMy?'#0ea5e9':'#ef4444';
+    c.fillStyle=col;c.beginPath();c.arc(bx,by,7,0,Math.PI*2);c.fill();
+    c.strokeStyle='#fff';c.lineWidth=1;c.stroke();
+    c.fillStyle='#fff';c.fillText((p.name||'').split(' ').pop().substr(0,6),bx,by-10);
+  });
+
+  // Ball
+  const bx=data.ball.x*W, by=data.ball.y*H;
+  c.fillStyle='#fff';c.beginPath();c.arc(bx,by,4,0,Math.PI*2);c.fill();
+
+  // Score HUD (HTML overlay is faster, but keep simple)
+  c.fillStyle='rgba(0,0,0,0.7)';c.fillRect(W/2-50,4,100,20);
+  c.fillStyle='#0ea5e9';c.font='bold 14px Arial';c.textAlign='right';c.fillText(data.score.my,W/2-6,18);
+  c.fillStyle='#fff';c.font='12px Arial';c.textAlign='center';c.fillText('-',W/2,18);
+  c.fillStyle='#ef4444';c.font='bold 14px Arial';c.textAlign='left';c.fillText(data.score.opp,W/2+6,18);
+  c.fillStyle='#94a3b8';c.font='bold 9px Arial';c.textAlign='right';c.fillText(data.min+"'",W/2+44,18);
+}
+
+function roundRect(ctx,x,y,w,h,r){ctx.beginPath();ctx.moveTo(x+r,y);ctx.lineTo(x+w-r,y);ctx.quadraticCurveTo(x+w,y,x+w,y+r);ctx.lineTo(x+w,y+h-r);ctx.quadraticCurveTo(x+w,y+h,x+w-r,y+h);ctx.lineTo(x+r,y+h);ctx.quadraticCurveTo(x,y+h,x,y+h-r);ctx.lineTo(x,y+r);ctx.quadraticCurveTo(x,y,x+r,y);ctx.closePath()}
+
+// ---- Render ----
+function render(){
+  const myL=G.league.find(l=>l.name==='FC United')||{won:0,drawn:0,lost:0,gf:0,ga:0,pts:0};
+  const sorted=[...G.league].sort((a,b)=>b.pts-a.pts);
+  const myPos=sorted.findIndex(l=>l.name==='FC United')+1;
+  let main='';
+  if(tab==='playerDetail')main=renderDetail();
+  else if(tab==='home')main=renderHome(myL,sorted,myPos);
+  else if(tab==='team')main=renderTeam();
+  else if(tab==='tactics')main=renderTactics();
+  else if(tab==='facility')main=renderFacility();
+  else if(tab==='match')main=renderMatch();
+
+  document.getElementById('app').innerHTML=`
+    <header style="position:sticky;top:0;z-index:20;background:linear-gradient(to bottom,#0f172a,rgba(15,23,42,.95));border-bottom:1px solid rgba(0,212,255,.3);padding:12px 16px">
+      <div style="max-width:480px;margin:0 auto;display:flex;justify-content:space-between;align-items:center">
+        <div>
+          <div class="gt" style="color:#00d4ff;font-weight:900;font-size:18px;letter-spacing:2px">UFO ⚽</div>
+          <div style="color:#fbbf24;font-size:13px;font-weight:600">${fmt(G.budget)}</div>
+        </div>
+        <div style="text-align:right">
+          <div style="display:flex;gap:4px;justify-content:flex-end;margin-bottom:4px">
+            <button onclick="LANG='zh';render()" style="padding:4px 10px;border-radius:20px;font-size:11px;font-weight:600;border:1px solid rgba(255,255,255,.3);background:${LANG==='zh'?'#00d4ff':'rgba(255,255,255,.1)'};color:${LANG==='zh'?'#000':'#fff'};cursor:pointer">中文</button>
+            <button onclick="LANG='en';render()" style="padding:4px 10px;border-radius:20px;font-size:11px;font-weight:600;border:1px solid rgba(255,255,255,.3);background:${LANG==='en'?'#00d4ff':'rgba(255,255,255,.1)'};color:${LANG==='en'?'#000':'#fff'};cursor:pointer">EN</button>
+          </div>
+          <div style="font-size:11px;color:#94a3b8">第${G.week}轮 · 赛季${G.season}</div>
+        </div>
+      </div>
+    </header>
+    <main style="max-width:480px;margin:0 auto;padding:12px 12px 100px">${main}</main>
+    <nav style="position:fixed;bottom:0;left:0;right:0;background:linear-gradient(to top,#0f172a,rgba(15,23,42,.95));border-top:1px solid rgba(0,212,255,.3);padding:8px;z-index:30">
+      <div style="max-width:480px;margin:0 auto;display:flex;justify-content:space-around">
+        ${tab!=='playerDetail'?['home','match','team','tactics','facility'].map(tb=>`
+          <button onclick="tab='${tb}';selPlayer=null;render()" class="nav-btn ${tab===tb?'on':''}">
+            <span style="font-size:18px">${tb==='home'?'🏠':tb==='match'?'⚽':tb==='team'?'👥':tb==='tactics'?'⚙️':'🏟️'}</span>
+            <span style="font-size:9px;margin-top:2px">${t(tb)}</span>
+          </button>`).join(''):''}
+      </div>
+    </nav>
+    ${toast?`<div class="toast">${toast}</div>`:''}
+  `;
+  if(toast)setTimeout(()=>{toast=null;render()},2000);
+  
+  // Init 3D voxel player after DOM update
+  requestAnimationFrame(()=>{
+    if(!window.THREE)return;
+    document.querySelectorAll('[data-player]').forEach(el=>{
+      if(el.dataset.voxelInited)return;
+      el.dataset.voxelInited='1';
+      try{
+        const raw=el.dataset.player.replace(/&apos;/g,"'");
+        const p=JSON.parse(raw);
+        console.log('[Voxel] Init player:', p.name, 'container:', el.id, 'THREE:', !!window.THREE);
+        initVoxelPlayer(p,el.id);
+      }catch(e){ console.error('[Voxel] Error:', e); }
+    });
+  });
+}
+
+
+
 function renderHome(myL,sorted,myPos){
   return `
     <div class="card" style="padding:12px;margin-bottom:12px">
