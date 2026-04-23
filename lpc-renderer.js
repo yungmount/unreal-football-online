@@ -381,6 +381,12 @@ class LPCColorRemapper {
     const data = imageData.data;
     const colorMapRgb = this.parseColorMap(colorMap);
     
+    // 构建源颜色列表（用于最近色匹配回退）
+    const sourceColors = Object.keys(colorMapRgb).map(k => {
+      const [r, g, b] = k.split(',').map(Number);
+      return { key: k, r, g, b };
+    });
+    
     for (let i = 0; i < data.length; i += 4) {
       const r = data[i];
       const g = data[i + 1];
@@ -391,10 +397,29 @@ class LPCColorRemapper {
       
       const colorKey = `${r},${g},${b}`;
       if (colorMapRgb[colorKey]) {
+        // 精确匹配
         const [nr, ng, nb] = colorMapRgb[colorKey];
         data[i] = nr;
         data[i + 1] = ng;
         data[i + 2] = nb;
+      } else if (sourceColors.length > 0) {
+        // 最近色匹配回退（容差 30）
+        let minDist = Infinity;
+        let closestKey = null;
+        for (const src of sourceColors) {
+          const dist = Math.abs(r - src.r) + Math.abs(g - src.g) + Math.abs(b - src.b);
+          if (dist < minDist) {
+            minDist = dist;
+            closestKey = src.key;
+          }
+        }
+        // 只在距离足够近时才替换，避免把非调色板颜色（如轮廓线）也改掉
+        if (closestKey && minDist < 80) {
+          const [nr, ng, nb] = colorMapRgb[closestKey];
+          data[i] = nr;
+          data[i + 1] = ng;
+          data[i + 2] = nb;
+        }
       }
     }
     
@@ -409,15 +434,34 @@ class LPCColorRemapper {
    * @returns {ImageData}
    */
   applyPalette(imageData, sourcePalette, targetPalette) {
-    if (sourcePalette.length !== targetPalette.length) {
-      console.warn('调色板长度不匹配');
-      return imageData;
-    }
-    
+    // 支持不同长度的调色板：用最近色匹配
     const colorMap = {};
-    sourcePalette.forEach((src, i) => {
-      colorMap[src] = targetPalette[i];
-    });
+    
+    if (sourcePalette.length === targetPalette.length) {
+      // 长度一致：直接按索引映射
+      sourcePalette.forEach((src, i) => {
+        colorMap[src] = targetPalette[i];
+      });
+    } else {
+      // 长度不一致：按亮度排序后映射
+      const sortByLuminance = (palette) => [...palette].sort((a, b) => {
+        const aRgb = this.hexToRgb(a);
+        const bRgb = this.hexToRgb(b);
+        if (!aRgb || !bRgb) return 0;
+        const aL = aRgb.r * 0.299 + aRgb.g * 0.587 + aRgb.b * 0.114;
+        const bL = bRgb.r * 0.299 + bRgb.g * 0.587 + bRgb.b * 0.114;
+        return aL - bL;
+      });
+      const sortedSrc = sortByLuminance(sourcePalette);
+      const sortedTgt = sortByLuminance(targetPalette);
+      // 按亮度顺序一一映射
+      const maxLen = Math.max(sortedSrc.length, sortedTgt.length);
+      for (let i = 0; i < maxLen; i++) {
+        const src = sortedSrc[i] || sortedSrc[sortedSrc.length - 1];
+        const tgt = sortedTgt[Math.min(i, sortedTgt.length - 1)];
+        colorMap[src] = tgt;
+      }
+    }
     
     return this.remapColors(imageData, colorMap);
   }
@@ -568,8 +612,15 @@ class LPCComposer {
           }
         }
         
-        // 绘制到 canvas
-        ctx.putImageData(imageData, layer.offsetX || 0, layer.offsetY || 0);
+        // 绘制到 canvas — 使用临时 canvas + drawImage 进行 alpha 混合
+        // putImageData 会直接覆盖像素（包括用透明像素擦掉已画内容），
+        // drawImage 才能正确做 alpha 混合
+        const tmpCanvas = document.createElement('canvas');
+        tmpCanvas.width = width;
+        tmpCanvas.height = height;
+        const tmpCtx = tmpCanvas.getContext('2d');
+        tmpCtx.putImageData(imageData, 0, 0);
+        ctx.drawImage(tmpCanvas, layer.offsetX || 0, layer.offsetY || 0);
       } catch (e) {
         if (!layer.optional) {
           console.warn(`Failed to compose layer:`, layer, e);
