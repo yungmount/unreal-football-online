@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<title>LPC Debug</title>
+<style>
+  body { font-family: monospace; background: #111; color: #0f0; padding: 20px; }
+  canvas { image-rendering: pixelated; border: 1px solid #333; margin: 4px; }
+  canvas.bad { border-color: red; }
+  canvas.good { border-color: green; }
+  h3 { color: #fff; margin: 16px 0 8px; }
+  .info { color: #888; font-size: 12px; }
+</style>
+</head>
+<body>
+<h2>LPC Renderer Debug</h2>
+<div id="log"></div>
+
+<script src="lpc-renderer.js"></script>
+<script>
+const logEl = document.getElementById('log');
+
+function addLog(msg, color = '#0f0') {
+  const d = document.createElement('div');
+  d.textContent = msg;
+  d.style.color = color;
+  logEl.appendChild(d);
+  console.log(msg);
+}
+
+function showCanvas(title, imageData, w, h) {
+  const c = document.createElement('canvas');
+  c.width = w; c.height = h;
+  c.getContext('2d').putImageData(imageData, 0, 0);
+  c.title = title;
+  document.body.appendChild(c);
+}
+
+// ============ Test 1: Verify hexToRgb ============
+addLog('=== Test 1: hexToRgb ===');
+const remapper = new LPCColorRemapper();
+const tests = ['#FAECE7', '#F9D5BA', 'FAECE7', '#CC8665', '#271920'];
+for (const h of tests) {
+  addLog(`hexToRgb('${h}') = ${JSON.stringify(remapper.hexToRgb(h))}`);
+}
+
+// ============ Test 2: Verify applyPalette ============
+addLog('\n=== Test 2: applyPalette with arrays ===');
+const skinLight = LPC_PALETTES.skin.light;
+const skinBrown = LPC_PALETTES.skin.brown;
+addLog(`skinLight: ${JSON.stringify(skinLight)}`);
+addLog(`skinBrown: ${JSON.stringify(skinBrown)}`);
+
+// Create 2x1 test image
+const tc = document.createElement('canvas');
+tc.width = 2; tc.height = 1;
+const tctx = tc.getContext('2d');
+tctx.fillStyle = skinLight[0]; // #271920 (darkest)
+tctx.fillRect(0, 0, 1, 1);
+tctx.fillStyle = skinLight[2]; // #cc8665 (middle)
+tctx.fillRect(1, 0, 1, 1);
+const testImg = tctx.getImageData(0, 0, 2, 1);
+addLog(`源: 像素0=${testImg.data[0]},${testImg.data[1]},${testImg.data[2]} (应该=${skinLight[0]})`);
+addLog(`源: 像素1=${testImg.data[4]},${testImg.data[5]},${testImg.data[6]} (应该=${skinLight[2]})`);
+
+// Apply palette (arrays as in production code)
+const result = remapper.applyPalette(testImg, skinLight, skinBrown);
+addLog(`结果: 像素0=${result.data[0]},${result.data[1]},${result.data[2]}`);
+addLog(`结果: 像素1=${result.data[4]},${result.data[5]},${result.data[6]}`);
+
+// ============ Test 3: Load real sprite and check colors ============
+async function testRealSprite() {
+  addLog('\n=== Test 3: Load body sprite and inspect pixels ===');
+  const loader = new LPCSpriteLoader();
+  const img = await loader.load('body__bodies__male__idle.png');
+  if (!img) {
+    addLog('❌ 加载失败 - 检查网络!', '#f55');
+    return;
+  }
+  addLog(`✅ 加载成功: ${img.width}x${img.height}`);
+  
+  // 提取 direction=0 (正面)
+  const frame = loader.extractFrame(img, 0, 0);
+  addLog(`帧尺寸: ${frame.width}x${frame.height}`);
+  
+  // 收集所有颜色
+  const colorFreq = new Map();
+  let opaquePixels = 0;
+  for (let i = 0; i < frame.data.length; i += 4) {
+    const a = frame.data[i+3];
+    if (a > 10) {
+      opaquePixels++;
+      const key = `${frame.data[i]},${frame.data[i+1]},${frame.data[i+2]}`;
+      colorFreq.set(key, (colorFreq.get(key) || 0) + 1);
+    }
+  }
+  addLog(`不透明像素: ${opaquePixels}`);
+  addLog(`不同颜色数: ${colorFreq.size}`);
+  addLog('Top 10 颜色 (RGBA):');
+  const sorted = [...colorFreq.entries()].sort((a,b) => b[1]-a[1]);
+  for (const [rgb, n] of sorted.slice(0, 10)) {
+    addLog(`  rgb(${rgb}): ${n}px`);
+  }
+  
+  // 检查像素的 hex 值是否与皮肤调色板匹配
+  addLog('\n检查皮肤色调色板匹配:');
+  for (const hex of skinLight) {
+    const rgb = remapper.hexToRgb(hex);
+    if (rgb) {
+      const key = `${rgb.r},${rgb.g},${rgb.b}`;
+      const count = colorFreq.get(key) || 0;
+      if (count > 0) {
+        addLog(`  ✅ ${hex} 找到 ${count}px`, '#0f0');
+      }
+    }
+  }
+  
+  // 显示原图
+  const c1 = document.createElement('canvas');
+  c1.width = 64; c1.height = 64;
+  c1.getContext('2d').putImageData(frame, 0, 0);
+  c1.title = '原图 (direction=0)';
+  document.body.appendChild(c1);
+  
+  // 显示应用皮肤棕色调后
+  const remapped = remapper.applyPalette(frame, skinLight, skinBrown);
+  const c2 = document.createElement('canvas');
+  c2.width = 64; c2.height = 64;
+  c2.getContext('2d').putImageData(remapped, 0, 0);
+  c2.title = '重映射 (light → brown)';
+  document.body.appendChild(c2);
+  
+  // 检查头发精灵
+  addLog('\n=== Test 4: Load hair sprite ===');
+  const hairImg = await loader.load('hair__plain__adult__idle.png');
+  if (!hairImg) {
+    addLog('❌ 头发加载失败!', '#f55');
+    return;
+  }
+  const hairFrame = loader.extractFrame(hairImg, 0, 0);
+  const hairColors = new Map();
+  for (let i = 0; i < hairFrame.data.length; i += 4) {
+    const a = hairFrame.data[i+3];
+    if (a > 10) {
+      const key = `${hairFrame.data[i]},${hairFrame.data[i+1]},${hairFrame.data[i+2]}`;
+      hairColors.set(key, (hairColors.get(key) || 0) + 1);
+    }
+  }
+  addLog(`头发不透明像素: ${[...hairColors.values()].reduce((a,b)=>a+b,0)}`);
+  addLog('头发颜色:');
+  for (const [rgb, n] of [...hairColors.entries()].sort((a,b) => b[1]-a[1]).slice(0, 8)) {
+    addLog(`  rgb(${rgb}): ${n}px`);
+  }
+  
+  const c3 = document.createElement('canvas');
+  c3.width = 64; c3.height = 64;
+  c3.getContext('2d').putImageData(hairFrame, 0, 0);
+  c3.title = '头发 (原图)';
+  document.body.appendChild(c3);
+  
+  // 测试 LPCComposer 完整渲染
+  addLog('\n=== Test 5: Full LPCComposer.compose() ===');
+  const composer = new LPCComposer();
+  const generator = new LPCPlayerGenerator();
+  
+  const appearance = generator.generateAppearance({name:'TestPlayer', id:1}, {});
+  addLog(`Appearance: skin=${appearance.skinTone}, hair=${appearance.hairstyle}, bodyType=${appearance.bodyType}`);
+  
+  try {
+    const canvas = await composer.compose(
+      composer.buildLayers ? composer.buildLayers(appearance, 'idle', 0) : [],
+      64, 64
+    );
+    addLog(`✅ Composer 成功: ${canvas.width}x${canvas.height}`);
+    canvas.title = 'Composer 结果';
+    document.body.appendChild(canvas);
+  } catch(e) {
+    addLog(`❌ Composer 失败: ${e.message}`, '#f55');
+  }
+}
+
+testRealSprite().catch(e => addLog('Error: ' + e));
+</script>
+</body>
+</html>

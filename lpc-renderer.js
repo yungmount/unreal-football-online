@@ -751,7 +751,7 @@ class LPCPlayerGenerator {
    * @param {number} direction - 方向 (0=下, 1=左, 2=右, 3=上)
    * @returns {Promise<HTMLCanvasElement>}
    */
-  async generatePlayerSprite(appearance, animation = 'idle', direction = 0) {
+  async generatePlayerSprite(appearance, animation = 'idle', direction = 2, flipH = false) {
     const layers = [];
     
     // 体型映射（大部分装备只有 male/thin/female 变体，没有 muscular）
@@ -890,7 +890,21 @@ class LPCPlayerGenerator {
     }
     
     // 合成
-    return this.composer.compose(layers);
+    const sprite = this.composer.compose(layers);
+    
+    // 水平翻转 (用于生成伪正面)
+    if (flipH) {
+      const flipped = document.createElement('canvas');
+      flipped.width = sprite.width;
+      flipped.height = sprite.height;
+      const fctx = flipped.getContext('2d');
+      fctx.translate(flipped.width, 0);
+      fctx.scale(-1, 1);
+      fctx.drawImage(sprite, 0, 0);
+      return flipped;
+    }
+    
+    return sprite;
   }
   
   /**
@@ -903,7 +917,7 @@ class LPCPlayerGenerator {
    */
   async generatePlayerCard(playerData, teamData, width = 200, height = 300) {
     const appearance = this.generateAppearance(playerData, teamData);
-    const sprite = await this.generatePlayerSprite(appearance, 'idle', 3); // 3=正面
+    const sprite = await this.generatePlayerSprite(appearance, 'idle', 2, true); // direction=2最接近正面 + 水平翻转
     
     const canvas = document.createElement('canvas');
     canvas.width = width;

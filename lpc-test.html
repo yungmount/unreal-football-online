@@ -1,275 +1,153 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html>
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>LPC Character Generator Test</title>
+<title>LPC Sprite Test</title>
 <style>
-body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  background: #1a1a2e;
-  color: #eee;
-  padding: 20px;
-}
-h1 { color: #61A0EF; }
-h2 { color: #ccc; font-size: 1.2em; margin-top: 30px; }
-.container { display: flex; flex-wrap: wrap; gap: 20px; }
-.player-card {
-  background: #252540;
-  border-radius: 12px;
-  padding: 15px;
-  text-align: center;
-  width: 220px;
-}
-.player-card canvas {
-  border-radius: 8px;
-  margin-bottom: 10px;
-  image-rendering: pixelated;
-}
-.player-card .name { font-weight: bold; font-size: 1.1em; color: #fff; }
-.player-card .info { font-size: 0.9em; color: #aaa; margin-top: 5px; }
-.controls {
-  background: #252540;
-  padding: 20px;
-  border-radius: 12px;
-  margin-bottom: 20px;
-}
-.controls label { margin-right: 10px; }
-.controls select, .controls button {
-  padding: 8px 16px;
-  border-radius: 6px;
-  border: none;
-  margin: 5px;
-}
-.controls button { background: #61A0EF; color: white; cursor: pointer; }
-.controls button:hover { background: #466AC9; }
-.loading { color: #f80; padding: 20px; }
-.error { color: #f44; padding: 20px; }
+  body { background: #1a1a2e; padding: 20px; }
+  canvas { image-rendering: pixelated; }
+  #results { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 16px; }
+  .item { text-align: center; }
+  .item span { display: block; color: #fff; font: 12px monospace; margin-top: 4px; }
+  .item.bad span { color: #f55; }
+  .item.good span { color: #5f5; }
 </style>
 </head>
 <body>
-<h1>🎭 LPC Character Generator - 千人千面测试</h1>
-
-<div class="controls">
-  <h2>生成控制</h2>
-  <label>皮肤:
-    <select id="skinTone">
-      <option value="random">随机</option>
-      <option value="light">浅色</option>
-      <option value="amber">琥珀</option>
-      <option value="olive">橄榄</option>
-      <option value="bronze">青铜</option>
-      <option value="brown">棕色</option>
-      <option value="black">黑色</option>
-      <option value="blue">蓝色(幻想)</option>
-      <option value="green">绿色(幻想)</option>
-    </select>
-  </label>
-  <label>发色:
-    <select id="hairColor">
-      <option value="random">随机</option>
-      <option value="black">黑色</option>
-      <option value="brown">棕色</option>
-      <option value="blonde">金色</option>
-      <option value="red">红色</option>
-      <option value="ginger">橘红</option>
-      <option value="white">白色</option>
-      <option value="gray">灰色</option>
-      <option value="blue">蓝色</option>
-      <option value="purple">紫色</option>
-    </select>
-  </label>
-  <label>球衣:
-    <select id="jerseyColor">
-      <option value="red">红色</option>
-      <option value="blue">蓝色</option>
-      <option value="white">白色</option>
-      <option value="black">黑色</option>
-      <option value="yellow">黄色</option>
-      <option value="green">绿色</option>
-      <option value="orange">橙色</option>
-      <option value="purple">紫色</option>
-    </select>
-  </label>
-  <button onclick="generateTeam()">生成球队</button>
-  <button onclick="generateRandomPlayers()">生成随机球员</button>
-</div>
-
-<div id="loading" class="loading">正在加载 LPC 精灵...</div>
-<div id="error" class="error" style="display:none;"></div>
-<div id="players" class="container"></div>
-
-<script src="lpc-renderer.js"></script>
+<h2 style="color:#fff">LPC Sprite Debug</h2>
+<div id="results"></div>
 <script>
-// ============================================================
-// LPC 测试脚本
-// ============================================================
+const BASE = 'https://unreal-football-online-git-main-yungmounts-projects.vercel.app/lpc-assets/';
+const results = document.getElementById('results');
 
-const playersDiv = document.getElementById('players');
-const loadingDiv = document.getElementById('loading');
-const errorDiv = document.getElementById('error');
-
-// 球员名字池
-const firstNames = ['Messi', 'Ronaldo', 'Neymar', 'Mbappé', 'Haaland', 'Salah', 'Kane', 'De Bruyne', 'Lewandowski', 'Benzema', 'Modrić', 'Vinicius', 'Bellingham', 'Saka', 'Foden', 'Gavi', 'Pedri', 'Rodri', 'Rice', 'Kane'];
-const lastNames = ['Jr', 'Sr', 'II', 'III', '', '', '', ''];
-
-// 调试日志
-const debugLog = [];
 function log(msg) {
-  const time = new Date().toLocaleTimeString();
-  debugLog.push(`[${time}] ${msg}`);
   console.log(msg);
+  const d = document.createElement('div');
+  d.textContent = msg;
+  d.style.cssText = 'color:#0f0;font:12px monospace;';
+  document.body.appendChild(d);
 }
 
-// 检查 LPC 渲染器是否加载
-async function checkReady() {
-  if (typeof LPCPlayerGenerator === 'undefined') {
-    errorDiv.textContent = 'LPC 渲染器未加载！请确保 lpc-renderer.js 存在';
-    errorDiv.style.display = 'block';
-    loadingDiv.style.display = 'none';
-    return false;
-  }
-  
-  log('LPC 渲染器已加载');
-  log(`足球运动员配置: ${LPC.FOOTBALL.HAIR_STYLES.length} 种发型, ${LPC.FOOTBALL.BEARD_STYLES.length} 种胡须`);
-  return true;
-}
-
-// 生成单个球员
-async function generatePlayerCard(playerData, teamData) {
-  const generator = new LPCPlayerGenerator();
-  
-  try {
-    const appearance = generator.generateAppearance(playerData, teamData);
-    log(`生成外观: ${appearance.hairstyle}, 肤色: ${appearance.skinTone}, 发色: ${appearance.hairColor}`);
-    
-    const canvas = await generator.generatePlayerSprite(appearance, 'idle', 0);
-    
-    // 放大到卡片尺寸
-    const cardCanvas = document.createElement('canvas');
-    cardCanvas.width = 200;
-    cardCanvas.height = 260;
-    const ctx = cardCanvas.getContext('2d');
-    
-    // 背景
-    const teamColor = generator.hexToTeamColor(teamData.primaryColor);
-    ctx.fillStyle = '#1a1a2e';
-    ctx.fillRect(0, 0, 200, 260);
-    
-    // 边框
-    ctx.strokeStyle = teamColor;
-    ctx.lineWidth = 3;
-    ctx.strokeRect(2, 2, 196, 256);
-    
-    // 绘制球员精灵 (放大 2x)
-    ctx.imageSmoothingEnabled = false;
-    ctx.drawImage(canvas, 68, 40, 64 * 2, 64 * 2);
-    
-    // 球员名字
-    ctx.fillStyle = '#ffffff';
-    ctx.font = 'bold 14px Arial';
-    ctx.textAlign = 'center';
-    ctx.fillText(playerData.name || 'Player', 100, 200);
-    
-    // 位置/评分
-    ctx.font = '12px Arial';
-    ctx.fillStyle = '#aaaaaa';
-    ctx.fillText(`${playerData.position || 'MID'} • ${playerData.rating || 75}`, 100, 220);
-    
-    // 球衣号码
-    ctx.font = 'bold 16px Arial';
-    ctx.fillStyle = teamColor;
-    ctx.fillText(`#${appearance.jerseyNumber}`, 170, 30);
-    
-    return cardCanvas;
-  } catch (e) {
-    console.error('生成球员失败:', e);
-    const errorCard = document.createElement('div');
-    errorCard.className = 'player-card';
-    errorCard.innerHTML = `<div style="color:#f44;padding:20px;">生成失败: ${e.message}</div>`;
-    return errorCard;
-  }
-}
-
-// 生成球队（11人）
-async function generateTeam() {
-  if (!await checkReady()) return;
-  
-  playersDiv.innerHTML = '<div class="loading">生成中...</div>';
-  
-  const jerseyColor = document.getElementById('jerseyColor').value;
-  const teamData = { primaryColor: jerseyColor, secondaryColor: 'white' };
-  
-  const positions = ['GK', 'CB', 'CB', 'LB', 'RB', 'CDM', 'CM', 'CM', 'LW', 'RW', 'ST'];
-  const cards = [];
-  
-  for (let i = 0; i < 11; i++) {
-    const playerData = {
-      id: i + 1,
-      name: firstNames[Math.floor(Math.random() * firstNames.length)] + ' ' + lastNames[Math.floor(Math.random() * lastNames.length)],
-      position: positions[i],
-      rating: 70 + Math.floor(Math.random() * 25),
-      jerseyNumber: i + 1,
+async function loadImg(path) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => resolve(img);
+    img.onerror = () => {
+      log(`❌ 404: ${path}`);
+      resolve(null);
     };
-    
-    const card = await generatePlayerCard(playerData, teamData);
-    cards.push(card);
+    img.src = BASE + path;
+  });
+}
+
+function extractFrame(img, frame, row) {
+  const FW = 64, FH = 64;
+  const c = document.createElement('canvas');
+  c.width = FW; c.height = FH;
+  const ctx = c.getContext('2d');
+  ctx.drawImage(img, frame * FW, row * FH, FW, FH, 0, 0, FW, FH);
+  return ctx.getImageData(0, 0, FW, FH);
+}
+
+function showCanvas(title, img, frame, row, scale = 3, good = true) {
+  const id = extractFrame(img, frame, row);
+  const c = document.createElement('canvas');
+  c.width = 64 * scale; c.height = 64 * scale;
+  c.style.cssText = `image-rendering:pixelated;border:2px solid ${good ? '#0f0' : '#f55'}`;
+  const ctx = c.getContext('2d');
+  ctx.imageSmoothingEnabled = false;
+  ctx.putImageData(id, 0, 0);
+  ctx.drawImage(c, 0, 0, 64 * scale, 64 * scale);
+  
+  // 统计不透明像素
+  let opaque = 0;
+  for (let i = 0; i < id.data.length; i += 4) if (id.data[i+3] > 10) opaque++;
+  
+  const div = document.createElement('div');
+  div.className = `item ${opaque > 50 ? 'good' : 'bad'}`;
+  div.appendChild(c);
+  const s = document.createElement('span');
+  s.textContent = `${title}\n${opaque}px`;
+  div.appendChild(s);
+  results.appendChild(div);
+  return opaque;
+}
+
+// 调色板
+const skinLight = ['#271920','#99423c','#cc8665','#E4A47C','#F9D5BA','#FAECE7'];
+
+function hexToRgb(hex) {
+  hex = hex.replace('#','');
+  return [parseInt(hex.substr(0,2),16), parseInt(hex.substr(2,2),16), parseInt(hex.substr(4,2),16)];
+}
+
+function applyPalette(id, src, dst) {
+  const d = id.data;
+  const map = {};
+  src.forEach((s,i) => { map[s] = dst[i]; });
+  const rgbMap = {};
+  for (const [k,v] of Object.entries(map)) {
+    const sk = hexToRgb(k), sv = hexToRgb(v);
+    if (sk && sv) rgbMap[sk.join(',')] = sv;
+  }
+  for (let i = 0; i < d.length; i += 4) {
+    if (d[i+3] > 10) {
+      const k = `${d[i]},${d[i+1]},${d[i+2]}`;
+      if (rgbMap[k]) { d[i]=rgbMap[k][0]; d[i+1]=rgbMap[k][1]; d[i+2]=rgbMap[k][2]; }
+    }
+  }
+  return id;
+}
+
+async function test() {
+  const sprites = [
+    'body__bodies__male__idle.png',
+    'head__heads__human__male__idle.png',
+    'hair__plain__adult__idle.png',
+    'torso__clothes__shortsleeve__shortsleeve__male__idle.png',
+    'legs__shorts__shorts__male__idle.png',
+    'feet__boots__basic__male__idle.png',
+  ];
+  
+  for (const spr of sprites) {
+    const img = await loadImg(spr);
+    if (!img) continue;
+    showCanvas(spr.split('__').slice(0,2).join('/'), img, 0, 0);
   }
   
-  playersDiv.innerHTML = '';
-  cards.forEach(card => playersDiv.appendChild(card));
-}
-
-// 生成随机球员
-async function generateRandomPlayers() {
-  if (!await checkReady()) return;
-  
-  playersDiv.innerHTML = '<div class="loading">生成中...</div>';
-  
-  const skinTone = document.getElementById('skinTone').value;
-  const hairColor = document.getElementById('hairColor').value;
-  const jerseyColor = document.getElementById('jerseyColor').value;
-  
-  const cards = [];
-  
-  for (let i = 0; i < 10; i++) {
-    const playerData = {
-      id: i + 1,
-      name: firstNames[Math.floor(Math.random() * firstNames.length)] + ' ' + lastNames[Math.floor(Math.random() * lastNames.length)],
-      position: ['GK', 'CB', 'CM', 'LW', 'ST'][Math.floor(Math.random() * 5)],
-      rating: 60 + Math.floor(Math.random() * 35),
-      jerseyNumber: Math.floor(Math.random() * 99) + 1,
-      skinTone: skinTone === 'random' ? undefined : skinTone,
-      hairColor: hairColor === 'random' ? undefined : hairColor,
-    };
-    
-    const teamData = {
-      primaryColor: jerseyColor,
-      secondaryColor: 'white',
-    };
-    
-    const card = await generatePlayerCard(playerData, teamData);
-    cards.push(card);
+  // 测试方向
+  log('\n--- 方向测试 (body) ---');
+  const bodyImg = await loadImg('body__bodies__male__idle.png');
+  if (bodyImg) {
+    for (let dir = 0; dir < 4; dir++) {
+      showCanvas(`body dir=${dir}`, bodyImg, 0, dir);
+    }
   }
   
-  playersDiv.innerHTML = '';
-  cards.forEach(card => playersDiv.appendChild(card));
+  // 测试颜色重映射 (light → brown)
+  log('\n--- 颜色重映射测试 ---');
+  const brown = ['#120E10','#412B29','#5F4539','#76513A','#9C663E','#B8773F'];
+  const body2 = await loadImg('body__bodies__male__idle.png');
+  if (body2) {
+    const id = extractFrame(body2, 0, 0);
+    const remapped = applyPalette(id, skinLight, brown);
+    const c = document.createElement('canvas');
+    c.width = 64; c.height = 64;
+    c.getContext('2d').putImageData(remapped, 0, 0);
+    c.style.cssText = 'image-rendering:pixelated;border:2px solid #f80';
+    const div = document.createElement('div');
+    div.className = 'item';
+    div.appendChild(c);
+    const s = document.createElement('span');
+    s.textContent = 'body light→brown';
+    s.style.color = '#fff';
+    div.appendChild(s);
+    results.appendChild(div);
+  }
 }
 
-// 初始化
-async function init() {
-  if (!await checkReady()) return;
-  
-  loadingDiv.style.display = 'none';
-  
-  // 自动生成初始球队
-  await generateTeam();
-}
-
-// 页面加载后初始化
-window.addEventListener('load', () => {
-  setTimeout(init, 100);
-});
+test().then(() => log('Done!')).catch(e => log('Error: '+e));
 </script>
 </body>
 </html>
