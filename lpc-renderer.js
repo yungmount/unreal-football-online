@@ -767,8 +767,10 @@ class LPCPlayerGenerator {
     if (appearance.beardStyle) {
       let beardPath;
       if (appearance.beardStyle === 'winter') {
+        // winter 有 female/male 性别后缀
         beardPath = `beards__beard__${appearance.beardStyle}__male__${animation}.png`;
       } else {
+        // 其他样式没有性别后缀
         beardPath = `beards__beard__${appearance.beardStyle}__${animation}.png`;
       }
       layers.push({
