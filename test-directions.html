@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>LPC Direction Test</title>
+<style>
+body { font-family: monospace; background: #222; color: #fff; padding: 20px; }
+.row { display: flex; align-items: center; margin: 10px 0; }
+canvas { image-rendering: pixelated; border: 2px solid #444; margin-right: 10px; }
+.label { color: #0f0; font-weight: bold; width: 200px; }
+</style>
+</head>
+<body>
+<h2>LPC 精灵图方向测试</h2>
+<p>加载 body__bodies__male__idle.png，显示各方向的帧</p>
+<div id="container"></div>
+
+<script>
+async function test() {
+  const container = document.getElementById('container');
+  
+  // 加载精灵图
+  const img = new Image();
+  img.crossOrigin = 'anonymous';
+  img.src = 'lpc-sprites/body__bodies__male__idle.png';
+  
+  await new Promise((resolve, reject) => {
+    img.onload = resolve;
+    img.onerror = reject;
+  });
+  
+  console.log('Image loaded:', img.width, 'x', img.height);
+  
+  // LPC 标准结构：128x256 (64x64 每帧，2列×4行)
+  // Row 0: 向下
+  // Row 1: 向左
+  // Row 2: 向右
+  // Row 3: 向上
+  
+  const directions = [
+    { row: 0, name: 'Row 0 (向下)', desc: '角色向下走 = 背对观众 = 背面？' },
+    { row: 1, name: 'Row 1 (向左)', desc: '角色向左走 = 左侧？' },
+    { row: 2, name: 'Row 2 (向右)', desc: '角色向右走 = 右侧？' },
+    { row: 3, name: 'Row 3 (向上)', desc: '角色向上走 = 面向观众 = 正面？' }
+  ];
+  
+  for (const dir of directions) {
+    const row = document.createElement('div');
+    row.className = 'row';
+    
+    const canvas = document.createElement('canvas');
+    canvas.width = 64;
+    canvas.height = 64;
+    const ctx = canvas.getContext('2d');
+    
+    // 提取该行第一帧
+    ctx.drawImage(img, 0, dir.row * 64, 64, 64, 0, 0, 64, 64);
+    
+    const label = document.createElement('div');
+    label.className = 'label';
+    label.innerHTML = `${dir.name}<br><small style="color:#aaa">${dir.desc}</small>`;
+    
+    row.appendChild(canvas);
+    row.appendChild(label);
+    container.appendChild(row);
+  }
+  
+  // 添加完整的精灵图
+  const fullRow = document.createElement('div');
+  fullRow.className = 'row';
+  fullRow.innerHTML = '<div class="label">完整精灵图 (128x256):</div>';
+  
+  const fullCanvas = document.createElement('canvas');
+  fullCanvas.width = img.width;
+  fullCanvas.height = img.height;
+  fullCanvas.getContext('2d').drawImage(img, 0, 0);
+  fullCanvas.style.border = '2px solid #0f0';
+  
+  fullRow.appendChild(fullCanvas);
+  container.appendChild(fullRow);
+}
+
+test();
+</script>
+</body>
+</html>
