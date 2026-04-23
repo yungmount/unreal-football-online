@@ -903,7 +903,7 @@ class LPCPlayerGenerator {
    */
   async generatePlayerCard(playerData, teamData, width = 200, height = 300) {
     const appearance = this.generateAppearance(playerData, teamData);
-    const sprite = await this.generatePlayerSprite(appearance, 'idle', 0);
+    const sprite = await this.generatePlayerSprite(appearance, 'idle', 3); // 3=正面
     
     const canvas = document.createElement('canvas');
     canvas.width = width;
