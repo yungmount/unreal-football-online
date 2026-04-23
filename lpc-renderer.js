@@ -763,10 +763,16 @@ class LPCPlayerGenerator {
       optional: true, // 标记为可选
     });
     
-    // 4. 胡须
+    // 4. 胡须 (只有 winter 有性别后缀)
     if (appearance.beardStyle) {
+      let beardPath;
+      if (appearance.beardStyle === 'winter') {
+        beardPath = `beards__beard__${appearance.beardStyle}__male__${animation}.png`;
+      } else {
+        beardPath = `beards__beard__${appearance.beardStyle}__${animation}.png`;
+      }
       layers.push({
-        sprite: `beards__beard__${appearance.beardStyle}__male__${animation}.png`,
+        sprite: beardPath,
         z: LPC.Z_LAYERS.BEARD,
         palette: LPC_PALETTES.hair[appearance.hairColor] || LPC_PALETTES.hair.brown,
         sourcePalette: LPC_PALETTES.hair.brown,
