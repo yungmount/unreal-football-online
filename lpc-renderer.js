@@ -748,10 +748,10 @@ class LPCPlayerGenerator {
    * 根据外观配置生成球员精灵 Canvas
    * @param {Object} appearance - 外观配置
    * @param {string} animation - 动画类型 ('idle' | 'walk')
-   * @param {number} direction - 方向 (0=下, 1=左, 2=右, 3=上)
+   * @param {number} direction - 方向 (0=下=背面, 1=左, 2=右, 3=上=正面)
    * @returns {Promise<HTMLCanvasElement>}
    */
-  async generatePlayerSprite(appearance, animation = 'idle', direction = 0, flipH = false) {
+  async generatePlayerSprite(appearance, animation = 'idle', direction = 3, flipH = false) {
     const layers = [];
     
     // 体型映射（大部分装备只有 male/thin/female 变体，没有 muscular）
@@ -917,7 +917,7 @@ class LPCPlayerGenerator {
    */
   async generatePlayerCard(playerData, teamData, width = 200, height = 300) {
     const appearance = this.generateAppearance(playerData, teamData);
-    const sprite = await this.generatePlayerSprite(appearance, 'idle', 0, false); // direction=0 正面视角
+    const sprite = await this.generatePlayerSprite(appearance, 'idle', 3, false); // direction=3 正面视角
     
     const canvas = document.createElement('canvas');
     canvas.width = width;
