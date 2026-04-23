@@ -721,6 +721,10 @@ async function initLPCPlayer(player, containerId) {
   const container = document.getElementById(containerId);
   if (!container) return;
   
+  // 防止重复初始化
+  if (container.dataset.lpcLoading === '1') return;
+  container.dataset.lpcLoading = '1';
+  
   container.innerHTML = '';
   
   // 检查 LPC 渲染器是否可用
@@ -816,6 +820,7 @@ async function initLPCPlayer(player, containerId) {
     
     // 添加到容器
     container.appendChild(cardCanvas);
+    container.dataset.lpcLoading = '2'; // 标记加载完成
     
     // 添加轻微呼吸动画
     let breathOffset = 0;
@@ -834,6 +839,7 @@ async function initLPCPlayer(player, containerId) {
     
   } catch (e) {
     console.error('[LPC] 渲染失败:', e);
+    container.dataset.lpcLoading = '0'; // 重置锁，允许重试
     // 回退到 Three.js
     initVoxelPlayer(player, containerId);
   }
@@ -1826,7 +1832,8 @@ function renderDetail(){
   const p = typeof selPlayer==='string'?JSON.parse(selPlayer):selPlayer;
   if(!p)return'';
   const av=getAvatar(p);
-  const voxelId='voxel-'+Date.now();
+  // 使用球员 ID 作为稳定的容器 ID，避免每次渲染重新初始化
+  const voxelId='voxel-'+(p.id||p.name.replace(/\s+/g,'-'));
   const stats=[{l:t('pace'),v:p.pace,c:'#00d4ff'},{l:t('shooting'),v:p.shooting,c:'#ef4444'},{l:t('passing'),v:p.passing,c:'#fbbf24'},{l:t('defending'),v:p.defending,c:'#22c55e'},{l:t('physical'),v:p.physical,c:'#8b5cf6'}];
   const bmi=(p.weight/Math.pow(p.height/100,2)).toFixed(1);
   return `
