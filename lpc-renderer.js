@@ -57,24 +57,27 @@ const LPC = {
     // 可用头部变体
     HEAD_TYPES: ['male', 'male_elderly', 'male_gaunt', 'male_plump', 'male_small'],
     
-    // 可用发型 (排除过于奇幻的风格)
+    // 可用发型 (基于实际下载的文件)
     HAIR_STYLES: [
       // 短发 (足球常见)
-      'buzzcut', 'short', 'plain', 'cowlick', 'parted', 'parted2', 'parted3',
+      'buzzcut', 'plain', 'cowlick', 'cowlick_tall', 'parted', 'parted2', 'parted3',
       // 中等长度
       'curtains', 'curtains_long', 'swoop', 'swoop_side', 'mop', 'messy1', 'messy2', 'messy3',
-      'bedhead', 'unkempt', 'natural', 'relm_short',
+      'bedhead', 'unkempt', 'natural', 'relm_short', 'halfmessy',
       // 卷发
-      'curly_short', 'curly_short2', 'afro', 'jewfro', 'curls_large',
-      // 长发 (扎起来)
-      'ponytail', 'ponytail2', 'high_ponytail', 'braid', 'braid2',
-      'half_up', 'long_tied', 'topknot_long', 'topknot_short',
+      'curly_short', 'curly_short2', 'curly_long', 'afro', 'jewfro',
+      // 长发
+      'half_up', 'long', 'long_messy', 'long_messy2', 'long_straight',
+      'loose', 'lob', 'bob', 'bob_side_part', 'bangs', 'bangs_bun', 'bangslong', 'bangsshort',
+      // 扎起来
+      'page', 'page2', 'pigtails', 'pigtails_bangs', 'pixie',
+      'extensions__ponytails__topknot_short', 'extensions__ties__high_bun',
       // 特殊风格
-      'dreadlocks_short', 'dreadlocks_long', 'cornrows', 'twists_fade',
+      'dreadlocks_short', 'dreadlocks_long', 'cornrows', 'twists_fade', 'twists_straight',
       // 莫霍克 (个性球员)
-      'shorthawk', 'longhawk', 'spiked', 'spiked2', 'flat_top_fade', 'high_and_tight',
-      // 秃头
-      'balding',
+      'shorthawk', 'longhawk', 'spiked', 'spiked2', 'flat_top_fade', 'flat_top_straight', 'high_and_tight',
+      // 其他
+      'balding', 'idol',
     ],
     
     // 可用胡须风格
@@ -700,11 +703,13 @@ class LPCPlayerGenerator {
   async generatePlayerSprite(appearance, animation = 'idle', direction = 0) {
     const layers = [];
     
-    // 体型映射
+    // 体型映射（大部分装备只有 male/thin/female 变体，没有 muscular）
     const bodyTypeMap = {
       'male': 'male',
-      'muscular': 'muscular',
+      'muscular': 'male',  // muscular 体型使用 male 装备
       'teen': 'thin',
+      'female': 'female',
+      'child': 'child',
     };
     const bodySuffix = bodyTypeMap[appearance.bodyType] || 'male';
     
