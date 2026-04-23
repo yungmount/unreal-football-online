@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>测试所有方向</title>
+<style>
+body { font-family: monospace; background: #1a1a1a; color: #fff; padding: 20px; }
+.grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; }
+.card { text-align: center; }
+canvas { image-rendering: pixelated; background: #333; border: 2px solid #555; }
+.active { border-color: #0f0; }
+h3 { margin: 10px 0; }
+</style>
+</head>
+<body>
+<h2>测试所有4个方向，找出正面</h2>
+<p>点击卡片选择正确的方向</p>
+<div class="grid" id="grid"></div>
+
+<script src="lpc-renderer.js"></script>
+<script>
+async function test() {
+  const grid = document.getElementById('grid');
+  const generator = new LPCPlayerGenerator();
+  
+  // 生成一个测试球员外观
+  const appearance = {
+    bodyType: 'male',
+    headType: 'male',
+    skinTone: 'light',
+    hairstyle: 'plain',
+    hairColor: 'brown',
+    jerseyStyle: 'tshirt',
+    jerseyColor: 'red',
+    shortsStyle: 'pantaloons',
+    shortsColor: 'white',
+    bootsStyle: 'booties',
+    bootsColor: 'black'
+  };
+  
+  const directionNames = [
+    'direction=0\n(向下)',
+    'direction=1\n(向左)',
+    'direction=2\n(向右)',
+    'direction=3\n(向上)'
+  ];
+  
+  for (let dir = 0; dir < 4; dir++) {
+    const card = document.createElement('div');
+    card.className = 'card';
+    
+    const canvas = document.createElement('canvas');
+    canvas.width = 64;
+    canvas.height = 64;
+    
+    const label = document.createElement('h3');
+    label.style.whiteSpace = 'pre';
+    label.textContent = directionNames[dir];
+    
+    card.appendChild(canvas);
+    card.appendChild(label);
+    
+    // 生成该方向的精灵
+    try {
+      const spriteCanvas = await generator.generatePlayerSprite(appearance, 'idle', dir, false);
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(spriteCanvas, 0, 0);
+    } catch(e) {
+      console.error(`direction ${dir} failed:`, e);
+    }
+    
+    card.onclick = () => {
+      document.querySelectorAll('.card canvas').forEach(c => c.classList.remove('active'));
+      canvas.classList.add('active');
+      console.log(`Selected direction=${dir}`);
+    };
+    
+    grid.appendChild(card);
+  }
+}
+
+test();
+</script>
+</body>
+</html>

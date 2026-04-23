@@ -764,8 +764,8 @@ async function initLPCPlayer(player, containerId) {
     // 生成外观配置
     const appearance = lpcGenerator.generateAppearance(playerData, teamData);
     
-    // 生成精灵 Canvas (idle 动画, direction=2 = LPC正视图)
-    const spriteCanvas = await lpcGenerator.generatePlayerSprite(appearance, 'idle', 2);
+    // 生成精灵 Canvas (idle 动画, direction=3 = 正面视角 = 向上走 = 面向观众)
+    const spriteCanvas = await lpcGenerator.generatePlayerSprite(appearance, 'idle', 3);
     
     // 创建球员卡片
     const cardCanvas = document.createElement('canvas');
