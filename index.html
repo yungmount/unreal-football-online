@@ -761,7 +761,7 @@ async function initLPCPlayer(player, containerId) {
     
     // 预生成4帧 idle 动画
     const NUM_FRAMES = 4;
-    const frames = await lpcGenerator.generateAnimationFrames(appearance, 'idle', 2, 1); // 只用1帧，无动画
+    const frames = await lpcGenerator.generateAnimationFrames(appearance, 'idle', 2, 2); // 试2帧
     
     // 只取成功的帧（部分帧可能加载失败）
     const validFrames = frames.filter(f => f && f.width > 0);
