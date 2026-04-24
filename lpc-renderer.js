@@ -751,7 +751,7 @@ class LPCPlayerGenerator {
    * @param {number} direction - 方向 (0=向下=背面, 1=向左=左侧, 2=向右=右侧, 3=向上=正面)
    * @returns {Promise<HTMLCanvasElement>}
    */
-  async generatePlayerSprite(appearance, animation = 'idle', direction = 3, flipH = false) {
+  async generatePlayerSprite(appearance, animation = 'idle', direction = 3, flipH = false, frameIndex = 0) {
     const layers = [];
     
     // 体型映射（大部分装备只有 male/thin/female 变体，没有 muscular）
@@ -781,7 +781,7 @@ class LPCPlayerGenerator {
       palette: LPC_PALETTES.skin[appearance.skinTone] || LPC_PALETTES.skin.light,
       sourcePalette: LPC_PALETTES.skin.light,
       row: direction,
-      frame: 0,
+      frame: frameIndex,
     });
     
     // 2. 头部
@@ -791,7 +791,7 @@ class LPCPlayerGenerator {
       palette: LPC_PALETTES.skin[appearance.skinTone] || LPC_PALETTES.skin.light,
       sourcePalette: LPC_PALETTES.skin.light,
       row: direction,
-      frame: 0,
+      frame: frameIndex,
     });
     
     // 3. 头发 (需要检查文件是否存在)
@@ -810,7 +810,7 @@ class LPCPlayerGenerator {
       palette: LPC_PALETTES.hair[appearance.hairColor] || LPC_PALETTES.hair.brown,
       sourcePalette: LPC_PALETTES.hair.blonde,
       row: direction,
-      frame: 0,
+      frame: frameIndex,
       optional: true, // 标记为可选
     });
     
@@ -830,7 +830,7 @@ class LPCPlayerGenerator {
         palette: LPC_PALETTES.hair[appearance.hairColor] || LPC_PALETTES.hair.brown,
         sourcePalette: LPC_PALETTES.hair.brown,
         row: direction,
-        frame: 0,
+        frame: frameIndex,
         optional: true,
       });
     }
@@ -843,7 +843,7 @@ class LPCPlayerGenerator {
         palette: LPC_PALETTES.hair[appearance.hairColor] || LPC_PALETTES.hair.brown,
         sourcePalette: LPC_PALETTES.hair.brown,
         row: direction,
-        frame: 0,
+        frame: frameIndex,
         optional: true,
       });
     }
@@ -855,7 +855,7 @@ class LPCPlayerGenerator {
       palette: LPC_PALETTES.cloth[appearance.shortsColor] || LPC_PALETTES.cloth.white,
       sourcePalette: LPC_PALETTES.cloth.white,
       row: direction,
-      frame: 0,
+      frame: frameIndex,
     });
     
     // 7. 球鞋
@@ -865,7 +865,7 @@ class LPCPlayerGenerator {
       palette: LPC_PALETTES.cloth[appearance.bootsColor] || LPC_PALETTES.cloth.black,
       sourcePalette: LPC_PALETTES.cloth.black,
       row: direction,
-      frame: 0,
+      frame: frameIndex,
     });
     
     // 8. 球衣 (球队颜色) - 使用短袖
@@ -875,7 +875,7 @@ class LPCPlayerGenerator {
       palette: LPC_PALETTES.cloth[appearance.jerseyColor] || LPC_PALETTES.cloth.red,
       sourcePalette: LPC_PALETTES.cloth.white,
       row: direction,
-      frame: 0,
+      frame: frameIndex,
     });
     
     // 9. 守门员手套
@@ -884,7 +884,7 @@ class LPCPlayerGenerator {
         sprite: `arms__hands__gloves__${bodySuffix}__${animation}.png`,
         z: LPC.Z_LAYERS.ARMS,
         row: direction,
-        frame: 0,
+        frame: frameIndex,
         optional: true,
       });
     }
@@ -907,6 +907,23 @@ class LPCPlayerGenerator {
     return sprite;
   }
   
+  /**
+   * 生成动画帧序列（用于播放动画）
+   * @param {Object} appearance - 外观配置
+   * @param {string} animation - 动画类型
+   * @param {number} direction - 方向
+   * @param {number} numFrames - 帧数量
+   * @returns {Promise<HTMLCanvasElement[]>}
+   */
+  async generateAnimationFrames(appearance, animation = 'idle', direction = 2, numFrames = 4) {
+    const frames = [];
+    for (let i = 0; i < numFrames; i++) {
+      const frame = await this.generatePlayerSprite(appearance, animation, direction, false, i);
+      frames.push(frame);
+    }
+    return frames;
+  }
+
   /**
    * 生成球员卡片 (用于显示)
    * @param {Object} playerData - 球员数据

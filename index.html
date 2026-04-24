@@ -757,10 +757,23 @@ async function initLPCPlayer(player, containerId) {
   
   try {
     const appearance = lpcGenerator.generateAppearance(playerData, teamData);
-    const spriteCanvas = await lpcGenerator.generatePlayerSprite(appearance, 'idle', 2);
+    const teamColor = lpcGenerator.hexToTeamColor(teamData.primaryColor);
+    
+    // 预生成4帧 idle 动画
+    const NUM_FRAMES = 4;
+    const frames = await lpcGenerator.generateAnimationFrames(appearance, 'idle', 2, NUM_FRAMES);
+    
+    // 只取成功的帧（部分帧可能加载失败）
+    const validFrames = frames.filter(f => f && f.width > 0);
+    if (validFrames.length === 0) {
+      console.warn('[LPC] 所有帧生成失败');
+      container.dataset.lpcLoading = '0';
+      initVoxelPlayer(player, containerId);
+      return;
+    }
+    
     const cardCanvas = document.createElement('canvas');
     const ctx = cardCanvas.getContext('2d');
-    const teamColor = lpcGenerator.hexToTeamColor(teamData.primaryColor);
     
     if (isAvatarMode) {
       // 头像模式：小尺寸，只显示头部+上半身
@@ -768,64 +781,96 @@ async function initLPCPlayer(player, containerId) {
       cardCanvas.width = size;
       cardCanvas.height = size;
       
-      ctx.fillStyle = 'rgba(26,26,46,0.95)';
-      ctx.fillRect(0, 0, size, size);
-      ctx.strokeStyle = teamColor;
-      ctx.lineWidth = 2;
-      ctx.strokeRect(1, 1, size-2, size-2);
+      // 绘制函数
+      function drawAvatarFrame(frame) {
+        ctx.clearRect(0, 0, size, size);
+        ctx.fillStyle = 'rgba(26,26,46,0.95)';
+        ctx.fillRect(0, 0, size, size);
+        ctx.strokeStyle = teamColor;
+        ctx.lineWidth = 2;
+        ctx.strokeRect(1, 1, size-2, size-2);
+        
+        ctx.imageSmoothingEnabled = false;
+        const scale = size / 64 * 1.5;
+        const sw = 64 * scale;
+        const sh = 64 * scale;
+        const sx = (size - sw) / 2;
+        const sy = -sh * 0.15;
+        ctx.drawImage(frame, sx, sy, sw, sh);
+      }
       
-      // 放大并裁剪显示头部为主
-      ctx.imageSmoothingEnabled = false;
-      const scale = size / 64 * 1.5;
-      const sw = 64 * scale;
-      const sh = 64 * scale;
-      const sx = (size - sw) / 2;
-      const sy = -sh * 0.15; // 向上偏移让头部居中
-      ctx.drawImage(spriteCanvas, sx, sy, sw, sh);
+      drawAvatarFrame(validFrames[0]);
+      container.appendChild(cardCanvas);
+      container.dataset.lpcLoading = '2';
+      
+      // 头像也播放动画（较慢节奏）
+      let afIdx = 0;
+      function animateAvatar() {
+        afIdx = (afIdx + 1) % validFrames.length;
+        drawAvatarFrame(validFrames[afIdx]);
+      }
+      container._animTimer = setInterval(animateAvatar, 400);
+      
     } else {
       // 全身模式：大尺寸球员卡片
       cardCanvas.width = 200;
       cardCanvas.height = 320;
       
-      const gradient = ctx.createLinearGradient(0, 0, 0, 320);
-      gradient.addColorStop(0, '#1a1a2e');
-      gradient.addColorStop(1, '#0f0f1a');
-      ctx.fillStyle = gradient;
-      ctx.fillRect(0, 0, 200, 320);
+      function drawFullFrame(frame) {
+        ctx.clearRect(0, 0, 200, 320);
+        const gradient = ctx.createLinearGradient(0, 0, 0, 320);
+        gradient.addColorStop(0, '#1a1a2e');
+        gradient.addColorStop(1, '#0f0f1a');
+        ctx.fillStyle = gradient;
+        ctx.fillRect(0, 0, 200, 320);
+        
+        ctx.strokeStyle = teamColor;
+        ctx.lineWidth = 3;
+        ctx.strokeRect(2, 2, 196, 316);
+        
+        ctx.imageSmoothingEnabled = false;
+        const scale = 3;
+        const sw = 64 * scale;
+        const sh = 64 * scale;
+        const spriteX = (200 - sw) / 2;
+        // 添加轻微呼吸弹跳效果
+        const bounce = validFrames.length > 1 ? Math.sin(Date.now() / 300) * 2 : 0;
+        ctx.drawImage(frame, spriteX, 60 + bounce, sw, sh);
+        
+        ctx.fillStyle = '#ffffff';
+        ctx.font = 'bold 16px Arial';
+        ctx.textAlign = 'center';
+        ctx.fillText(playerData.name, 100, 240);
+        
+        ctx.font = '13px Arial';
+        ctx.fillStyle = '#94a3b8';
+        ctx.fillText(playerData.position, 100, 260);
+        
+        const ovr = player.ovr || 70;
+        ctx.font = 'bold 28px Arial';
+        ctx.fillStyle = ovr >= 80 ? '#00d4ff' : ovr >= 70 ? '#22c55e' : '#fbbf24';
+        ctx.fillText(String(ovr), 100, 290);
+        
+        ctx.font = 'bold 18px Arial';
+        ctx.fillStyle = teamColor;
+        ctx.textAlign = 'right';
+        ctx.fillText('#' + playerData.jerseyNumber, 185, 30);
+      }
       
-      ctx.strokeStyle = teamColor;
-      ctx.lineWidth = 3;
-      ctx.strokeRect(2, 2, 196, 316);
+      drawFullFrame(validFrames[0]);
+      container.appendChild(cardCanvas);
+      container.dataset.lpcLoading = '2';
       
-      ctx.imageSmoothingEnabled = false;
-      const scale = 3;
-      const sw = 64 * scale;
-      const sh = 64 * scale;
-      const spriteX = (200 - sw) / 2;
-      ctx.drawImage(spriteCanvas, spriteX, 60, sw, sh);
-      
-      ctx.fillStyle = '#ffffff';
-      ctx.font = 'bold 16px Arial';
-      ctx.textAlign = 'center';
-      ctx.fillText(playerData.name, 100, 240);
-      
-      ctx.font = '13px Arial';
-      ctx.fillStyle = '#94a3b8';
-      ctx.fillText(playerData.position, 100, 260);
-      
-      const ovr = player.ovr || 70;
-      ctx.font = 'bold 28px Arial';
-      ctx.fillStyle = ovr >= 80 ? '#00d4ff' : ovr >= 70 ? '#22c55e' : '#fbbf24';
-      ctx.fillText(String(ovr), 100, 290);
-      
-      ctx.font = 'bold 18px Arial';
-      ctx.fillStyle = teamColor;
-      ctx.textAlign = 'right';
-      ctx.fillText('#' + playerData.jerseyNumber, 185, 30);
+      // 全身模式播放 idle 动画
+      if (validFrames.length > 1) {
+        let fIdx = 0;
+        function animateFull() {
+          fIdx = (fIdx + 1) % validFrames.length;
+          drawFullFrame(validFrames[fIdx]);
+        }
+        container._animTimer = setInterval(animateFull, 350);
+      }
     }
-    
-    container.appendChild(cardCanvas);
-    container.dataset.lpcLoading = '2';
     
   } catch (e) {
     console.error('[LPC] 渲染失败:', e);
@@ -1708,6 +1753,10 @@ function render(){
   const sorted=[...G.league].sort((a,b)=>b.pts-a.pts);
   const myPos=sorted.findIndex(l=>l.name==='FC United')+1;
   let main='';
+  // 清理旧动画定时器（页面切换时）
+  document.querySelectorAll('[data-player]').forEach(el=>{
+    if(el._animTimer) { clearInterval(el._animTimer); el._animTimer=null; }
+  });
   if(tab==='playerDetail')main=renderDetail();
   else if(tab==='home')main=renderHome(myL,sorted,myPos);
   else if(tab==='team')main=renderTeam();
