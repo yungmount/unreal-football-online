@@ -759,52 +759,60 @@ async function initLPCPlayer(player, containerId) {
     const appearance = lpcGenerator.generateAppearance(playerData, teamData);
     const teamColor = lpcGenerator.hexToTeamColor(teamData.primaryColor);
     
-    // 头像只用1帧（静态），全身模式用2帧动画
-    const NUM_FRAMES = isAvatarMode ? 1 : 2;
-    const frames = await lpcGenerator.generateAnimationFrames(appearance, 'idle', 2, NUM_FRAMES);
-    
-    // 只取成功的帧（部分帧可能加载失败）
-    const validFrames = frames.filter(f => f && f.width > 0);
-    if (validFrames.length === 0) {
-      console.warn('[LPC] 所有帧生成失败');
-      container.dataset.lpcLoading = '0';
-      initVoxelPlayer(player, containerId);
-      return;
-    }
-    
     const cardCanvas = document.createElement('canvas');
     const ctx = cardCanvas.getContext('2d');
     
     if (isAvatarMode) {
-      // 头像模式：小尺寸，只显示头部+上半身
+      // === 头像模式：只用头部层，快速渲染 ===
+      const spriteCanvas = await lpcGenerator.generateAvatarSprite(appearance, 2);
+      if (!spriteCanvas || spriteCanvas.width === 0) {
+        container.dataset.lpcLoading = '0';
+        initVoxelPlayer(player, containerId);
+        return;
+      }
+      
       const size = container.offsetWidth || container.offsetHeight || 52;
       cardCanvas.width = size;
       cardCanvas.height = size;
       
-      // 绘制函数
-      function drawAvatarFrame(frame) {
-        ctx.clearRect(0, 0, size, size);
-        ctx.fillStyle = 'rgba(26,26,46,0.95)';
-        ctx.fillRect(0, 0, size, size);
-        ctx.strokeStyle = teamColor;
-        ctx.lineWidth = 2;
-        ctx.strokeRect(1, 1, size-2, size-2);
-        
-        ctx.imageSmoothingEnabled = false;
-        const scale = size / 64 * 2.0; // 放大到2.0倍
-        const sw = 64 * scale;
-        const sh = 64 * scale;
-        const sx = (size - sw) / 2;
-        const sy = -sh * 0.25; // 向上偏移更多，显示更多头部
-        ctx.drawImage(frame, sx, sy, sw, sh);
-      }
+      ctx.fillStyle = 'rgba(26,26,46,0.95)';
+      ctx.fillRect(0, 0, size, size);
+      ctx.strokeStyle = teamColor;
+      ctx.lineWidth = 2;
+      ctx.strokeRect(1, 1, size-2, size-2);
       
-      drawAvatarFrame(validFrames[0]);
+      // 裁剪头部区域：LPC 64x64 精灵中，脸中心约 (32, 12)
+      // 头部范围约 x:16-48, y:0-24，宽32高24
+      ctx.imageSmoothingEnabled = false;
+      const headW = 32, headH = 26;
+      const headCx = 32, headCy = 13; // 脸中心
+      const headX = headCx - headW / 2;
+      const headY = headCy - headH / 2;
+      // 放大头部填满容器
+      const scale = Math.max(size / headW, size / headH) * 1.1;
+      const dw = headW * scale;
+      const dh = headH * scale;
+      const dx = (size - dw) / 2;
+      const dy = (size - dh) / 2;
+      ctx.drawImage(spriteCanvas, headX, headY, headW, headH, dx, dy, dw, dh);
+      
       container.appendChild(cardCanvas);
       container.dataset.lpcLoading = '2';
       // 头像静态，不播放动画
       
     } else {
+      // === 全身模式 ===
+      const NUM_FRAMES = 2;
+      const frames = await lpcGenerator.generateAnimationFrames(appearance, 'idle', 2, NUM_FRAMES);
+      
+      // 只取成功的帧
+      const validFrames = frames.filter(f => f && f.width > 0);
+      if (validFrames.length === 0) {
+        console.warn('[LPC] 所有帧生成失败');
+        container.dataset.lpcLoading = '0';
+        initVoxelPlayer(player, containerId);
+        return;
+      }
       // 全身模式：大尺寸球员卡片
       cardCanvas.width = 200;
       cardCanvas.height = 320;
