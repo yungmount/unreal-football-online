@@ -760,7 +760,7 @@ async function initLPCPlayer(player, containerId) {
     const teamColor = lpcGenerator.hexToTeamColor(teamData.primaryColor);
     
     // 预生成4帧 idle 动画
-    const NUM_FRAMES = 4;
+    const NUM_FRAMES = 3;
     const frames = await lpcGenerator.generateAnimationFrames(appearance, 'idle', 2, NUM_FRAMES);
     
     // 只取成功的帧（部分帧可能加载失败）
@@ -809,7 +809,7 @@ async function initLPCPlayer(player, containerId) {
         afIdx = (afIdx + 1) % validFrames.length;
         drawAvatarFrame(validFrames[afIdx]);
       }
-      container._animTimer = setInterval(animateAvatar, 400);
+      container._animTimer = setInterval(animateAvatar, 500);
       
     } else {
       // 全身模式：大尺寸球员卡片
@@ -868,7 +868,7 @@ async function initLPCPlayer(player, containerId) {
           fIdx = (fIdx + 1) % validFrames.length;
           drawFullFrame(validFrames[fIdx]);
         }
-        container._animTimer = setInterval(animateFull, 350);
+        container._animTimer = setInterval(animateFull, 400);
       }
     }
     
