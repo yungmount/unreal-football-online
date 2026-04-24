@@ -760,8 +760,8 @@ async function initLPCPlayer(player, containerId) {
     const teamColor = lpcGenerator.hexToTeamColor(teamData.primaryColor);
     
     // 预生成4帧 idle 动画
-    const NUM_FRAMES = 3;
-    const frames = await lpcGenerator.generateAnimationFrames(appearance, 'idle', 2, NUM_FRAMES);
+    const NUM_FRAMES = 4;
+    const frames = await lpcGenerator.generateAnimationFrames(appearance, 'idle', 2, 1); // 只用1帧，无动画
     
     // 只取成功的帧（部分帧可能加载失败）
     const validFrames = frames.filter(f => f && f.width > 0);
