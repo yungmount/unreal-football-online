@@ -655,6 +655,21 @@ class LPCPlayerGenerator {
   }
   
   /**
+   * 预加载常用精灵（加速首次渲染）
+   * @returns {Promise<void>}
+   */
+  async preload() {
+    const commonSprites = [
+      'body__bodies__male__idle.png',
+      'head__heads__human__male__idle.png',
+      'legs__pants__male__idle.png',
+      'feet__shoes__male__idle.png',
+      'torso__shirts__male__idle.png',
+    ];
+    await this.loader.loadBatch(commonSprites);
+  }
+  
+  /**
    * 生成球员外观配置
    * @param {Object} playerData - 球员数据
    * @param {Object} teamData - 球队数据 (颜色等)

@@ -759,9 +759,9 @@ async function initLPCPlayer(player, containerId) {
     const appearance = lpcGenerator.generateAppearance(playerData, teamData);
     const teamColor = lpcGenerator.hexToTeamColor(teamData.primaryColor);
     
-    // 预生成4帧 idle 动画
-    const NUM_FRAMES = 4;
-    const frames = await lpcGenerator.generateAnimationFrames(appearance, 'idle', 2, 2); // 试2帧
+    // 头像只用1帧（静态），全身模式用2帧动画
+    const NUM_FRAMES = isAvatarMode ? 1 : 2;
+    const frames = await lpcGenerator.generateAnimationFrames(appearance, 'idle', 2, NUM_FRAMES);
     
     // 只取成功的帧（部分帧可能加载失败）
     const validFrames = frames.filter(f => f && f.width > 0);
@@ -791,25 +791,18 @@ async function initLPCPlayer(player, containerId) {
         ctx.strokeRect(1, 1, size-2, size-2);
         
         ctx.imageSmoothingEnabled = false;
-        const scale = size / 64 * 1.5;
+        const scale = size / 64 * 2.0; // 放大到2.0倍
         const sw = 64 * scale;
         const sh = 64 * scale;
         const sx = (size - sw) / 2;
-        const sy = -sh * 0.15;
+        const sy = -sh * 0.25; // 向上偏移更多，显示更多头部
         ctx.drawImage(frame, sx, sy, sw, sh);
       }
       
       drawAvatarFrame(validFrames[0]);
       container.appendChild(cardCanvas);
       container.dataset.lpcLoading = '2';
-      
-      // 头像也播放动画（较慢节奏）
-      let afIdx = 0;
-      function animateAvatar() {
-        afIdx = (afIdx + 1) % validFrames.length;
-        drawAvatarFrame(validFrames[afIdx]);
-      }
-      container._animTimer = setInterval(animateAvatar, 500);
+      // 头像静态，不播放动画
       
     } else {
       // 全身模式：大尺寸球员卡片
@@ -835,7 +828,7 @@ async function initLPCPlayer(player, containerId) {
         const spriteX = (200 - sw) / 2;
         // 添加轻微呼吸弹跳效果
         const bounce = validFrames.length > 1 ? Math.sin(Date.now() / 300) * 2 : 0;
-        ctx.drawImage(frame, spriteX, 60 + bounce, sw, sh);
+        ctx.drawImage(frame, spriteX, 35 + bounce, sw, sh); // 向上移动到35
         
         ctx.fillStyle = '#ffffff';
         ctx.font = 'bold 16px Arial';
@@ -2074,6 +2067,12 @@ initGame();
 refreshMarket();
 scoutAcademy();
 render();
+
+// 预加载 LPC 精灵（加速首次渲染）
+if (typeof LPCPlayerGenerator !== 'undefined') {
+  const preloader = new LPCPlayerGenerator();
+  preloader.preload().then(() => console.log('[LPC] 精灵预加载完成'));
+}
 </script>
 </body>
 </html>
