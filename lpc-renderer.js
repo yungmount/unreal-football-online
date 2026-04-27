@@ -783,11 +783,11 @@ class LPCPlayerGenerator {
 
     const layers = [];
 
-    // 体型映射(大部分装备只有 male/thin/female 变体,没有 muscular)
+    // 体型映射(只有 male/thin/female/child/muscular,没有 teen)
     const bodyTypeMap = {
       'male': 'male',
-      'muscular': 'male',  // muscular 体型使用 male 装备
-      'teen': 'thin',
+      'muscular': 'male',
+      'teen': 'thin',  // teen → thin (没有 teen body,只有 teen torso/clothes)
       'female': 'female',
       'child': 'child',
     };
@@ -962,7 +962,7 @@ class LPCPlayerGenerator {
     const layers = [];
 
     // 身体(需要作为头部底座)
-    const bodyTypeMap = { 'male':'male','muscular':'male','teen':'thin','female':'female','child':'child' };
+    const bodyTypeMap = { 'male':'male','muscular':'male','teen':'teen','female':'female','child':'child' };
     const bodySuffix = bodyTypeMap[appearance.bodyType] || 'male';
     layers.push({
       sprite: `body__bodies__${bodySuffix}__idle.png`,
