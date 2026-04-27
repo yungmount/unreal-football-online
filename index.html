@@ -1671,10 +1671,10 @@ function matchLoopV3() {
   if(!MS||!MS.playing){rafId=null;return}
   drawMatchV3();
   const evts=(MS.events||[]).length;
-  if(evts!==_lastEvtLen){
+  if(evts!==MS.lastEvtLen){
     const evtEl=document.getElementById('evts');
     if(evtEl)evtEl.innerHTML=evtHTML();
-    _lastEvtLen=evts;
+    MS.lastEvtLen=evts;
   }
   // 更新 HUD 分数/分钟
   const f=MS.getCurrentFrame();

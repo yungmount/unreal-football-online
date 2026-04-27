@@ -350,7 +350,7 @@ class MatchSimulator {
       this._trackStat(side, 'On target', 1);
 
       // 进球判定
-      const goalProb = SHOT_OUTCOME.On target.is_goal[1];
+      const goalProb = SHOT_OUTCOME['On target'].is_goal[1];
       // 守门员技能降低进球率
       const gkSkill = gk.defending || gk.overall || 65;
       const shootSkill = shooter.shooting || shooter.overall || 65;
