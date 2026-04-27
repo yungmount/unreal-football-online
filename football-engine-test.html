@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Football Simulation Engine Test</title>
+<style>
+body { font-family: monospace; background: #1a1a1a; color: #0f0; padding: 20px; }
+canvas { background: #2a5a2a; border: 2px solid #fff; margin: 10px; }
+button { background: #0a5; color: #fff; border: none; padding: 10px 20px; margin: 5px; cursor: pointer; font-size: 16px; }
+button:hover { background: #0c6; }
+#log { background: #111; color: #0f0; padding: 10px; max-height: 300px; overflow-y: auto; font-size: 12px; }
+#log p { margin: 2px 0; }
+#score { font-size: 24px; color: #ff0; margin: 10px 0; }
+canvas#pitch { image-rendering: pixelated; }
+</style>
+</head>
+<body>
+<h1>Football Simulation Engine 测试</h1>
+
+<div id="score">比分: <span id="homeScore">0</span> - <span id="awayScore">0</span></div>
+
+<canvas id="pitch" width="680" height="600"></canvas>
+
+<div>
+  <button onclick="stepSim()">一步 (Step)</button>
+  <button onclick="startAuto()">自动开始</button>
+  <button onclick="stopAuto()">停止</button>
+  <button onclick="newMatch()">新比赛</button>
+</div>
+
+<div id="log"></div>
+
+<script type="module">
+// 简化的 Football Engine 适配器测试
+class SimpleFootballEngine {
+  constructor() {
+    this.match = null;
+    this.pitchWidth = 680;
+    this.pitchHeight = 1050;
+  }
+
+  createTeam(name, isHome) {
+    const positions = isHome ? this.getHomePositions() : this.getAwayPositions();
+    return {
+      name,
+      players: [
+        { name: 'GK', position: 'GK', rating: 80, currentPOS: positions[0], hasBall: false },
+        { name: 'LB', position: 'LB', rating: 75, currentPOS: positions[1], hasBall: false },
+        { name: 'CB1', position: 'CB', rating: 78, currentPOS: positions[2], hasBall: false },
+        { name: 'CB2', position: 'CB', rating: 78, currentPOS: positions[3], hasBall: false },
+        { name: 'RB', position: 'RB', rating: 75, currentPOS: positions[4], hasBall: false },
+        { name: 'CDM', position: 'CDM', rating: 76, currentPOS: positions[5], hasBall: false },
+        { name: 'CM1', position: 'CM', rating: 80, currentPOS: positions[6], hasBall: false },
+        { name: 'CM2', position: 'CM', rating: 80, currentPOS: positions[7], hasBall: false },
+        { name: 'LW', position: 'LW', rating: 82, currentPOS: positions[8], hasBall: false },
+        { name: 'RW', position: 'RW', rating: 82, currentPOS: positions[9], hasBall: false },
+        { name: 'ST', position: 'ST', rating: 85, currentPOS: positions[10], hasBall: false }
+      ],
+      intent: isHome ? 'attack' : 'defend'
+    };
+  }
+
+  getHomePositions() {
+    return [
+      [340, 50], [80, 180], [230, 180], [450, 180], [600, 180],
+      [340, 350], [200, 380], [480, 380], [120, 500], [560, 500], [340, 550]
+    ];
+  }
+
+  getAwayPositions() {
+    return [
+      [340, 1000], [600, 870], [450, 870], [230, 870], [80, 870],
+      [340, 700], [480, 670], [200, 670], [560, 500], [120, 500], [340, 450]
+    ];
+  }
+
+  initMatch(homeName, awayName) {
+    this.homeTeam = this.createTeam(homeName, true);
+    this.awayTeam = this.createTeam(awayName, false);
+    this.ball = { position: [340, 525], withPlayer: true, withTeam: 'home', owner: 10 };
+    this.homeStats = { goals: 0, shots: 0, passes: 0, fouls: 0 };
+    this.awayStats = { goals: 0, shots: 0, passes: 0, fouls: 0 };
+    this.iteration = 0;
+    this.half = 1;
+    this.homeTeam.players[10].hasBall = true;
+    this.log('比赛开始! ' + homeName + ' 开球');
+    return this.getMatchState();
+  }
+
+  getMatchState() {
+    return {
+      homeTeam: this.homeTeam,
+      awayTeam: this.awayTeam,
+      ball: this.ball,
+      homeStats: this.homeStats,
+      awayStats: this.awayStats,
+      iteration: this.iteration,
+      half: this.half
+    };
+  }
+
+  nextIteration() {
+    this.iteration++;
+    
+    // 每 525 次迭代 = 45 分钟 (半场)
+    if (this.iteration === 525) {
+      this.half = 2;
+      this.log('===== 下半场开始 =====');
+      // 切换半场位置
+      [this.homeTeam, this.awayTeam] = [this.awayTeam, this.homeTeam];
+      this.ball.position = [340, 525];
+      this.homeTeam.players.forEach(p => p.hasBall = false);
+      this.homeTeam.players[10].hasBall = true;
+      return this.getMatchState();
+    }
+
+    const ballCarrier = this.homeTeam.players.find(p => p.hasBall);
+    const hasBall = ballCarrier !== undefined;
+    
+    if (!hasBall) {
+      // 球在空中,简单移动
+      this.ball.position[1] += (Math.random() - 0.5) * 20;
+      this.ball.position[0] += (Math.random() - 0.5) * 20;
+      
+      // 检查进球
+      if (this.ball.position[1] <= 0) {
+        this.awayStats.goals++;
+        this.log('⚽ 客队进球! 比分: ' + this.homeStats.goals + '-' + this.awayStats.goals);
+        this.resetBall();
+      } else if (this.ball.position[1] >= this.pitchHeight) {
+        this.homeStats.goals++;
+        this.log('⚽ 主队进球! 比分: ' + this.homeStats.goals + '-' + this.awayStats.goals);
+        this.resetBall();
+      }
+    } else {
+      // 持球球员行动
+      const action = Math.random();
+      const attacker = ballCarrier;
+      const origPos = [...attacker.currentPOS];
+
+      if (action < 0.7) {
+        // 传球 (70%)
+        this.homeStats.passes++;
+        attacker.hasBall = false;
+        
+        // 选择一个队友传球
+        const teammates = this.homeTeam.players.filter(p => p !== attacker);
+        const receiver = teammates[Math.floor(Math.random() * teammates.length)];
+        
+        // 目标位置 (队友当前位置 + 随机偏移)
+        const targetX = Math.max(50, Math.min(630, receiver.currentPOS[0] + (Math.random() - 0.5) * 100));
+        const targetY = Math.max(50, Math.min(1000, receiver.currentPOS[1] + (Math.random() - 0.5) * 100));
+        
+        this.ball.position = [targetX, targetY];
+        this.ball.withPlayer = false;
+        
+        // 移动球
+        this.moveBall();
+        
+        // 检查是否被断球 (20% 概率)
+        if (Math.random() < 0.2) {
+          this.log('🛑 传球被拦截!');
+          attacker.hasBall = false;
+          
+          // 客队球员尝试断球
+          const nearestDefender = this.findNearest(this.awayTeam.players, this.ball.position);
+          nearestDefender.hasBall = true;
+          this.homeTeam = this.awayTeam;
+          this.awayTeam = this.homeTeam;
+        } else {
+          receiver.hasBall = true;
+        }
+        
+      } else if (action < 0.85) {
+        // 射门 (15%)
+        this.homeStats.shots++;
+        attacker.hasBall = false;
+        
+        // 射门目标 (对方球门)
+        const targetY = this.pitchHeight;
+        const targetX = 340 + (Math.random() - 0.5) * 80;
+        this.ball.position = [targetX, targetY];
+        this.ball.withPlayer = false;
+        
+        this.log('🦶 射门! 目标: ' + targetX.toFixed(0) + ',' + targetY);
+        
+        // 移动球 (可能进球或偏出)
+        this.moveBall();
+        
+        // 进球概率 基于距离
+        const dist = this.pitchHeight - attacker.currentPOS[1];
+        const goalProb = Math.max(0.05, 0.4 - dist / 2000);
+        
+        if (Math.random() < goalProb) {
+          this.homeStats.goals++;
+          this.log('⚽⚽⚽ 进球!!! 当前比分: ' + this.homeStats.goals + '-' + this.awayStats.goals);
+        } else {
+          this.log('❌ 射门偏出!');
+        }
+        
+        this.resetBall();
+        
+      } else {
+        // 带球前进 (15%)
+        attacker.currentPOS[1] += 20 + Math.random() * 30;
+        attacker.currentPOS[0] += (Math.random() - 0.5) * 40;
+        
+        this.ball.position = [...attacker.currentPOS];
+        
+        // 被铲球概率
+        if (Math.random() < 0.15) {
+          attacker.hasBall = false;
+          this.homeStats.fouls++;
+          this.log('🟨 犯规! 自由球');
+          this.resetBall();
+        }
+      }
+
+      // 球员向球移动
+      this.homeTeam.players.forEach(p => {
+        if (!p.hasBall) {
+          // 向球靠近
+          const dx = this.ball.position[0] - p.currentPOS[0];
+          const dy = this.ball.position[1] - p.currentPOS[1];
+          const dist = Math.sqrt(dx*dx + dy*dy);
+          if (dist > 80) {
+            p.currentPOS[0] += dx / dist * (5 + Math.random() * 10);
+            p.currentPOS[1] += dy / dist * (5 + Math.random() * 10);
+          }
+        }
+      });
+      
+      // 防守球员回追
+      this.awayTeam.players.forEach(p => {
+        const dx = this.ball.position[0] - p.currentPOS[0];
+        const dy = this.ball.position[1] - p.currentPOS[1];
+        const dist = Math.sqrt(dx*dx + dy*dy);
+        if (dist > 50) {
+          p.currentPOS[0] += dx / dist * 8;
+          p.currentPOS[1] += dy / dist * 8;
+        }
+      });
+    }
+
+    return this.getMatchState();
+  }
+
+  moveBall() {
+    // 模拟球移动到目标位置
+    const target = [...this.ball.position];
+    let steps = 0;
+    const animate = () => {
+      if (steps < 10) {
+        steps++;
+        requestAnimationFrame(animate);
+      }
+    };
+    animate();
+  }
+
+  resetBall() {
+    this.ball.position = [340, 525];
+    this.ball.withPlayer = true;
+    this.homeTeam.players.forEach(p => p.hasBall = false);
+    this.homeTeam.players[10].hasBall = true;
+    this.log('🔄 球重新开始, 主队持球');
+  }
+
+  findNearest(players, pos) {
+    let nearest = players[0];
+    let minDist = Infinity;
+    players.forEach(p => {
+      const dx = p.currentPOS[0] - pos[0];
+      const dy = p.currentPOS[1] - pos[1];
+      const dist = Math.sqrt(dx*dx + dy*dy);
+      if (dist < minDist) {
+        minDist = dist;
+        nearest = p;
+      }
+    });
+    return nearest;
+  }
+
+  log(msg) {
+    const log = document.getElementById('log');
+    const p = document.createElement('p');
+    p.textContent = '[' + this.iteration + '] ' + msg;
+    log.insertBefore(p, log.firstChild);
+    if (log.children.length > 50) log.removeChild(log.lastChild);
+  }
+}
+
+// 全局实例
+window.simEngine = new SimpleFootballEngine();
+window.simState = null;
+let autoInterval = null;
+
+function render() {
+  const canvas = document.getElementById('pitch');
+  const ctx = canvas.getContext('2d');
+  
+  // 清空画布
+  ctx.fillStyle = '#2a5a2a';
+  ctx.fillRect(0, 0, 680, 600);
+  
+  // 球场线
+  ctx.strokeStyle = '#fff';
+  ctx.lineWidth = 2;
+  
+  // 中线
+  ctx.beginPath();
+  ctx.moveTo(0, 300);
+  ctx.lineTo(680, 300);
+  ctx.stroke();
+  
+  // 中圈
+  ctx.beginPath();
+  ctx.arc(340, 300, 60, 0, Math.PI * 2);
+  ctx.stroke();
+  
+  // 禁区
+  ctx.strokeRect(200, 0, 280, 100);
+  ctx.strokeRect(200, 500, 280, 100);
+  
+  if (!simState) return;
+  
+  // 绘制主队 (蓝色)
+  ctx.fillStyle = '#3498db';
+  simState.homeTeam.players.forEach((p, i) => {
+    const x = p.currentPOS[0] * 0.63;
+    const y = p.currentPOS[1] * 0.57;
+    ctx.beginPath();
+    ctx.arc(x, y, 12, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = '#fff';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    
+    ctx.fillStyle = '#fff';
+    ctx.font = '10px Arial';
+    ctx.fillText(p.position, x - 10, y + 20);
+  });
+  
+  // 绘制客队 (红色)
+  ctx.fillStyle = '#e74c3c';
+  simState.awayTeam.players.forEach(p => {
+    const x = p.currentPOS[0] * 0.63;
+    const y = p.currentPOS[1] * 0.57;
+    ctx.beginPath();
+    ctx.arc(x, y, 12, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = '#fff';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+  });
+  
+  // 绘制球
+  const bx = simState.ball.position[0] * 0.63;
+  const by = simState.ball.position[1] * 0.57;
+  ctx.fillStyle = '#fff';
+  ctx.beginPath();
+  ctx.arc(bx, by, 6, 0, Math.PI * 2);
+  ctx.fill();
+  
+  // 更新比分
+  document.getElementById('homeScore').textContent = simState.homeStats.goals;
+  document.getElementById('awayScore').textContent = simState.awayStats.goals;
+}
+
+function stepSim() {
+  simState = window.simEngine.nextIteration();
+  render();
+}
+
+function startAuto() {
+  if (autoInterval) clearInterval(autoInterval);
+  autoInterval = setInterval(stepSim, 100);
+}
+
+function stopAuto() {
+  if (autoInterval) {
+    clearInterval(autoInterval);
+    autoInterval = null;
+  }
+}
+
+function newMatch() {
+  stopAuto();
+  simState = window.simEngine.initMatch('主队', '客队');
+  render();
+}
+
+// 初始化
+newMatch();
+</script>
+</body>
+</html>
