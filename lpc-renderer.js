@@ -668,13 +668,13 @@ class LPCPlayerGenerator {
       'head__heads__human__male_gaunt__idle.png',
       'head__heads__human__male_plump__idle.png',
       'head__heads__human__male_small__idle.png',
-      'hair__messy__adult__idle.png',
-      'hair__curly__adult__idle.png',
-      'hair__long__adult__idle.png',
-      'hair__spiked__adult__idle.png',
+      'hair__plain__adult__idle.png',
+      'hair__messy1__adult__idle.png',
+      'hair__buzzcut__adult__idle.png',
       'legs__pants__male__idle.png',
-      'feet__shoes__male__idle.png',
-      'torso__shirts__male__idle.png',
+      'legs__shorts__shorts__male__idle.png',
+      'feet__boots__basic__male__idle.png',
+      'torso__clothes__shortsleeve__shortsleeves__male__idle.png',
     ];
     await this.loader.loadBatch(commonSprites);
   }
@@ -899,7 +899,7 @@ class LPCPlayerGenerator {
 
     // 8. 球衣 (球队颜色) - 使用短袖
     layers.push({
-      sprite: `torso__clothes__${appearance.jerseyStyle}__${appearance.jerseyStyle}__${bodySuffix === 'thin' ? 'teen' : bodySuffix}__${animation}.png`,
+      sprite: `torso__clothes__${appearance.jerseyStyle}__shortsleeve__shortsleeves__${bodySuffix}__${animation}.png`,
       z: LPC.Z_LAYERS.TORSO,
       palette: LPC_PALETTES.cloth[appearance.jerseyColor] || LPC_PALETTES.cloth.red,
       sourcePalette: LPC_PALETTES.cloth.white,
