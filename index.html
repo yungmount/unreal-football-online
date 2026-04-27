@@ -9,6 +9,8 @@
 <script src="https://cdn.jsdelivr.net/npm/three@0.140.0/examples/js/loaders/FBXLoader.js"></script>
 <!-- LPC 千人千面球员渲染器 -->
 <script src="lpc-renderer.js"></script>
+<!-- AllenThomasDev/Football-Simulator JS移植 -->
+<script src="match-simulator.js"></script>
 <script>
 // ---- Utils (must be before engine) ----
 const rand=(a,b)=>Math.floor(Math.random()*(b-a+1))+a;
@@ -97,6 +99,8 @@ class MatchEngine {
     this.oppName = oppName;
     this.myTactic = myTactic;
     this.oppTactic = oppTactic;
+    // 尝试使用增强模拟器
+    this._useSimulator = !!window.MATCH_ODDS;
     this.score = { my: 0, opp: 0 };
     this.events = [];
     this.stats = {
@@ -109,6 +113,8 @@ class MatchEngine {
     // 预计算所有帧
     this.frames = [];
     this._precompute();
+    // 注入 AllenThomasDev 模拟事件
+    if (this._useSimulator) this._injectSimEvents();
   }
 
   // ---- 预计算阶段（一次性）----
@@ -346,6 +352,40 @@ class MatchEngine {
     p.y += (dy / dist) * Math.min(speed, pace);
     p.x = Math.max(0.03, Math.min(0.97, p.x));
     p.y = Math.max(0.05, Math.min(0.95, p.y));
+  }
+
+  // ---- 注入 AllenThomasDev 模拟器事件 ----
+  _injectSimEvents() {
+    try {
+      const simResult = useSimulatorInMatch(
+        this.myTeam.map(p => ({ name: p.name, overall: p.overall || 70, role: p.role, position: p.position })),
+        this.oppTeam.map(p => ({ name: p.name, overall: p.overall || 70, role: p.role, position: p.position })),
+        'FC United', this.oppName
+      );
+      if (!simResult) return;
+      this.events = simResult.events;
+      // 按分钟标记帧
+      this.events.forEach(evt => {
+        const evtMin = parseInt(evt.min) || 0;
+        // 找到对应分钟的帧
+        for (let i = 0; i < this.frames.length; i++) {
+          if (this.frames[i].min === evtMin) {
+            this.frames[i].evt = i; // 标记事件帧
+            this.frames[i].evtData = evt;
+            break;
+          }
+        }
+      });
+      // 同步比分
+      if (simResult.score) {
+        this.score = simResult.score;
+        this.myScore = simResult.score.home;
+        this.oppScore = simResult.score.away;
+      }
+      console.log('[MatchEngine] AllenThomasDev 模拟器注入完成:', this.events.length, '个事件');
+    } catch (e) {
+      console.warn('[MatchEngine] 模拟器注入失败:', e);
+    }
   }
 
   // ---- 播放阶段（零 AI 计算）----
@@ -1594,6 +1634,10 @@ function startMatch() {
   if(rafId){cancelAnimationFrame(rafId);rafId=null}
   MS = null; tab = 'match'; render();
 
+  // 异步加载模拟器概率数据
+  const simLoad = window.loadMatchOdds ? loadMatchOdds('match-odds.json').catch(()=>null) : Promise.resolve(null);
+
+  simLoad.then(()=>{
   setTimeout(()=>{
     const fp = FP[G.formation]||FP['4-4-2'];
     const myTeam = G.team.slice(0,11).map((p,i)=>{
@@ -1619,7 +1663,8 @@ function startMatch() {
 
     render();
     setTimeout(()=>{rafId=requestAnimationFrame(matchLoopV3)},100);
-  },100);
+  });
+  });
 }
 
 function matchLoopV3() {
