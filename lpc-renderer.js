@@ -962,7 +962,7 @@ class LPCPlayerGenerator {
     const layers = [];
 
     // 身体(需要作为头部底座)
-    const bodyTypeMap = { 'male':'male','muscular':'male','teen':'teen','female':'female','child':'child' };
+    const bodyTypeMap = { 'male':'male','muscular':'male','teen':'thin','female':'female','child':'child' };
     const bodySuffix = bodyTypeMap[appearance.bodyType] || 'male';
     layers.push({
       sprite: `body__bodies__${bodySuffix}__idle.png`,
