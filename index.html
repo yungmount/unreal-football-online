@@ -9,8 +9,7 @@
 <script src="https://cdn.jsdelivr.net/npm/three@0.140.0/examples/js/loaders/FBXLoader.js"></script>
 <!-- LPC 千人千面球员渲染器 -->
 <script src="lpc-renderer.js"></script>
-<!-- AllenThomasDev/Football-Simulator JS移植 -->
-<script src="match-simulator.js"></script>
+<!-- match-simulator.js 已弃用，使用内置状态机引擎 -->
 <script>
 // ---- Utils (must be before engine) ----
 const rand=(a,b)=>Math.floor(Math.random()*(b-a+1))+a;
@@ -81,365 +80,374 @@ function expandPlayerStats(p) {
     targetX: p.hx || 0.5,
     targetY: p.hy || 0.5,
     distanceRun: 0, touches: 0, passesAttempted: 0, passesCompleted: 0,
-    shots: 0, tackles: 0, interceptions: 0
+    shots: 0, tackles: 0, interceptions: 0, dribbling: Math.min(99, (p.pace || 70) + rand(-5, 5))
   };
 }
 
-// ============================================================
-// UFO Match Engine v4.0 - Pre-computed + Playback
-// 赛前一次性生成所有帧，播放时零 AI 计算，纯 Canvas 渲染
-// ============================================================
-
-const MATCH_FPS = 5;   // 每秒 5 帧动画（足够流畅，内存友好）
-const MATCH_DURATION = 270; // 270 game-minutes = 45+45 min (×3 scale → 90s real)
-const MATCH_REAL_SEC = 90;  // 90 秒现实时间播完 270 分钟比赛
-
 class MatchEngine {
-  constructor(myTeam, oppTeam, oppName, myTactic = {}, oppTactic = {}) {
+  constructor(myTeam, oppTeam, oppName, myTactic = Tactics.TIKITAKA, oppTactic = Tactics.COUNTER) {
+    this.W = 960; this.H = 540;
+    this.myTeam = myTeam.map(p => expandPlayerStats({...p, isMy: true}));
+    this.oppTeam = oppTeam.map(p => expandPlayerStats({...p, isMy: false}));
     this.oppName = oppName;
     this.myTactic = myTactic;
     this.oppTactic = oppTactic;
-    // 尝试使用增强模拟器
-    this._useSimulator = !!window.MATCH_ODDS;
     this.score = { my: 0, opp: 0 };
+    this.min = 0;
+    this.sec = 0;
+    this.phase = 'first_half';
+    this.possession = { my: 0, opp: 0, current: 'my' };
+    this.ball = { x: 0.5, y: 0.5, owner: null, vx: 0, vy: 0 };
     this.events = [];
+    this.phaseT = 0;
     this.stats = {
       my: { shots: 0, shotsOn: 0, passes: 0, passesComp: 0, tackles: 0, fouls: 0, corners: 0 },
       opp: { shots: 0, shotsOn: 0, passes: 0, passesComp: 0, tackles: 0, fouls: 0, corners: 0 }
     };
-    // 展开球员属性
-    this.myTeam = myTeam.map(p => ({ ...expandPlayerStats({ ...p, isMy: true }), hx: p.hx, hy: p.hy }));
-    this.oppTeam = oppTeam.map(p => ({ ...expandPlayerStats({ ...p, isMy: false }), hx: p.hx, hy: p.hy }));
-    // 预计算所有帧
-    this.frames = [];
-    this._precompute();
-    // 注入 AllenThomasDev 模拟事件
-    if (this._useSimulator) this._injectSimEvents();
+    this.started = true;
+    this.finished = false;
+    this.initFormation();
   }
 
-  // ---- 预计算阶段（一次性）----
-  _precompute() {
+  initFormation() {
     const fp = FP[G.formation] || FP['4-4-2'];
-    // 初始化位置
-    const state = {
-      my: this.myTeam.map((p, i) => {
-        const pos = fp[i] || [0.25, 0.5];
-        return { ...p, x: pos[0], y: pos[1], hx: pos[0], hy: pos[1], vx: 0, vy: 0 };
-      }),
-      opp: this.oppTeam.map((p, i) => {
-        const pos = fp[i] || [0.75, 0.5];
-        return { ...p, x: 1 - pos[0], y: pos[1], hx: 1 - pos[0], hy: pos[1], vx: 0, vy: 0 };
-      }),
-      ball: { x: 0.5, y: 0.5, vx: 0, vy: 0 },
-      score: { my: 0, opp: 0 },
-      possession: 'my',
-      phase: 'opening', // opening | first_half | half_time | second_half | finished
-      ticks: 0,
-      goalTicks: null,
-      goalScorer: null,
-    };
+    this.myTeam.forEach((p, i) => {
+      const pos = fp[i] || [0.25, 0.5];
+      p.hx = pos[0]; p.hy = pos[1];
+      p.x = pos[0]; p.y = pos[1];
+      p.targetX = pos[0]; p.targetY = pos[1];
+    });
+    this.oppTeam.forEach((p, i) => {
+      const pos = fp[i] || [0.75, 0.5];
+      p.hx = 1 - pos[0]; p.hy = pos[1];
+      p.x = p.hx; p.y = p.hy;
+      p.targetX = p.hx; p.targetY = p.hy;
+    });
+  }
 
-    const totalTicks = Math.ceil(MATCH_DURATION * MATCH_FPS);
+  update(dt) {
+    if (!this.started || this.finished) return;
+    this.sec += dt;
+    if (this.sec >= 1) {
+      this.sec = 0;
+      this.min++;
+      if (this.min === 45 && this.phase === 'first_half') {
+        this.phase = 'half_time';
+        this.addEvent('⏱️ 半场休息', 'info', 45);
+        this.phaseT = 3;
+        return;
+      }
+      if (this.min === 46 && this.phase === 'half_time') {
+        this.phase = 'second_half';
+        this.possession.current = 'opp';
+        this.ball.x = 0.5; this.ball.y = 0.5;
+        this.addEvent('▶️ 下半场开始', 'info', 46);
+      }
+      if (this.min >= 90 && this.phase === 'second_half') {
+        this.endMatch();
+        return;
+      }
+    }
+    if (this.phaseT > 0) {
+      this.phaseT -= dt;
+      return;
+    }
+    this.updatePlayersAI(dt);
+    this.updateBall(dt);
+    if (this.ball.owner) {
+      this.possession[this.ball.owner.isMy ? 'my' : 'opp'] += dt;
+    }
+    this.generateEvents();
+  }
 
-    for (let tick = 0; tick < totalTicks; tick++) {
-      const min = Math.floor((tick / MATCH_FPS) / 60);
-      const sec = Math.floor((tick / MATCH_FPS) % 60);
-      const phase = this._getPhase(min, state.phase);
+  updatePlayersAI(dt) {
+    const allPlayers = [...this.myTeam, ...this.oppTeam];
+    const myAtk = this.possession.current === 'my';
+    allPlayers.forEach(p => {
+      switch (p.state) {
+        case PlayerState.WAIT: this.handleWaitState(p, myAtk); break;
+        case PlayerState.CHASE_BALL: this.handleChaseState(p, myAtk); break;
+        case PlayerState.DRIBBLE: this.handleDribbleState(p, myAtk); break;
+        case PlayerState.PASS: this.handlePassState(p, myAtk); break;
+        case PlayerState.SHOOT: this.handleShootState(p, myAtk); break;
+        case PlayerState.RECEIVE_BALL: this.handleReceiveState(p, myAtk); break;
+        case PlayerState.RETURN_HOME: this.handleReturnState(p, myAtk); break;
+        case PlayerState.SUPPORT_ATTACKER: this.handleSupportState(p, myAtk); break;
+        case PlayerState.PRESS: this.handlePressState(p, myAtk); break;
+      }
+      this.movePlayer(p, dt);
+    });
+  }
 
-      // 如果刚进球，3 秒内不处理球权
-      if (state.goalTicks !== null && tick - state.goalTicks < 3 * MATCH_FPS) {
-        // 保持进球画面
+  handleWaitState(p, myAtk) {
+    const isMy = p.isMy;
+    const ballDist = Math.hypot(this.ball.x - p.x, this.ball.y - p.y);
+    if (ballDist < 0.15 && this.isClosestToBall(p)) {
+      p.state = PlayerState.CHASE_BALL;
+      return;
+    }
+    if (isMy === myAtk && p.role === 'ATT' && !p.isControllingPlayer) {
+      p.state = PlayerState.SUPPORT_ATTACKER;
+      return;
+    }
+    if (isMy !== myAtk && ballDist < 0.25) {
+      p.state = PlayerState.PRESS;
+      return;
+    }
+    p.state = PlayerState.RETURN_HOME;
+  }
+
+  handleChaseState(p, myAtk) {
+    const ballDist = Math.hypot(this.ball.x - p.x, this.ball.y - p.y);
+    if (ballDist < 0.03) {
+      this.ball.owner = p;
+      p.touches++;
+      const zone = getZone(p.x, p.isMy);
+      const canShoot = this.canShoot(p, zone);
+      const canPass = this.findBestPass(p);
+      if (canShoot && Math.random() < 0.4) {
+        p.state = PlayerState.SHOOT;
+      } else if (canPass && Math.random() < 0.7) {
+        p.state = PlayerState.PASS;
+        p.passTarget = canPass;
       } else {
-        this._tick(state, min, phase);
-      }
-
-      // 记录事件帧（事件触发后的前 10 帧高亮）
-      const evtFrame = this._pendingEvt ? tick : null;
-
-      this.frames.push({
-        my: state.my.map(p => ({ x: p.x, y: p.y, isMy: true, role: p.role, name: p.name })),
-        opp: state.opp.map(p => ({ x: p.x, y: p.y, isMy: false, role: p.role, name: p.name })),
-        ball: { x: state.ball.x, y: state.ball.y },
-        score: { ...state.score },
-        min,
-        sec,
-        phase,
-        evt: evtFrame,
-        possession: state.possession,
-      });
-    }
-
-    this.score = state.score;
-    this.events = this._allEvents || [];
-  }
-
-  _getPhase(min, prev) {
-    if (min === 0) return 'opening';
-    if (min < 1) return 'opening';
-    if (min === 45 && prev !== 'half_time') return 'half_time';
-    if (min === 46) return 'second_half';
-    if (min >= 45 && min < 46) return 'half_time';
-    if (min >= 90) return 'finished';
-    if (min > 1 && min < 45) return 'first_half';
-    return 'second_half';
-  }
-
-  _tick(state, min, phase) {
-    // 开球阶段：球在中间，双方落位
-    if (phase === 'opening') {
-      state.ball.x += (0.5 - state.ball.x) * 0.1;
-      state.ball.y += (0.5 - state.ball.y) * 0.1;
-      this._moveToHome(state.my);
-      this._moveToHome(state.opp);
-      if (min >= 1) state.phase = 'first_half';
-      return;
-    }
-
-    // 半场休息
-    if (phase === 'half_time') {
-      state.ball.x += (0.5 - state.ball.x) * 0.05;
-      state.ball.y += (0.5 - state.ball.y) * 0.05;
-      this._moveToHome(state.my);
-      this._moveToHome(state.opp);
-      if (min === 46) {
-        // 换边开球
-        state.possession = 'my';
-        state.ball = { x: 0.5, y: 0.5, vx: 0, vy: 0 };
+        p.state = PlayerState.DRIBBLE;
       }
       return;
     }
+    p.targetX = this.ball.x;
+    p.targetY = this.ball.y;
+  }
 
-    if (phase === 'finished') return;
-
-    // 计算双方进攻倾向
-    const myStr = this._teamStrength(state.my, 'my');
-    const oppStr = this._teamStrength(state.opp, 'opp');
-    const myAtk = state.possession === 'my';
-    const atkTeam = myAtk ? state.my : state.opp;
-    const defTeam = myAtk ? state.opp : state.my;
-    const atkStr = myAtk ? myStr : oppStr;
-    const defStr = myAtk ? oppStr : myStr;
-
-    // 球在脚下时：有概率射门/传球/推进
-    if (state.ball.vx === 0 && state.ball.vy === 0) {
-      const holder = atkTeam[0]; // 默认找前锋
-      const defGoal = myAtk ? 0.97 : 0.03;
-      const defMid = myAtk ? 0.7 : 0.3;
-
-      // 射门判定
-      const inBox = Math.abs(holder.x - defGoal) < 0.15 && Math.abs(holder.y - 0.5) < 0.25;
-      const inThird = Math.abs(holder.x - defGoal) < 0.35;
-      if ((inBox && Math.random() < 0.18) || (inThird && Math.random() < 0.04)) {
-        const shootSkill = holder.shooting || 60;
-        const gkSkill = defTeam[0].defending || 50;
-        const accuracy = 0.6 + (shootSkill - 60) / 200;
-        const onTarget = Math.random() < accuracy;
-        if (onTarget) {
-          const conversion = 0.3 + (shootSkill - gkSkill) / 200;
-          if (Math.random() < conversion) {
-            state.score.myAtk ? state.score.my++ : state.score.opp++;
-            const scorer = holder;
-            const goalTxt = `⚽ 进球! ${scorer.name.split(' ').pop()}! ${state.score.my}-${state.score.opp}`;
-            this._allEvents = this._allEvents || [];
-            this._allEvents.push({ text: goalTxt, type: 'goal', min: `${min}'`, isMy: !!myAtk });
-            state.ball.x = defGoal; state.ball.y = 0.4 + Math.random() * 0.2;
-            state.goalTicks = state.ticks;
-            state.possession = myAtk ? 'opp' : 'my';
-          } else {
-            const saveTxt = `🧤 门将扑出!`;
-            this._allEvents = this._allEvents || [];
-            this._allEvents.push({ text: saveTxt, type: 'save', min: `${min}'`, isMy: !!myAtk });
-            state.ball.x = myAtk ? 0.88 : 0.12; state.ball.y = 0.3 + Math.random() * 0.4;
-          }
-        } else {
-          this._allEvents = this._allEvents || [];
-          this._allEvents.push({ text: `❌ 偏出!`, type: 'miss', min: `${min}'`, isMy: !!myAtk });
-          state.ball.x = myAtk ? 0.9 : 0.1; state.ball.y = Math.random() > 0.5 ? 0.08 : 0.92;
-        }
-        state.goalTicks = state.ticks;
-        return;
+  handleDribbleState(p, myAtk) {
+    const isMy = p.isMy;
+    const goalX = isMy ? 0.95 : 0.05;
+    const goalY = 0.5;
+    let bestX = p.x + (goalX - p.x) * 0.1;
+    let bestY = p.y + (goalY - p.y) * 0.05;
+    const defenders = (isMy ? this.oppTeam : this.myTeam).filter(d => d.role !== 'GK');
+    let avoidX = 0, avoidY = 0;
+    defenders.forEach(d => {
+      const dist = Math.hypot(d.x - p.x, d.y - p.y);
+      if (dist < 0.15) {
+        avoidX -= (d.x - p.x) / dist * 0.05;
+        avoidY -= (d.y - p.y) / dist * 0.05;
       }
-
-      // 传球推进
-      const receivers = atkTeam.filter(p => p !== holder);
-      const target = receivers[rand(0, receivers.length - 1)];
-      if (target) {
-        const passSkill = holder.passing || 55;
-        const dist = Math.hypot(target.x - holder.x, target.y - holder.y);
-        const pressPenalty = this._nearDefenders(holder, defTeam) * 0.1;
-        const passOk = Math.random() < (0.75 + (passSkill - 55) / 200 - dist * 0.5 - pressPenalty);
-        if (passOk) {
-          this._allEvents = this._allEvents || [];
-          this._allEvents.push({ text: `👟 ${holder.name.split(' ').pop()} → ${target.name.split(' ').pop()}`, type: 'pass', min: `${min}'`, isMy: !!myAtk });
-          state.ball.x = target.x; state.ball.y = target.y;
-        } else {
-          const def = defTeam[rand(1, defTeam.length - 1)];
-          this._allEvents = this._allEvents || [];
-          this._allEvents.push({ text: `🚫 拦截! ${def.name.split(' ').pop()}`, type: 'defense', min: `${min}'`, isMy: !myAtk });
-          state.ball.x = def.x; state.ball.y = def.y;
-          state.possession = myAtk ? 'opp' : 'my';
-        }
-        return;
-      }
+    });
+    p.targetX = Math.max(0.05, Math.min(0.95, bestX + avoidX));
+    p.targetY = Math.max(0.1, Math.min(0.9, bestY + avoidY));
+    this.ball.x = p.x;
+    this.ball.y = p.y;
+    this.ball.vx = (p.targetX - p.x) * 2;
+    this.ball.vy = (p.targetY - p.y) * 2;
+    const zone = getZone(p.x, isMy);
+    if (zone === (isMy ? Zone.AWAY_BOX : Zone.HOME_BOX) && Math.random() < 0.3) {
+      p.state = PlayerState.SHOOT;
+      return;
     }
+    const passOption = this.findBestPass(p);
+    if (passOption && Math.random() < 0.2) {
+      p.state = PlayerState.PASS;
+      p.passTarget = passOption;
+      return;
+    }
+    const press = defenders.filter(d => Math.hypot(d.x - p.x, d.y - p.y) < 0.08).length;
+    if (press > 0 && Math.random() < press * 0.15) {
+      this.ball.owner = null;
+      p.state = PlayerState.CHASE_BALL;
+      this.addEvent(`🤺 ${p.name.split(' ').pop()} 被抢断!`, 'defense');
+    }
+  }
 
-    // 球在移动中
-    const speed = Math.hypot(state.ball.vx, state.ball.vy);
-    if (speed < 0.001) {
-      // 球停下，随机给一方
-      const receiver = (Math.random() < 0.5 ? state.my : state.opp)[rand(0, 9)];
-      state.ball.x = receiver.x; state.ball.y = receiver.y;
-      state.possession = receiver.isMy ? 'my' : 'opp';
+  handlePassState(p, myAtk) {
+    if (!p.passTarget) {
+      p.state = PlayerState.DRIBBLE;
+      return;
+    }
+    const target = p.passTarget;
+    p.passesAttempted++;
+    this.stats[p.isMy ? 'my' : 'opp'].passes++;
+    const passSkill = (p.passing + p.vision + p.composure + p.teamwork) / 4;
+    const distance = Math.hypot(target.x - p.x, target.y - p.y);
+    const pressure = this.calculatePressure(p);
+    const baseSuccess = 0.85;
+    const skillMod = (passSkill - 50) / 200;
+    const distPenalty = distance * 0.3;
+    const pressPenalty = pressure * 0.15;
+    const tacticMod = (p.isMy ? this.myTactic : this.oppTactic).passBonus || 1;
+    const successRate = Math.max(0.3, Math.min(0.95, (baseSuccess + skillMod - distPenalty - pressPenalty) * tacticMod));
+    this.ball.owner = null;
+    this.ball.vx = (target.x - p.x) * 3;
+    this.ball.vy = (target.y - p.y) * 3;
+    setTimeout(() => {
+      if (!this.started || this.finished) return;
+      if (Math.random() < successRate) {
+        this.ball.x = target.x;
+        this.ball.y = target.y;
+        this.ball.owner = target;
+        this.ball.vx = 0;
+        this.ball.vy = 0;
+        target.state = PlayerState.RECEIVE_BALL;
+        p.passesCompleted++;
+        this.stats[p.isMy ? 'my' : 'opp'].passesComp++;
+        this.possession.current = target.isMy ? 'my' : 'opp';
+        this.addEvent(`👟 ${p.name.split(' ').pop()} → ${target.name.split(' ').pop()}`, 'pass');
+      } else {
+        const interceptors = (p.isMy ? this.oppTeam : this.myTeam).filter(d => d.role !== 'GK');
+        const interceptor = interceptors[rand(0, interceptors.length - 1)];
+        if (interceptor) {
+          this.ball.x = interceptor.x + (Math.random() - 0.5) * 0.1;
+          this.ball.y = interceptor.y + (Math.random() - 0.5) * 0.1;
+          this.ball.owner = interceptor;
+          this.ball.vx = 0;
+          this.ball.vy = 0;
+          interceptor.state = PlayerState.CHASE_BALL;
+          interceptor.interceptions++;
+          this.possession.current = interceptor.isMy ? 'my' : 'opp';
+          this.addEvent(`🚫 ${interceptor.name.split(' ').pop()} 拦截!`, 'defense');
+        }
+      }
+      p.state = PlayerState.WAIT;
+    }, 400);
+    p.state = PlayerState.WAIT;
+    this.phaseT = 0.5;
+  }
+
+  handleShootState(p, myAtk) {
+    p.shots++;
+    this.stats[p.isMy ? 'my' : 'opp'].shots++;
+    const isMy = p.isMy;
+    const gk = (isMy ? this.oppTeam : this.myTeam)[0];
+    const goalX = isMy ? 0.97 : 0.03;
+    const goalY = 0.4 + Math.random() * 0.2;
+    this.ball.owner = null;
+    this.ball.vx = (goalX - p.x) * 4;
+    this.ball.vy = (goalY - p.y) * 4;
+    this.addEvent(`⚡ ${p.name.split(' ').pop()} 射门!`, 'shot');
+    setTimeout(() => {
+      if (!this.started || this.finished) return;
+      const shootRating = (p.shooting + p.composure + p.decisions) / 3;
+      const gkRating = (gk.defending + 30);
+      const accuracyBase = 0.65;
+      const accuracy = Math.max(0.15, Math.min(0.85, accuracyBase + (shootRating - 50) / 200));
+      if (Math.random() > accuracy) {
+        this.addEvent('❌ 偏出球门!', 'miss');
+        this.ball.x = isMy ? 0.95 : 0.05;
+        this.ball.y = Math.random() > 0.5 ? 0.1 : 0.9;
+        this.ball.vx = 0;
+        this.ball.vy = 0;
+        this.possession.current = isMy ? 'opp' : 'my';
+        this.phaseT = 2;
+        return;
+      }
+      const conversionBase = 0.35;
+      const conversion = Math.max(0.10, Math.min(0.70, conversionBase + (shootRating - gkRating) / 150));
+      if (Math.random() < conversion) {
+        if (isMy) {
+          this.score.my++;
+          p.goals = (p.goals || 0) + 1;
+        } else {
+          this.score.opp++;
+        }
+        this.stats[isMy ? 'my' : 'opp'].shotsOn++;
+        this.addEvent(`⚽ 进球! ${this.score.my}-${this.score.opp}`, 'goal');
+        this.ball.x = goalX;
+        this.ball.y = goalY;
+        this.ball.vx = 0;
+        this.ball.vy = 0;
+        setTimeout(() => {
+          this.ball.x = 0.5;
+          this.ball.y = 0.5;
+          this.ball.owner = null;
+          this.possession.current = isMy ? 'opp' : 'my';
+        }, 2000);
+        this.phaseT = 3;
+      } else {
+        this.stats[isMy ? 'my' : 'opp'].shotsOn++;
+        this.addEvent('🧤 门将扑出!', 'save');
+        this.ball.x = isMy ? 0.9 : 0.1;
+        this.ball.y = 0.3 + Math.random() * 0.4;
+        this.ball.vx = 0;
+        this.ball.vy = 0;
+        this.possession.current = isMy ? 'opp' : 'my';
+        this.phaseT = 2;
+      }
+      p.state = PlayerState.WAIT;
+    }, 600);
+    p.state = PlayerState.WAIT;
+  }
+
+  handleReceiveState(p, myAtk) {
+    const ballDist = Math.hypot(this.ball.x - p.x, this.ball.y - p.y);
+    if (ballDist < 0.05) {
+      this.ball.owner = p;
+      this.ball.x = p.x;
+      this.ball.y = p.y;
+      const zone = getZone(p.x, p.isMy);
+      if (zone === (p.isMy ? Zone.AWAY_BOX : Zone.HOME_BOX)) {
+        p.state = PlayerState.SHOOT;
+      } else {
+        p.state = PlayerState.DRIBBLE;
+      }
     } else {
-      state.ball.x += state.ball.vx / MATCH_FPS;
-      state.ball.y += state.ball.vy / MATCH_FPS;
-      state.ball.vx *= 0.85;
-      state.ball.vy *= 0.85;
-      // 边界反弹
-      if (state.ball.x < 0.03) { state.ball.vx = Math.abs(state.ball.vx) * 0.5; state.ball.x = 0.03; }
-      if (state.ball.x > 0.97) { state.ball.vx = -Math.abs(state.ball.vx) * 0.5; state.ball.x = 0.97; }
-      if (state.ball.y < 0.05) { state.ball.vy = Math.abs(state.ball.vy) * 0.5; state.ball.y = 0.05; }
-      if (state.ball.y > 0.95) { state.ball.vy = -Math.abs(state.ball.vy) * 0.5; state.ball.y = 0.95; }
-
-      // 进攻方向趋势（根据双方实力差）
-      const goalX = myAtk ? 0.97 : 0.03;
-      const trendBias = (atkStr - defStr) * 0.001;
-      state.ball.vx += (goalX - state.ball.x) * 0.03 + trendBias;
-      state.ball.vy += (0.5 - state.ball.y) * 0.02;
+      p.targetX = this.ball.x;
+      p.targetY = this.ball.y;
     }
-
-    // 球员跟随（简化：进攻方前压，防守方回撤）
-    atkTeam.forEach((p, i) => {
-      const target = {
-        x: state.ball.x + (i % 3) * 0.08 * (myAtk ? 1 : -1),
-        y: state.ball.y + (i - 2) * 0.1
-      };
-      target.x = Math.max(0.05, Math.min(0.95, target.x));
-      target.y = Math.max(0.1, Math.min(0.9, target.y));
-      this._moveToward(p, target, 0.08);
-    });
-    defTeam.forEach((p, i) => {
-      const defLine = myAtk ? 0.4 : 0.6;
-      const target = {
-        x: Math.max(0.1, Math.min(0.9, state.ball.x * 0.5 + defLine)),
-        y: state.ball.y + (i - 2) * 0.12
-      };
-      target.y = Math.max(0.1, Math.min(0.9, target.y));
-      this._moveToward(p, target, 0.05);
-    });
-
-    state.ticks++;
   }
 
-  _teamStrength(team, side) {
-    return team.reduce((s, p) => s + (p.overall || 65), 0) / team.length;
+  handleReturnState(p, myAtk) {
+    const distToHome = Math.hypot(p.hx - p.x, p.hy - p.y);
+    if (distToHome < 0.05) {
+      p.state = PlayerState.WAIT;
+      p.vx *= 0.5;
+      p.vy *= 0.5;
+    } else {
+      p.targetX = p.hx;
+      p.targetY = p.hy;
+    }
   }
 
-  _nearDefenders(player, defTeam) {
-    return defTeam.filter(d => Math.hypot(d.x - player.x, d.y - player.y) < 0.15).length;
+  handleSupportState(p, myAtk) {
+    const controller = this.getControllingPlayer(p.isMy);
+    if (!controller) {
+      p.state = PlayerState.WAIT;
+      return;
+    }
+    const goalX = p.isMy ? 0.95 : 0.05;
+    const supportX = controller.x + (goalX - controller.x) * 0.3;
+    const supportY = controller.y + (Math.random() - 0.5) * 0.3;
+    p.targetX = Math.max(0.1, Math.min(0.9, supportX));
+    p.targetY = Math.max(0.1, Math.min(0.9, supportY));
+    const distToTarget = Math.hypot(p.targetX - p.x, p.targetY - p.y);
+    if (distToTarget < 0.08) {
+      p.vx *= 0.3;
+      p.vy *= 0.3;
+    }
   }
 
-  _moveToHome(players) {
-    players.forEach(p => this._moveToward(p, { x: p.hx, y: p.hy }, 0.05));
-  }
-
-  _moveToward(p, target, speed) {
-    const dx = target.x - p.x, dy = target.y - p.y;
-    const dist = Math.hypot(dx, dy);
-    if (dist < 0.005) return;
-    const pace = (p.pace || 70) / 10000;
-    p.x += (dx / dist) * Math.min(speed, pace);
-    p.y += (dy / dist) * Math.min(speed, pace);
-    p.x = Math.max(0.03, Math.min(0.97, p.x));
-    p.y = Math.max(0.05, Math.min(0.95, p.y));
-  }
-
-  // ---- 注入 AllenThomasDev 模拟器事件 ----
-  _injectSimEvents() {
-    try {
-      const simResult = useSimulatorInMatch(
-        this.myTeam.map(p => ({ name: p.name, overall: p.overall || 70, role: p.role, position: p.position })),
-        this.oppTeam.map(p => ({ name: p.name, overall: p.overall || 70, role: p.role, position: p.position })),
-        'FC United', this.oppName
-      );
-      if (!simResult) return;
-      this.events = simResult.events;
-      // 按分钟标记帧
-      this.events.forEach(evt => {
-        const evtMin = parseInt(evt.min) || 0;
-        // 找到对应分钟的帧
-        for (let i = 0; i < this.frames.length; i++) {
-          if (this.frames[i].min === evtMin) {
-            this.frames[i].evt = i; // 标记事件帧
-            this.frames[i].evtData = evt;
-            break;
-          }
-        }
-      });
-      // 同步比分
-      if (simResult.score) {
-        this.score = simResult.score;
-        this.myScore = simResult.score.home;
-        this.oppScore = simResult.score.away;
+  handlePressState(p, myAtk) {
+    const controller = this.getControllingPlayer(!p.isMy);
+    if (!controller) {
+      p.state = PlayerState.RETURN_HOME;
+      return;
+    }
+    const dist = Math.hypot(controller.x - p.x, controller.y - p.y);
+    if (dist < 0.05) {
+      const tackleSkill = p.tackling / 100;
+      const dribbleSkill = controller.dribbling / 100;
+      if (Math.random() < tackleSkill * 0.4 - dribbleSkill * 0.2) {
+        this.ball.owner = p;
+        p.tackles++;
+        this.stats[p.isMy ? 'my' : 'opp'].tackles++;
+        this.possession.current = p.isMy ? 'my' : 'opp';
+        this.addEvent(`🤺 ${p.name.split(' ').pop()} 抢断成功!`, 'defense');
+        p.state = PlayerState.DRIBBLE;
+      } else if (Math.random() < 0.15) {
+        this.addEvent(`⚠️ ${p.name.split(' ').pop()} 犯规!`, 'foul');
+        this.stats[p.isMy ? 'my' : 'opp'].fouls++;
+        this.phaseT = 2;
       }
-      console.log('[MatchEngine] AllenThomasDev 模拟器注入完成:', this.events.length, '个事件');
-    } catch (e) {
-      console.warn('[MatchEngine] 模拟器注入失败:', e);
-    }
-  }
-
-  // ---- 播放阶段（零 AI 计算）----
-  start() {
-    this.playing = true;
-    this.playTick = 0;
-    this.startTime = performance.now();
-    this.lastEvtLen = 0;
-    // 每个现实帧对应 gameTick 数
-    // 270 game-mins × 60 = 16200 game-seconds
-    // 16200 game-seconds / MATCH_REAL_SEC real-seconds = 180 game-sec/real-sec
-    // 180 game-sec / MATCH_FPS ticks/sec = 36 ticks/real-sec
-    this.ticksPerRealSec = (MATCH_DURATION * 60) / MATCH_REAL_SEC;
-  }
-
-  getCurrentFrame() {
-    if (!this.playing || !this.frames.length) return null;
-    const elapsed = (performance.now() - this.startTime) / 1000;
-    const currentTick = Math.min(Math.floor(elapsed * this.ticksPerRealSec), this.frames.length - 1);
-    return this.frames[currentTick];
-  }
-
-  getDisplayTime() {
-    const frame = this.getCurrentFrame();
-    if (!frame) return { min: 0, sec: 0 };
-    return { min: frame.min, sec: frame.sec };
-  }
-
-  isFinished() {
-    if (!this.playing) return false;
-    const elapsed = (performance.now() - this.startTime) / 1000;
-    return elapsed >= MATCH_REAL_SEC;
-  }
-
-  getRenderData() {
-    const frame = this.getCurrentFrame();
-    if (!frame) return null;
-    const myEvents = (this.events || []).filter(e => {
-      const evFrame = this.frames.findIndex(f => f.evt !== null && f.min === frame.min && f.sec >= frame.sec - 1);
-      return true;
-    });
-    return {
-      score: frame.score,
-      min: frame.min,
-      sec: frame.sec,
-      phase: frame.phase,
-      ball: frame.ball,
-      players: [...frame.my, ...frame.opp],
-      events: this.events,
-      possession: frame.possession,
-      stats: this.stats,
-    };
-  }
-}
+    } else {
 </script>
 <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
@@ -1634,10 +1642,6 @@ function startMatch() {
   if(rafId){cancelAnimationFrame(rafId);rafId=null}
   MS = null; tab = 'match'; render();
 
-  // 异步加载模拟器概率数据
-  const simLoad = window.loadMatchOdds ? loadMatchOdds('match-odds.json').catch(()=>null) : Promise.resolve(null);
-
-  simLoad.then(()=>{
   setTimeout(()=>{
     const fp = FP[G.formation]||FP['4-4-2'];
     const myTeam = G.team.slice(0,11).map((p,i)=>{
@@ -1652,49 +1656,40 @@ function startMatch() {
       return {...p, role:pos, isMy:false};
     });
 
-    // v4: 预计算引擎 — 赛前一次性生成，播放零计算
+    // 使用新引擎 v3.0 (状态机实时AI)
     MS = new MatchEngine(myTeam, oppTeam, getLN(oppIdx), Tactics.TIKITAKA, Tactics.COUNTER);
     MS.oppName = getLN(oppIdx);
-    // 兼容别名
-    Object.defineProperty(MS, 'myScore', { get() { return this.score.my; } });
-    Object.defineProperty(MS, 'oppScore', { get() { return this.score.opp; } });
-    Object.defineProperty(MS, 'finished', { get() { return !this.playing; } });
-    MS.start();
-
+    
     render();
-    setTimeout(()=>{rafId=requestAnimationFrame(matchLoopV3)},100);
-  });
+    setTimeout(()=>{lastT=performance.now();rafId=requestAnimationFrame(matchLoopV3)},200);
   });
 }
 
-function matchLoopV3() {
-  if(!MS||!MS.playing){rafId=null;return}
+function matchLoopV3(ts) {
+  if(!MS||!MS.started||MS.finished){rafId=null;return}
+  const dt=Math.min((ts-lastT)/1000,.05);
+  lastT=ts;
+  
+  // 更新引擎（实时AI状态机）
+  MS.update(dt);
+  
+  // 渲染
   drawMatchV3();
-  const evts=(MS.events||[]).length;
-  if(evts!==MS.lastEvtLen){
-    const evtEl=document.getElementById('evts');
-    if(evtEl)evtEl.innerHTML=evtHTML();
-    MS.lastEvtLen=evts;
-  }
-  // 更新 HUD 分数/分钟
-  const f=MS.getCurrentFrame();
-  if(f){
-    const sEl=document.getElementById('scr-my');
-    const oEl=document.getElementById('scr-opp');
-    const mEl=document.getElementById('scr-min');
-    if(sEl)sEl.textContent=f.score.my;
-    if(oEl)oEl.textContent=f.score.opp;
-    if(mEl)mEl.textContent=f.min+"'";
-  }
-  if(MS.isFinished()){
+  
+  // 更新事件显示
+  const evtEl=document.getElementById('evts');
+  if(evtEl)evtEl.innerHTML=evtHTMLV3();
+  
+  // 检查比赛结束
+  if(MS.finished){
     endMatchV3();
-    rafId=null;
     return;
   }
+  
   rafId=requestAnimationFrame(matchLoopV3);
 }
 
-function evtHTML(){
+function evtHTMLV3(){
   if(!MS)return'';
   const colors={goal:'#22c55e',shot:'#f59e0b',foul:'#ef4444',pass:'#3b82f6',info:'#94a3b8',defense:'#a855f7',red:'#dc2626',miss:'#6b7280',save:'#f59e0b',end:'#10b981'};
   return MS.events.slice(0,15).map(e=>`<div style="padding:6px 8px;border-radius:6px;font-size:11px;border-left:3px solid ${colors[e.type]||'#94a3b8'};background:${colors[e.type]||'#94a3b8'}18;margin-bottom:4px"><span style="color:#94a3b8;margin-right:6px">${e.min}</span>${e.txt}</div>`).join('');
@@ -1751,44 +1746,71 @@ function drawMatchV3(){
   if(cvs.width!==W||cvs.height!==H){cvs.width=W;cvs.height=H;_mcCtx=null;}
   if(!_mcCtx||_mcCtx.canvas!==cvs){_mcCtx=cvs.getContext('2d');}
   const c=_mcCtx;
-
+  
   const data=MS.getRenderData();
-  if(!data)return;
 
-  // Grass
+  // Grass with stripes
   c.fillStyle='#2d8a2d';c.fillRect(0,0,W,H);
+  for(let i=0;i<10;i++){c.fillStyle=i%2?'rgba(0,0,0,0.04)':'rgba(255,255,255,0.03)';c.fillRect(i*(W/10),0,W/10,H);}
 
-  // Simple stripes (fewer iterations)
-  for(let i=0;i<10;i+=2){c.fillStyle='rgba(0,0,0,0.03)';c.fillRect(i*(W/10),0,W/10,H);}
+  // Lines
+  c.strokeStyle='rgba(255,255,255,0.6)';c.lineWidth=1.5;
+  c.strokeRect(15,15,W-30,H-30);
+  c.strokeRect(15,H/2-50,40,100);
+  c.strokeRect(W-55,H/2-50,40,100);
+  c.beginPath();c.moveTo(W/2,15);c.lineTo(W/2,H-15);c.stroke();
+  c.beginPath();c.arc(W/2,H/2,35,0,Math.PI*2);c.stroke();
+  c.beginPath();c.arc(W/2,H/2,5,0,Math.PI*2);c.fillStyle='rgba(255,255,255,0.3)';c.fill();
 
-  // Lines (simplified)
-  c.strokeStyle='rgba(255,255,255,0.5)';c.lineWidth=1;
-  c.strokeRect(12,12,W-24,H-24);
-  c.strokeRect(12,H/2-45,35,90);
-  c.strokeRect(W-47,H/2-45,35,90);
-  c.beginPath();c.moveTo(W/2,12);c.lineTo(W/2,H-12);c.stroke();
-  c.beginPath();c.arc(W/2,H/2,30,0,Math.PI*2);c.stroke();
-
-  // Players (simplified - no shadows, fewer state colors)
-  c.font='7px Arial';c.textAlign='center';
+  // Players with state visualization
   data.players.forEach(p=>{
     const bx=p.x*W, by=p.y*H;
-    const col=p.isMy?'#0ea5e9':'#ef4444';
-    c.fillStyle=col;c.beginPath();c.arc(bx,by,7,0,Math.PI*2);c.fill();
-    c.strokeStyle='#fff';c.lineWidth=1;c.stroke();
-    c.fillStyle='#fff';c.fillText((p.name||'').split(' ').pop().substr(0,6),bx,by-10);
+    const isMy=p.isMy;
+    const col=isMy?'#0ea5e9':'#ef4444';
+    const stateCol={wait:'#666',chase:'#f59e0b',dribble:'#22c55e',pass:'#3b82f6',shoot:'#ef4444',receive:'#a855f7',home:'#666',support:'#14b8a6',press:'#f97316'}[p.state]||'#666';
+    
+    // Shadow
+    c.fillStyle='rgba(0,0,0,0.25)';c.beginPath();c.ellipse(bx,by+10,8,3,0,0,Math.PI*2);c.fill();
+    
+    // Player circle
+    c.fillStyle=col;c.beginPath();c.arc(bx,by,8,0,Math.PI*2);c.fill();
+    c.strokeStyle='#fff';c.lineWidth=1.5;c.stroke();
+    
+    // State indicator ring
+    c.strokeStyle=stateCol;c.lineWidth=2;c.beginPath();c.arc(bx,by,10,0,Math.PI*2);c.stroke();
+    
+    // Name
+    c.fillStyle='#fff';c.font='bold 6px Arial';c.textAlign='center';
+    c.fillText((p.name||'').split(' ').pop().substr(0,6),bx,by-12);
+    
+    // Role indicator
+    c.fillStyle='rgba(255,255,255,0.8)';c.font='5px Arial';
+    c.fillText(p.role,bx,by+14);
   });
 
-  // Ball
+  // Ball with trail effect
   const bx=data.ball.x*W, by=data.ball.y*H;
-  c.fillStyle='#fff';c.beginPath();c.arc(bx,by,4,0,Math.PI*2);c.fill();
+  c.fillStyle='rgba(0,0,0,0.25)';c.beginPath();c.ellipse(bx,by+5,5,2,0,0,Math.PI*2);c.fill();
+  c.fillStyle='#fff';c.beginPath();c.arc(bx,by,5,0,Math.PI*2);c.fill();
+  c.strokeStyle='#333';c.lineWidth=0.5;c.stroke();
+  // Ball pattern
+  c.strokeStyle='#666';c.beginPath();c.arc(bx,by,3,0,Math.PI*2);c.stroke();
 
-  // Score HUD (HTML overlay is faster, but keep simple)
-  c.fillStyle='rgba(0,0,0,0.7)';c.fillRect(W/2-50,4,100,20);
-  c.fillStyle='#0ea5e9';c.font='bold 14px Arial';c.textAlign='right';c.fillText(data.score.my,W/2-6,18);
-  c.fillStyle='#fff';c.font='12px Arial';c.textAlign='center';c.fillText('-',W/2,18);
-  c.fillStyle='#ef4444';c.font='bold 14px Arial';c.textAlign='left';c.fillText(data.score.opp,W/2+6,18);
-  c.fillStyle='#94a3b8';c.font='bold 9px Arial';c.textAlign='right';c.fillText(data.min+"'",W/2+44,18);
+  // Score HUD
+  c.fillStyle='rgba(0,0,0,0.7)';c.fillRect(W/2-45,4,90,22);
+  c.fillStyle='#0ea5e9';c.font='bold 14px Arial';c.textAlign='right';c.fillText(data.score.my+'',W/2-6,20);
+  c.fillStyle='#fff';c.font='10px Arial';c.textAlign='center';c.fillText('VS',W/2,20);
+  c.fillStyle='#ef4444';c.font='bold 14px Arial';c.textAlign='left';c.fillText(data.score.opp+'',W/2+6,20);
+  c.fillStyle='#94a3b8';c.font='bold 9px Arial';c.textAlign='right';c.fillText(data.min+"'",W/2+40,20);
+  
+  // Possession bar
+  const totalPoss=data.possession.my+data.possession.opp;
+  if(totalPoss>0){
+    const myPct=data.possession.my/totalPoss;
+    c.fillStyle='rgba(0,0,0,0.5)';c.fillRect(W/2-40,28,80,4);
+    c.fillStyle='#0ea5e9';c.fillRect(W/2-40,28,80*myPct,4);
+    c.fillStyle='#ef4444';c.fillRect(W/2-40+80*myPct,28,80*(1-myPct),4);
+  }
 }
 
 function roundRect(ctx,x,y,w,h,r){ctx.beginPath();ctx.moveTo(x+r,y);ctx.lineTo(x+w-r,y);ctx.quadraticCurveTo(x+w,y,x+w,y+r);ctx.lineTo(x+w,y+h-r);ctx.quadraticCurveTo(x+w,y+h,x+w-r,y+h);ctx.lineTo(x+r,y+h);ctx.quadraticCurveTo(x,y+h,x,y+h-r);ctx.lineTo(x,y+r);ctx.quadraticCurveTo(x,y,x+r,y);ctx.closePath()}
