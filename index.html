@@ -448,6 +448,142 @@ class MatchEngine {
         this.phaseT = 2;
       }
     } else {
+      p.targetX = controller.x;
+      p.targetY = controller.y;
+    }
+  }
+
+  movePlayer(p, dt) {
+    if (p.targetX === undefined || p.targetY === undefined) return;
+    const dx = p.targetX - p.x;
+    const dy = p.targetY - p.y;
+    const dist = Math.hypot(dx, dy);
+    if (dist < 0.01) return;
+    const maxSpeed = (p.pace / 100) * 0.4 * (p.fitness / 100) * 0.8;
+    const accel = 2.0;
+    p.vx += (dx / dist) * accel * dt;
+    p.vy += (dy / dist) * accel * dt;
+    const speed = Math.hypot(p.vx, p.vy);
+    if (speed > maxSpeed) {
+      p.vx = (p.vx / speed) * maxSpeed;
+      p.vy = (p.vy / speed) * maxSpeed;
+    }
+    p.vx *= 0.92;
+    p.vy *= 0.92;
+    p.x += p.vx * dt;
+    p.y += p.vy * dt;
+    p.x = Math.max(0.02, Math.min(0.98, p.x));
+    p.y = Math.max(0.05, Math.min(0.95, p.y));
+    p.distanceRun += speed * dt;
+  }
+
+  updateBall(dt) {
+    this.ball.x += this.ball.vx * dt;
+    this.ball.y += this.ball.vy * dt;
+    this.ball.vx *= 0.96;
+    this.ball.vy *= 0.96;
+    if (this.ball.x < 0.02 || this.ball.x > 0.98) {
+      this.ball.vx *= -0.6;
+      this.ball.x = Math.max(0.02, Math.min(0.98, this.ball.x));
+    }
+    if (this.ball.y < 0.05 || this.ball.y > 0.95) {
+      this.ball.vy *= -0.6;
+      this.ball.y = Math.max(0.05, Math.min(0.95, this.ball.y));
+    }
+  }
+
+  canShoot(p, zone) {
+    const isMy = p.isMy;
+    const inBox = zone === (isMy ? Zone.AWAY_BOX : Zone.HOME_BOX);
+    const inThird = zone === (isMy ? Zone.AWAY_THIRD : Zone.HOME_THIRD);
+    return inBox || (inThird && p.shooting > 75);
+  }
+
+  findBestPass(p) {
+    const teammates = (p.isMy ? this.myTeam : this.oppTeam).filter(t => t.id !== p.id);
+    let bestTarget = null;
+    let bestScore = -1;
+    teammates.forEach(t => {
+      const dist = Math.hypot(t.x - p.x, t.y - p.y);
+      if (dist < 0.1 || dist > 0.5) return;
+      const forwardBonus = (p.isMy ? t.x > p.x : t.x < p.x) ? 0.2 : 0;
+      const openBonus = 0.3 - this.calculatePressureAt(t.x, t.y, !p.isMy) * 0.3;
+      const score = (0.4 - dist) + forwardBonus + openBonus + t.positioning / 200;
+      if (score > bestScore) {
+        bestScore = score;
+        bestTarget = t;
+      }
+    });
+    return bestTarget;
+  }
+
+  calculatePressure(p) {
+    return this.calculatePressureAt(p.x, p.y, !p.isMy);
+  }
+
+  calculatePressureAt(x, y, isMyTeam) {
+    const opponents = (isMyTeam ? this.myTeam : this.oppTeam).filter(o => o.role !== 'GK');
+    let pressure = 0;
+    opponents.forEach(o => {
+      const dist = Math.hypot(o.x - x, o.y - y);
+      if (dist < 0.2) {
+        pressure += (0.2 - dist) / 0.2;
+      }
+    });
+    return Math.min(1, pressure);
+  }
+
+  isClosestToBall(p) {
+    const all = [...this.myTeam, ...this.oppTeam];
+    const myDist = Math.hypot(this.ball.x - p.x, this.ball.y - p.y);
+    return !all.some(other => {
+      if (other.id === p.id) return false;
+      const dist = Math.hypot(this.ball.x - other.x, this.ball.y - other.y);
+      return dist < myDist - 0.02;
+    });
+  }
+
+  getControllingPlayer(isMyTeam) {
+    const team = isMyTeam ? this.myTeam : this.oppTeam;
+    return team.find(p => this.ball.owner && this.ball.owner.id === p.id);
+  }
+
+  generateEvents() {
+    if (Math.random() < 0.001) {
+      const team = Math.random() < 0.5 ? this.myTeam : this.oppTeam;
+      const player = team[rand(1, 10)];
+      if (player) {
+        this.addEvent(`🟥 ${player.name.split(' ').pop()} 红牌!`, 'red');
+        player.redCard = true;
+        this.phaseT = 3;
+      }
+    }
+  }
+
+  addEvent(text, type, minute = null) {
+    const min = minute !== null ? minute : this.min;
+    this.events.unshift({ text, type, min: `${min}'` });
+    if (this.events.length > 20) this.events.pop();
+  }
+
+  endMatch() {
+    this.finished = true;
+    this.started = false;
+    this.addEvent(`🏁 全场结束 ${this.score.my}-${this.score.opp}`, 'end', 90);
+  }
+
+  getRenderData() {
+    return {
+      score: this.score,
+      min: this.min,
+      ball: this.ball,
+      players: [...this.myTeam, ...this.oppTeam],
+      events: this.events,
+      possession: this.possession,
+      stats: this.stats
+    };
+  }
+}
 </script>
 <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
