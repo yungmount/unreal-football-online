@@ -223,8 +223,9 @@ class MatchEngine {
     const isMy = p.isMy;
     const goalX = isMy ? 0.95 : 0.05;
     const goalY = 0.5;
-    let bestX = p.x + (goalX - p.x) * 0.1;
-    let bestY = p.y + (goalY - p.y) * 0.05;
+    // 向球门移动，每帧移动距离的 25%
+    let bestX = p.x + (goalX - p.x) * 0.25;
+    let bestY = p.y + (goalY - p.y) * 0.15;
     const defenders = (isMy ? this.oppTeam : this.myTeam).filter(d => d.role !== 'GK');
     let avoidX = 0, avoidY = 0;
     defenders.forEach(d => {
@@ -458,9 +459,10 @@ class MatchEngine {
     const dx = p.targetX - p.x;
     const dy = p.targetY - p.y;
     const dist = Math.hypot(dx, dy);
-    if (dist < 0.01) return;
-    const maxSpeed = (p.pace / 100) * 0.4 * (p.fitness / 100) * 0.8;
-    const accel = 2.0;
+    if (dist < 0.005) { p.vx *= 0.8; p.vy *= 0.8; return; }
+    // 速度：pace 60-99 映射到 0.8-1.5 场宽/秒
+    const maxSpeed = 0.6 + (p.pace / 100) * 0.9;
+    const accel = 3.0;
     p.vx += (dx / dist) * accel * dt;
     p.vy += (dy / dist) * accel * dt;
     const speed = Math.hypot(p.vx, p.vy);
@@ -468,8 +470,8 @@ class MatchEngine {
       p.vx = (p.vx / speed) * maxSpeed;
       p.vy = (p.vy / speed) * maxSpeed;
     }
-    p.vx *= 0.92;
-    p.vy *= 0.92;
+    p.vx *= 0.95;
+    p.vy *= 0.95;
     p.x += p.vx * dt;
     p.y += p.vy * dt;
     p.x = Math.max(0.02, Math.min(0.98, p.x));
@@ -480,8 +482,8 @@ class MatchEngine {
   updateBall(dt) {
     this.ball.x += this.ball.vx * dt;
     this.ball.y += this.ball.vy * dt;
-    this.ball.vx *= 0.96;
-    this.ball.vy *= 0.96;
+    this.ball.vx *= 0.98;
+    this.ball.vy *= 0.98;
     if (this.ball.x < 0.02 || this.ball.x > 0.98) {
       this.ball.vx *= -0.6;
       this.ball.x = Math.max(0.02, Math.min(0.98, this.ball.x));
@@ -1828,7 +1830,7 @@ function matchLoopV3(ts) {
 function evtHTMLV3(){
   if(!MS)return'';
   const colors={goal:'#22c55e',shot:'#f59e0b',foul:'#ef4444',pass:'#3b82f6',info:'#94a3b8',defense:'#a855f7',red:'#dc2626',miss:'#6b7280',save:'#f59e0b',end:'#10b981'};
-  return MS.events.slice(0,15).map(e=>`<div style="padding:6px 8px;border-radius:6px;font-size:11px;border-left:3px solid ${colors[e.type]||'#94a3b8'};background:${colors[e.type]||'#94a3b8'}18;margin-bottom:4px"><span style="color:#94a3b8;margin-right:6px">${e.min}</span>${e.txt}</div>`).join('');
+  return MS.events.slice(0,15).map(e=>`<div style="padding:6px 8px;border-radius:6px;font-size:11px;border-left:3px solid ${colors[e.type]||'#94a3b8'};background:${colors[e.type]||'#94a3b8'}18;margin-bottom:4px"><span style="color:#94a3b8;margin-right:6px">${e.min}</span>${e.text}</div>`).join('');
 }
 
 function endMatchV3(){
