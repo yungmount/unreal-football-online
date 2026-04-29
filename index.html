@@ -2253,7 +2253,7 @@ function renderMatch(){
     </div>
     <div class="card" style="padding:12px;max-height:180px;overflow-y:auto">
       <div style="font-size:12px;font-weight:700;margin-bottom:8px">📋 事件</div>
-      <div id="evts">${evtHTML()}</div>
+      <div id="evts">${evtHTMLV3()}</div>
     </div>
     ${MS.finished?`<div style="text-align:center;margin-top:16px"><div style="font-size:24px;font-weight:700;margin-bottom:12px;color:${MS.myScore>MS.oppScore?'#22c55e':MS.myScore===MS.oppScore?'#fbbf24':'#ef4444'}">${MS.myScore>MS.oppScore?'🎉 '+t('win'):MS.myScore===MS.oppScore?'🤝 '+t('draw'):'😢 '+t('lose')}</div><button onclick="tab='home';MS=null;render()" class="btn btn-g">${t('back')}</button></div>`:''}
   `;
