@@ -674,7 +674,7 @@ class LPCPlayerGenerator {
       'legs__pants__male__idle.png',
       'legs__shorts__shorts__male__idle.png',
       'feet__boots__basic__male__idle.png',
-      'torso__clothes__shortsleeve__shortsleeves__male__idle.png',
+      'torso__clothes__shortsleeve__shortsleeve__male__idle.png',
     ];
     await this.loader.loadBatch(commonSprites);
   }
@@ -897,9 +897,12 @@ class LPCPlayerGenerator {
       frame: frameIndex,
     });
 
-    // 8. 球衣 (球队颜色) - 使用短袖
+    // 8. 球衣 (球队颜色)
+    const jerseySprite = appearance.jerseyStyle === 'longsleeve'
+      ? `torso__clothes__longsleeve__longsleeve2__${bodySuffix}__${animation}.png`
+      : `torso__clothes__shortsleeve__shortsleeve__${bodySuffix}__${animation}.png`;
     layers.push({
-      sprite: `torso__clothes__${appearance.jerseyStyle}__shortsleeve__shortsleeves__${bodySuffix}__${animation}.png`,
+      sprite: jerseySprite,
       z: LPC.Z_LAYERS.TORSO,
       palette: LPC_PALETTES.cloth[appearance.jerseyColor] || LPC_PALETTES.cloth.red,
       sourcePalette: LPC_PALETTES.cloth.white,
