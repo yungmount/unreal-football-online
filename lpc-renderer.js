@@ -628,6 +628,30 @@ class LPCComposer {
       }
     }
 
+    // 处理球衣图案叠加
+    const patternLayers = layers.filter(l => l.type === 'pattern');
+    for (const patternLayer of patternLayers) {
+      try {
+        // 创建图案覆盖
+        const patternCanvas = this.createJerseyPattern(
+          patternLayer.pattern,
+          patternLayer.secondaryColor,
+          width,
+          height
+        );
+        if (patternCanvas) {
+          // 使用叠加模式混合
+          ctx.globalCompositeOperation = 'multiply';
+          ctx.globalAlpha = 0.5;
+          ctx.drawImage(patternCanvas, 0, 0);
+          ctx.globalCompositeOperation = 'source-over';
+          ctx.globalAlpha = 1;
+        }
+      } catch (e) {
+        console.warn('Pattern overlay failed:', e);
+      }
+    }
+
     return canvas;
   }
 
@@ -730,10 +754,26 @@ class LPCPlayerGenerator {
     const eyeColors = ['brown', 'blue', 'green', 'gray'];
     const eyeColor = playerData.eyeColor || eyeColors[Math.floor(rng() * eyeColors.length)];
 
-    // 球队颜色
-    const jerseyColor = teamData.primaryColor || 'red';
-    const shortsColor = teamData.secondaryColor || 'white';
-    const bootsColor = teamData.bootsColor || 'black';
+    // ========== 球衣自定义系统 ==========
+    // 如果有球衣自定义配置，使用它；否则用默认颜色
+    let jerseyColor, shortsColor, bootsColor;
+    let jerseyPattern = null;
+    let jerseyStyle = 'shortsleeve';
+
+    if (teamData.jerseyConfig) {
+      // 使用球衣自定义系统
+      const jc = teamData.jerseyConfig;
+      jerseyColor = jc.primaryColor || 'red';
+      shortsColor = jc.shortsColor || jc.secondaryColor || 'white';
+      bootsColor = jc.bootsColor || 'black';
+      jerseyPattern = jc.pattern || null;
+      jerseyStyle = jc.jerseyStyle || 'shortsleeve';
+    } else {
+      // 兼容旧的简单颜色配置
+      jerseyColor = teamData.primaryColor || 'red';
+      shortsColor = teamData.secondaryColor || 'white';
+      bootsColor = teamData.bootsColor || 'black';
+    }
 
     // 短裤风格
     const shortsStyles = config.SHORTS_STYLES;
@@ -742,10 +782,6 @@ class LPCPlayerGenerator {
     // 球鞋风格
     const bootsStyles = config.BOOTS_STYLES;
     const bootsStyle = playerData.bootsStyle || bootsStyles[Math.floor(rng() * bootsStyles.length)];
-
-    // 球衣风格 (短袖为主)
-    const jerseyStyles = config.JERSEY_STYLES;
-    const jerseyStyle = playerData.jerseyStyle || jerseyStyles[Math.floor(rng() * jerseyStyles.length)];
 
     return {
       bodyType,
@@ -762,6 +798,7 @@ class LPCPlayerGenerator {
       shortsStyle,
       bootsStyle,
       jerseyStyle,
+      jerseyPattern, // 新增：图案类型
       // 球衣号码
       jerseyNumber: playerData.jerseyNumber || Math.floor(rng() * 99) + 1,
       // 守门员
@@ -897,7 +934,7 @@ class LPCPlayerGenerator {
       frame: frameIndex,
     });
 
-    // 8. 球衣 (球队颜色)
+     // 8. 球衣 (球队颜色)
     const jerseySprite = appearance.jerseyStyle === 'longsleeve'
       ? `torso__clothes__longsleeve__longsleeve2__${bodySuffix}__${animation}.png`
       : `torso__clothes__shortsleeve__shortsleeve__${bodySuffix}__${animation}.png`;
@@ -908,7 +945,20 @@ class LPCPlayerGenerator {
       sourcePalette: LPC_PALETTES.cloth.white,
       row: direction,
       frame: frameIndex,
+      isJersey: true, // 标记为球衣层
     });
+
+    // 8.5 球衣图案叠加 (如果有)
+    if (appearance.jerseyPattern && appearance.jerseyPattern !== 'solid') {
+      layers.push({
+        type: 'pattern',
+        pattern: appearance.jerseyPattern,
+        secondaryColor: appearance.secondaryColor || appearance.jerseyColor,
+        z: LPC.Z_LAYERS.TORSO + 1,
+        row: direction,
+        frame: frameIndex,
+      });
+    }
 
     // 9. 守门员手套
     if (appearance.isGoalkeeper) {
@@ -1126,6 +1176,136 @@ class LPCPlayerGenerator {
       s = Math.sin(s) * 10000;
       return s - Math.floor(s);
     };
+  }
+
+  /**
+   * 创建球衣图案
+   * @param {string} patternType - 图案类型
+   * @param {string} secondaryColor - 次色
+   * @param {number} width - 宽度
+   * @param {number} height - 高度
+   * @returns {HTMLCanvasElement|null}
+   */
+  createJerseyPattern(patternType, secondaryColor, width, height) {
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext('2d');
+
+    // 定义球衣区域 (LPC 精灵图中身体部分的大致区域)
+    // 躯干区域: 约从 y=25 到 y=55, x=20 到 x=44
+    const jerseyBounds = {
+      x: width * 0.3,
+      y: height * 0.4,
+      w: width * 0.4,
+      h: height * 0.25
+    };
+
+    const hex = this.hexToTeamColor(secondaryColor);
+    ctx.fillStyle = hex;
+
+    switch (patternType) {
+      case 'horizontal_stripes':
+        const stripeH = jerseyBounds.h / 5;
+        for (let i = 0; i < 5; i += 2) {
+          ctx.fillRect(jerseyBounds.x, jerseyBounds.y + i * stripeH, jerseyBounds.w, stripeH);
+        }
+        break;
+
+      case 'vertical_stripes':
+        const stripeW = jerseyBounds.w / 7;
+        for (let i = 0; i < 7; i += 2) {
+          ctx.fillRect(jerseyBounds.x + i * stripeW, jerseyBounds.y, stripeW, jerseyBounds.h);
+        }
+        break;
+
+      case 'diagonal_stripes':
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(jerseyBounds.x, jerseyBounds.y, jerseyBounds.w, jerseyBounds.h);
+        ctx.clip();
+        const gap = jerseyBounds.w / 4;
+        for (let i = -jerseyBounds.h; i < jerseyBounds.w + jerseyBounds.h; i += gap * 2) {
+          ctx.beginPath();
+          ctx.moveTo(jerseyBounds.x + i, jerseyBounds.y);
+          ctx.lineTo(jerseyBounds.x + i + gap, jerseyBounds.y);
+          ctx.lineTo(jerseyBounds.x + i + gap - jerseyBounds.h, jerseyBounds.y + jerseyBounds.h);
+          ctx.lineTo(jerseyBounds.x + i - jerseyBounds.h, jerseyBounds.y + jerseyBounds.h);
+          ctx.closePath();
+          ctx.fill();
+        }
+        ctx.restore();
+        break;
+
+      case 'hoops':
+        const hoopH = jerseyBounds.h / 4;
+        ctx.fillRect(jerseyBounds.x, jerseyBounds.y + hoopH, jerseyBounds.w, hoopH);
+        break;
+
+      case 'v_neck':
+        ctx.beginPath();
+        ctx.moveTo(jerseyBounds.x + jerseyBounds.w * 0.3, jerseyBounds.y);
+        ctx.lineTo(jerseyBounds.x + jerseyBounds.w * 0.5, jerseyBounds.y + jerseyBounds.h * 0.5);
+        ctx.lineTo(jerseyBounds.x + jerseyBounds.w * 0.7, jerseyBounds.y);
+        ctx.lineTo(jerseyBounds.x + jerseyBounds.w * 0.7, jerseyBounds.y + jerseyBounds.h * 0.3);
+        ctx.lineTo(jerseyBounds.x + jerseyBounds.w * 0.3, jerseyBounds.y + jerseyBounds.h * 0.3);
+        ctx.closePath();
+        ctx.fill();
+        break;
+
+      case 'sleeve_cuffs':
+        // 左袖口
+        ctx.fillRect(jerseyBounds.x, jerseyBounds.y, jerseyBounds.w * 0.15, jerseyBounds.h * 0.15);
+        // 右袖口
+        ctx.fillRect(jerseyBounds.x + jerseyBounds.w * 0.85, jerseyBounds.y, jerseyBounds.w * 0.15, jerseyBounds.h * 0.15);
+        break;
+
+      case 'chest_band':
+        ctx.fillRect(jerseyBounds.x + jerseyBounds.w * 0.1, jerseyBounds.y + jerseyBounds.h * 0.4, jerseyBounds.w * 0.8, jerseyBounds.h * 0.15);
+        break;
+
+      case 'shoulder_blocks':
+        ctx.fillRect(jerseyBounds.x, jerseyBounds.y, jerseyBounds.w * 0.25, jerseyBounds.h * 0.2);
+        ctx.fillRect(jerseyBounds.x + jerseyBounds.w * 0.75, jerseyBounds.y, jerseyBounds.w * 0.25, jerseyBounds.h * 0.2);
+        break;
+
+      case 'sash':
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(jerseyBounds.x, jerseyBounds.y, jerseyBounds.w, jerseyBounds.h);
+        ctx.clip();
+        ctx.beginPath();
+        ctx.moveTo(jerseyBounds.x + jerseyBounds.w * 0.6, jerseyBounds.y);
+        ctx.lineTo(jerseyBounds.x + jerseyBounds.w, jerseyBounds.y);
+        ctx.lineTo(jerseyBounds.x + jerseyBounds.w * 0.4, jerseyBounds.y + jerseyBounds.h);
+        ctx.lineTo(jerseyBounds.x, jerseyBounds.y + jerseyBounds.h);
+        ctx.closePath();
+        ctx.fill();
+        ctx.restore();
+        break;
+
+      case 'checkered':
+        const cellW = jerseyBounds.w / 4;
+        const cellH = jerseyBounds.h / 4;
+        for (let x = 0; x < 4; x++) {
+          for (let y = 0; y < 4; y++) {
+            if ((x + y) % 2 === 0) {
+              ctx.fillRect(jerseyBounds.x + x * cellW, jerseyBounds.y + y * cellH, cellW, cellH);
+            }
+          }
+        }
+        break;
+
+      case 'quartered':
+        ctx.fillRect(jerseyBounds.x, jerseyBounds.y, jerseyBounds.w * 0.5, jerseyBounds.h * 0.5);
+        ctx.fillRect(jerseyBounds.x + jerseyBounds.w * 0.5, jerseyBounds.y + jerseyBounds.h * 0.5, jerseyBounds.w * 0.5, jerseyBounds.h * 0.5);
+        break;
+
+      default:
+        return null;
+    }
+
+    return canvas;
   }
 
   /**
