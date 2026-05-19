@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>球衣自定义系统演示</title>
+<style>
+* { font-family: 'Segoe UI', Arial, sans-serif; box-sizing: border-box; }
+body { margin: 0; background: linear-gradient(135deg, #0a0a1a, #1a1a3a); color: #fff; min-height: 100vh; padding: 20px; }
+h1 { text-align: center; margin-bottom: 30px; }
+.container { max-width: 1200px; margin: 0 auto; display: grid; grid-template-columns: 300px 1fr; gap: 30px; }
+.controls { background: rgba(255,255,255,0.1); padding: 20px; border-radius: 12px; }
+.control-group { margin-bottom: 15px; }
+.control-group label { display: block; margin-bottom: 5px; font-size: 12px; color: #aaa; }
+.control-group select, .control-group input { width: 100%; padding: 8px; border: 1px solid #444; border-radius: 6px; background: #222; color: #fff; }
+.preview { display: flex; flex-direction: column; align-items: center; }
+.player-card { width: 200px; height: 300px; background: linear-gradient(145deg, #1e293b, #0f172a); border-radius: 12px; border: 3px solid; overflow: hidden; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+.player-card canvas { image-rendering: pixelated; }
+.player-name { font-size: 14px; font-weight: bold; margin-top: 10px; }
+.player-info { font-size: 11px; color: #aaa; }
+.random-btn { margin-top: 20px; padding: 12px 24px; font-size: 14px; background: linear-gradient(135deg, #00d4ff, #0099cc); border: none; border-radius: 8px; color: #000; font-weight: bold; cursor: pointer; }
+.random-btn:hover { transform: scale(1.05); }
+.gallery { margin-top: 30px; display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 10px; }
+.gallery-item { background: rgba(255,255,255,0.05); border-radius: 8px; padding: 10px; cursor: pointer; transition: all 0.2s; }
+.gallery-item:hover { background: rgba(255,255,255,0.1); transform: scale(1.05); }
+.gallery-item canvas { width: 64px; height: 64px; image-rendering: pixelated; }
+.stats { background: rgba(0,212,255,0.1); padding: 15px; border-radius: 8px; margin-top: 20px; font-size: 12px; }
+.stats strong { color: #00d4ff; }
+</style>
+</head>
+<body>
+<h1>🧥 球衣自定义系统演示</h1>
+
+<div class="container">
+  <div class="controls">
+    <div class="control-group">
+      <label>球衣主色</label>
+      <select id="primaryColor">
+        <option value="red">红色</option>
+        <option value="blue">蓝色</option>
+        <option value="green">绿色</option>
+        <option value="yellow">黄色</option>
+        <option value="orange">橙色</option>
+        <option value="purple">紫色</option>
+        <option value="navy">深蓝</option>
+        <option value="maroon">栗色</option>
+        <option value="teal">青色</option>
+        <option value="white">白色</option>
+        <option value="black">黑色</option>
+        <option value="pink">粉色</option>
+        <option value="lavender">淡紫</option>
+        <option value="forest">森林绿</option>
+        <option value="tan">棕色</option>
+      </select>
+    </div>
+    
+    <div class="control-group">
+      <label>球衣次色 (图案颜色)</label>
+      <select id="secondaryColor">
+        <option value="white">白色</option>
+        <option value="black">黑色</option>
+        <option value="red">红色</option>
+        <option value="blue">蓝色</option>
+        <option value="yellow">黄色</option>
+        <option value="navy">深蓝</option>
+      </select>
+    </div>
+    
+    <div class="control-group">
+      <label>球衣图案</label>
+      <select id="pattern">
+        <option value="solid">纯色</option>
+        <option value="horizontal_stripes">横条纹</option>
+        <option value="vertical_stripes">竖条纹</option>
+        <option value="diagonal_stripes">斜条纹</option>
+        <option value="hoops">环纹</option>
+        <option value="v_neck">V领色块</option>
+        <option value="sleeve_cuffs">袖口色块</option>
+        <option value="chest_band">胸前色带</option>
+        <option value="shoulder_blocks">肩部色块</option>
+        <option value="sash">斜带</option>
+        <option value="checkered">格子</option>
+        <option value="quartered">四分格</option>
+      </select>
+    </div>
+    
+    <div class="control-group">
+      <label>球衣款式</label>
+      <select id="jerseyStyle">
+        <option value="shortsleeve">短袖</option>
+        <option value="longsleeve">长袖</option>
+      </select>
+    </div>
+    
+    <div class="control-group">
+      <label>短裤颜色</label>
+      <select id="shortsColor">
+        <option value="white">白色</option>
+        <option value="black">黑色</option>
+        <option value="red">红色</option>
+        <option value="blue">蓝色</option>
+        <option value="navy">深蓝</option>
+      </select>
+    </div>
+    
+    <div class="control-group">
+      <label>球袜颜色</label>
+      <select id="socksColor">
+        <option value="white">白色</option>
+        <option value="black">黑色</option>
+        <option value="red">红色</option>
+        <option value="blue">蓝色</option>
+      </select>
+    </div>
+    
+    <div class="control-group">
+      <label>号码颜色</label>
+      <select id="numberColor">
+        <option value="white">白色</option>
+        <option value="black">黑色</option>
+        <option value="yellow">黄色</option>
+      </select>
+    </div>
+    
+    <div class="control-group">
+      <label>预设球队</label>
+      <select id="preset">
+        <option value="">自定义</option>
+        <option value="man_united">曼联</option>
+        <option value="liverpool">利物浦</option>
+        <option value="arsenal">阿森纳</option>
+        <option value="chelsea">切尔西</option>
+        <option value="barcelona">巴塞罗那</option>
+        <option value="real_madrid">皇家马德里</option>
+        <option value="bayern">拜仁慕尼黑</option>
+        <option value="juventus">尤文图斯</option>
+      </select>
+    </div>
+    
+    <button class="random-btn" onclick="randomize()">🎲 随机生成</button>
+    
+    <div class="stats">
+      <strong>理论组合数：</strong><span id="totalCombos">7,812,500+</span><br>
+      <strong>当前唯一ID：</strong><span id="currentId">-</span>
+    </div>
+  </div>
+  
+  <div class="preview">
+    <div class="player-card" id="playerCard">
+      <canvas id="playerCanvas" width="64" height="64"></canvas>
+      <div class="player-name" id="playerName">Messi</div>
+      <div class="player-info" id="playerInfo">RW • 99</div>
+    </div>
+    
+    <button class="random-btn" onclick="generateBatch()">📋 批量生成10个</button>
+    
+    <div class="gallery" id="gallery"></div>
+  </div>
+</div>
+
+<script src="lpc-renderer.js"></script>
+<script src="jersey-customizer.js"></script>
+<script>
+let generator, customizer;
+let currentConfig = {};
+
+async function init() {
+  generator = new LPCPlayerGenerator();
+  customizer = new JerseyCustomizer();
+  
+  // 监听控制变化
+  document.querySelectorAll('select').forEach(el => {
+    el.addEventListener('change', updatePreview);
+  });
+  
+  await updatePreview();
+}
+
+async function updatePreview() {
+  const primary = document.getElementById('primaryColor').value;
+  const secondary = document.getElementById('secondaryColor').value;
+  const pattern = document.getElementById('pattern').value;
+  const style = document.getElementById('jerseyStyle').value;
+  const shorts = document.getElementById('shortsColor').value;
+  const socks = document.getElementById('socksColor').value;
+  const number = document.getElementById('numberColor').value;
+  const preset = document.getElementById('preset').value;
+  
+  // 应用预设
+  if (preset) {
+    const presetConfig = customizer.fromPreset(preset);
+    document.getElementById('primaryColor').value = presetConfig.primaryColor;
+    document.getElementById('secondaryColor').value = presetConfig.secondaryColor;
+    document.getElementById('pattern').value = presetConfig.pattern;
+    document.getElementById('shortsColor').value = presetConfig.shortsColor;
+    document.getElementById('socksColor').value = presetConfig.socksColor;
+  }
+  
+  currentConfig = {
+    primaryColor: preset ? customizer.PRESETS[preset]?.primary : primary,
+    secondaryColor: secondary,
+    pattern: pattern,
+    jerseyStyle: style,
+    shortsColor: shorts,
+    socksColor: socks,
+    numberColor: number,
+  };
+  
+  const teamData = {
+    primaryColor: currentConfig.primaryColor,
+    secondaryColor: currentConfig.secondaryColor,
+    jerseyConfig: currentConfig,
+  };
+  
+  const playerData = {
+    name: 'Player',
+    position: 'MID',
+    rating: 85,
+    jerseyNumber: Math.floor(Math.random() * 99) + 1,
+  };
+  
+  // 生成球员卡片
+  const cardCanvas = await generator.generatePlayerCard(playerData, teamData);
+  
+  // 显示
+  const container = document.getElementById('playerCard');
+  container.innerHTML = '';
+  container.style.borderColor = customizer.getColorHex(currentConfig.primaryColor);
+  container.appendChild(cardCanvas);
+  
+  // 计算唯一ID
+  const uniqueness = customizer.calculateUniqueness(currentConfig);
+  document.getElementById('currentId').textContent = `#${uniqueness}`;
+}
+
+async function randomize() {
+  const config = customizer.generateRandom();
+  
+  document.getElementById('primaryColor').value = config.primaryColor;
+  document.getElementById('secondaryColor').value = config.secondaryColor;
+  document.getElementById('pattern').value = config.pattern;
+  document.getElementById('jerseyStyle').value = config.jerseyStyle;
+  document.getElementById('shortsColor').value = config.shortsColor;
+  document.getElementById('socksColor').value = config.socksColor;
+  document.getElementById('numberColor').value = config.numberColor;
+  document.getElementById('preset').value = '';
+  
+  await updatePreview();
+}
+
+async function generateBatch() {
+  const gallery = document.getElementById('gallery');
+  gallery.innerHTML = '';
+  
+  for (let i = 0; i < 10; i++) {
+    const config = customizer.generateRandom();
+    const teamData = {
+      primaryColor: config.primaryColor,
+      jerseyConfig: config,
+    };
+    
+    const playerData = {
+      name: `Player ${i + 1}`,
+      jerseyNumber: Math.floor(Math.random() * 99) + 1,
+    };
+    
+    const sprite = await generator.generatePlayerSprite(
+      generator.generateAppearance(playerData, teamData),
+      'idle', 3, false, 0
+    );
+    
+    const item = document.createElement('div');
+    item.className = 'gallery-item';
+    item.appendChild(sprite);
+    gallery.appendChild(item);
+  }
+}
+
+init();
+</script>
+</body>
+</html>
