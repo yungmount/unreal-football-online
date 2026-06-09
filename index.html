@@ -11,6 +11,8 @@
 <script src="lpc-renderer.js"></script>
 <!-- 球衣自定义系统 -->
 <script src="jersey-customizer.js"></script>
+<!-- 像素风格UI系统 -->
+<script src="pixel-ui.js"></script>
 <!-- match-simulator.js 已弃用，使用内置状态机引擎 -->
 <script>
 // ---- Utils (must be before engine) ----
@@ -590,34 +592,9 @@ class MatchEngine {
 }
 </script>
 <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-<style>
-*{font-family:'Inter',sans-serif;-webkit-tap-highlight-color:transparent;user-select:none;box-sizing:border-box}
-body{margin:0;background:linear-gradient(135deg,#0a0a1a,#1a1a3a);color:#fff;min-height:100vh;overflow-x:hidden}
-.gt{font-family:'Orbitron',sans-serif}
-.card{background:linear-gradient(145deg,rgba(30,41,59,.9),rgba(15,23,42,.95));border:1px solid rgba(0,212,255,.2);border-radius:16px}
-.btn{border:none;border-radius:12px;padding:10px 16px;font-weight:700;cursor:pointer;transition:all .2s;letter-spacing:.5px;font-size:13px}
-.btn-c{background:linear-gradient(135deg,#00d4ff,#0099cc);color:#000;box-shadow:0 4px 15px rgba(0,212,255,.3)}
-.btn-g{background:linear-gradient(135deg,#ffd700,#b8860b);color:#000;box-shadow:0 4px 15px rgba(255,215,0,.4)}
-.btn-gr{background:linear-gradient(135deg,#22c55e,#16a34a);color:#fff}
-.btn-r{background:linear-gradient(135deg,#ef4444,#dc2626);color:#fff}
-.btn-p{background:linear-gradient(135deg,#9333ea,#7c3aed);color:#fff}
-.btn:active{transform:scale(.95)}
-.pcard{background:linear-gradient(145deg,#1e293b,#0f172a);border:1px solid rgba(255,215,0,.3);border-radius:12px;padding:12px;cursor:pointer;transition:all .2s;position:relative}
-.pcard::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,#ffd700,#00d4ff,#ffd700);border-radius:12px 12px 0 0}
-.pcard:active{transform:scale(.98)}
-.sbar{height:6px;border-radius:3px;background:rgba(0,0,0,.5);overflow:hidden}
-.sfill{height:100%;border-radius:3px}
-.nav-btn{display:flex;flex-direction:column;align-items:center;padding:8px 12px;color:rgba(255,255,255,.5);cursor:pointer;transition:all .2s;background:none;border:none}
-.nav-btn.on{color:#00d4ff}
-.toast{position:fixed;top:80px;left:50%;transform:translateX(-50%);background:linear-gradient(135deg,rgba(34,197,94,.95),rgba(22,163,74,.95));padding:12px 24px;border-radius:30px;font-weight:600;z-index:100;white-space:nowrap}
-@keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
-.pulse{animation:pulse 1s infinite}
-@keyframes spin3d{from{transform:rotateY(0deg)}to{transform:rotateY(360deg)}}
-.spin3d{animation:spin3d 6s linear infinite;transform-style:preserve-3d}
-canvas{display:block}
-</style>
+<link rel="stylesheet" href="pixel-ui.css">
 </head>
-<body>
+<body class="px-crt">
 <div id="app"></div>
 <script>
 // ============================================================
@@ -2068,26 +2045,9 @@ function getVoxelAvatarHTML(player, size) {
   return `<div id="${aid}" data-player='${JSON.stringify(player).replace(/'/g,"&apos;")}' data-avatar="1" style="width:${size}px;height:${size}px;border-radius:12px;overflow:hidden;border:2px solid rgba(0,212,255,.4);flex-shrink:0"></div>`;
 }
 
+// 球员卡片HTML (兼容旧代码)
 function pCardHTML(p,showSign,showPrice){
-  return `<div class="pcard" onclick="selPlayer=${JSON.stringify(p).replace(/"/g,'&quot;')};tab='playerDetail';render()" style="margin-bottom:8px">
-    <div style="display:flex;justify-content:space-between;align-items:center">
-      <div style="display:flex;align-items:center;gap:10px">
-        ${getVoxelAvatarHTML(p,44)}
-        <div>
-          <div style="font-weight:700;font-size:13px">${p.name}</div>
-          <div style="font-size:11px;color:#94a3b8">${p.age}岁 · ${p.position} · ${p.region}</div>
-        </div>
-      </div>
-      <div style="text-align:right">
-        <div class="gt" style="font-size:24px;font-weight:700;color:${p.ovr>=75?'#00d4ff':p.ovr>=65?'#22c55e':'#94a3b8'}">${p.ovr}</div>
-        ${showPrice?`<div style="font-size:11px;color:#fbbf24">${fmt(p.askPrice)}</div>`:''}
-      </div>
-    </div>
-    ${showSign?`<div style="display:flex;gap:6px;margin-top:8px">
-      <button onclick="event.stopPropagation();signP('${p.id}')" class="btn btn-gr" style="flex:1;font-size:11px;padding:7px">✅ ${t('sign')}</button>
-      <button onclick="event.stopPropagation();rejectP('${p.id}')" class="btn btn-r" style="flex:1;font-size:11px;padding:7px">❌ ${t('reject')}</button>
-    </div>`:''}
-  </div>`;
+  return PixelUI.playerCard(p, {showSign, showPrice});
 }
 
 function renderDetail(){
